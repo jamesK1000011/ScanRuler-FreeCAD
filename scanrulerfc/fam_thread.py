@@ -165,7 +165,16 @@ def read_for_agent_link(session, args):
 
 
 def register():
+    # Agent Link API 1: a reader of kind "thread_scan", whoever answers
+    # thread_identify { scan } (Workshop's Make add-on since 14 Nov 2026).
     try:
+        from agentlink import hooks
+    except ImportError:
+        hooks = None
+    if hooks is not None:
+        hooks.register_reader("thread_scan", read_for_agent_link)
+        return
+    try:  # an Agent Link from before the hooks
         from agentlink.families import thread
     except ImportError:
         return

@@ -50,6 +50,18 @@ class DfmWall(unittest.TestCase):
 
     def test_registered_in_the_check(self):
         import scanrulerfc.agentlink_families  # noqa: F401
+
+        try:
+            from agentlink import hooks
+        except ImportError:
+            hooks = None
+        if hooks is not None:
+            from scanrulerfc import dfm_wall
+
+            self.assertIn(dfm_wall.read, hooks.readers("wall"))
+            w = hooks.read("wall", Part.makeBox(30, 30, 2))
+            self.assertIn("ScanRuler", w.get("by", ""))
+            return
         from agentlink import printability
 
         if not hasattr(printability, "WALL_READERS"):
