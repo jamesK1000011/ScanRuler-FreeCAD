@@ -5,6 +5,8 @@ ScanRuler's measuring of 3D scans, ported to FreeCAD from **ScanRuler by
 CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
 Licensed AGPL-3.0-only, the same as ScanRuler.
 
+Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of FreeCAD Agent Link installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
+
 It adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:
 it loads any package on the path that holds an `agentlink_families` module
@@ -108,3 +110,11 @@ part review, setups, BumpMesh texturing (`texture_prepare`,
 Not ported yet: patent kit (TechDraw does most of it),
 and the electronics pages (KiCad's own tools and KiCad StepUp cover the
 board).
+
+## Tests
+
+`python -m unittest discover -s tests` with Agent Link
+(github.com/jamesK1000011/FreeCAD-AgentLink) and this folder on `PYTHONPATH`.
+The tests that need FreeCAD skip without it. CI (`.github/workflows/ci.yml`)
+runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
+out beside it.
