@@ -1,11 +1,13 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # ScanRuler for FreeCAD
 
+> An independent port: not an official CNC Kitchen or FreeCAD project, and not endorsed by the FreeCAD project association (FPA), whose trademark FreeCAD is.
+
 ScanRuler's measuring of 3D scans, ported to FreeCAD from **ScanRuler by
 CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
 Licensed AGPL-3.0-only, the same as ScanRuler.
 
-Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of FreeCAD Agent Link installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
+Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of Agent Link for FreeCAD installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
 
 It adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:
@@ -114,7 +116,7 @@ board).
 ## Tests
 
 `python -m unittest discover -s tests` with Agent Link
-(github.com/jamesK1000011/FreeCAD-AgentLink) and this folder on `PYTHONPATH`.
+(github.com/jamesK1000011/AgentLink-FreeCAD) and this folder on `PYTHONPATH`.
 The tests that need FreeCAD skip without it. CI (`.github/workflows/ci.yml`)
 runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
 out beside it.

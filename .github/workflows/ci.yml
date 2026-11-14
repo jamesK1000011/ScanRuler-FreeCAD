@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5
         with:
-          repository: jamesK1000011/FreeCAD-AgentLink
+          repository: jamesK1000011/AgentLink-FreeCAD
           path: agentlink-addon
       - uses: mamba-org/setup-micromamba@v2
         with:
