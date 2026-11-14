@@ -98,7 +98,16 @@ def read(shape, spacing=1.5, reach=12.0, cap=2500, cone_rays=8):
 
 
 def register():
+    # Agent Link API 1: a reader of kind "wall", whoever asks for the
+    # thinnest wall (the DFM check, Workshop's Make add-on since 14 Nov 2026).
     try:
+        from agentlink import hooks
+    except ImportError:
+        hooks = None
+    if hooks is not None:
+        hooks.register_reader("wall", read)
+        return
+    try:  # an Agent Link from before the hooks
         from agentlink import printability
     except ImportError:
         return
