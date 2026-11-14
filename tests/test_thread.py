@@ -140,6 +140,9 @@ class Tools(unittest.TestCase):
 
         d = tempfile.mkdtemp()
         server = build_server(Session(out_dir=d), lean=False)
+        # thread_identify is Workshop for FreeCAD's (Make) since 14 Nov 2026.
+        if "thread_identify" not in server.tools:
+            self.skipTest("no add-on with thread_identify beside Agent Link (Workshop Make)")
 
         def call(n, a=None):
             r = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": n, "arguments": a or {}}})["result"]
