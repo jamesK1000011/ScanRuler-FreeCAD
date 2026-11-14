@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# ScanRuler for FreeCAD's own tests, on the newest FreeCAD conda-forge has
+# and the newest 1.1 and 1.0, with Agent Link (the add-on these tools plug
+# into) checked out beside it and nothing else.
+name: ScanRuler for FreeCAD tests
+
+on:
+  push:
+    branches: [main, 'test-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        series: ['newest', '1.1', '1.0']
+    name: freecad-${{ matrix.series }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: jamesK1000011/FreeCAD-AgentLink
+          path: agentlink-addon
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: fc-${{ matrix.series }}
+          create-args: >-
+            -c conda-forge
+            ${{ matrix.series == 'newest' && 'freecad' || format('freecad={0}', matrix.series) }}
+            python=3.11
+            numpy
+          cache-environment: true
+      - name: FreeCAD imports
+        run: |
+          echo "FREECAD_LIB=$CONDA_PREFIX/lib" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/agentlink-addon:$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          python -c "import sys; sys.path.append('$CONDA_PREFIX/lib'); import FreeCAD, Part, Mesh; print('FreeCAD', FreeCAD.Version()[:3])"
+      - name: Tests
+        timeout-minutes: 25
+        # Not exit: a login shell's exit runs ~/.bash_logout, whose
+        # clear_console fails on the runner and turns a pass into 1.
+        run: |
+          code=0
+          python -X faulthandler -m unittest discover -s tests -v > "$RUNNER_TEMP/tests.log" 2>&1 || code=$?
+          tail -n 300 "$RUNNER_TEMP/tests.log"
+          echo "unittest exit code: $code"
+          test "$code" -eq 0
