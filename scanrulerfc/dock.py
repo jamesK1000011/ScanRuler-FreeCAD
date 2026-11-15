@@ -143,6 +143,10 @@ class Dock:
         self._seen = None
         self.widget = QtWidgets.QWidget(parent)
         lay = QtWidgets.QVBoxLayout(self.widget)
+        from .pages import kit
+
+        lay.setSpacing(kit.SPACING)  # dense: a whole section fits without scrolling
+        lay.setContentsMargins(kit.MARGIN, kit.MARGIN, kit.MARGIN, kit.MARGIN)
         self.head = QtWidgets.QLabel()
         self.head.setWordWrap(True)
         lay.addWidget(self.head)

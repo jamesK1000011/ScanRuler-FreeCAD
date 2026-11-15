@@ -101,6 +101,19 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(g.at["Cone"], (1, 0))
         self.assertEqual(row.d, "across")
 
+    def test_dense_and_info_on_the_title_row(self):
+        from scanrulerfc.pages import kit
+
+        self.assertLessEqual(kit.SPACING, 6)
+        self.assertLessEqual(kit.MARGIN, 6)
+        self.assertTrue(all(m <= 6 for m in kit.GROUP_MARGINS))
+        # The (i) key and the count sit on the group's title row.
+        self.assertEqual(kit.head_row({"header": "FIT SETTINGS", "info": "Fit", "count": None}), ["title", "stretch", "info"])
+        self.assertEqual(kit.head_row({"header": "ELEMENTS", "info": "x", "count": 3}), ["title", "stretch", "count", "info"])
+        self.assertEqual(kit.head_row({"header": "VIEW"}), ["title"])
+        self.assertEqual(kit.head_row({"info": "x"}), ["stretch", "info"])
+        self.assertEqual(kit.head_row({}), [])
+
     def test_labels_wrap(self):
         mods = fake_pyside()
         with mock.patch.dict(sys.modules, mods):

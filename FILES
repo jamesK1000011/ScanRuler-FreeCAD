@@ -323,6 +323,7 @@ tests/test_gui_pages.py
 tests/test_heightmap.py
 tests/test_integration.py
 tests/test_layout.py
+tests/test_layout_placer.py
 tests/test_legend.py
 tests/test_manual.py
 tests/test_measure3d_page.py
