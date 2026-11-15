@@ -29,6 +29,7 @@ scanrulerfc/dev_surface.py
 scanrulerfc/dev_volume.py
 scanrulerfc/dfm_wall.py
 scanrulerfc/dimensions.py
+scanrulerfc/dock.py
 scanrulerfc/draft_core.py
 scanrulerfc/fam_align.py
 scanrulerfc/fam_cad.py
@@ -161,9 +162,16 @@ scanrulerfc/on_reference.py
 scanrulerfc/outline_core.py
 scanrulerfc/pack_core.py
 scanrulerfc/pages/__init__.py
+scanrulerfc/pages/deviation.py
+scanrulerfc/pages/flat2d.py
 scanrulerfc/pages/fonts.py
 scanrulerfc/pages/infotext.py
+scanrulerfc/pages/infotext_pages.py
+scanrulerfc/pages/kit.py
 scanrulerfc/pages/measure3d.py
+scanrulerfc/pages/meshtools.py
+scanrulerfc/pages/reverse.py
+scanrulerfc/pages/thickness.py
 scanrulerfc/planar.py
 scanrulerfc/qa_core.py
 scanrulerfc/render_layers.py
@@ -179,6 +187,7 @@ scanrulerfc/snapshot/card.py
 scanrulerfc/snapshot/handlers.py
 scanrulerfc/snapshot/marks.py
 scanrulerfc/snapshot/store.py
+scanrulerfc/statusbar.py
 scanrulerfc/symmetry.py
 scanrulerfc/thread_core.py
 scanrulerfc/wall_thickness.py
@@ -204,6 +213,7 @@ tests/test_flat.py
 tests/test_flat_objects.py
 tests/test_flat_sheet.py
 tests/test_gui_commands.py
+tests/test_gui_pages.py
 tests/test_heightmap.py
 tests/test_integration.py
 tests/test_legend.py
@@ -231,7 +241,9 @@ tests/test_upstream_011.py
 tests/test_volume_maths.py
 tests/test_wear.py
 tests/test_workspaces.py
+tests/tsxresolve.py
 tests/tsxsource.py
 tools/gen_icons.py
 tools/gen_infotext.py
+tools/gen_infotext_pages.py
 tools/icon_lint.py
