@@ -244,6 +244,10 @@ def widget(model, on_key=None, on_field=None, parent=None):
             box = QtWidgets.QVBoxLayout(group)
         header(s, box)
         for sl in s.get("slots") or ([s["slot"]] if s.get("slot") else []):
+            if not isinstance(sl, dict):
+                # GD&T's "slots" are the names a tolerance takes (Feature,
+                # Datum …), not slot rows: 3D Measure failed to open on them.
+                continue
             row = QtWidgets.QHBoxLayout()
             row.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])))
             b = QtWidgets.QPushButton(button_text(sl["button"]["label"]))

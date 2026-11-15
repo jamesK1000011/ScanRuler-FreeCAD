@@ -331,6 +331,7 @@ tests/test_noise.py
 tests/test_on_reference.py
 tests/test_outline.py
 tests/test_pack.py
+tests/test_pages_draw.py
 tests/test_qa.py
 tests/test_redteam_boundary.py
 tests/test_redteam_deviation.py
