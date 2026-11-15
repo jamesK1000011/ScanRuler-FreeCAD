@@ -23,6 +23,7 @@ from .features import dependents_of, plane_at_offset, plane_offset, plane_takes_
 from .regions import find_regions, match_region, region_by_place, regions_by_pick, split_parts
 from .sketch import clone_sketch, is_dimension
 from .solver import solve_sketch
+from .stations import inset_chains
 
 PARAMETER_KINDS = (
     {"kind": "length", "label": "Length", "unit": "mm"},
@@ -488,12 +489,8 @@ def _inset_again(f, features):
     of = next((x for x in features if x["id"] == inset["of"] and x["kind"] == "sketch"), None)
     if not of:
         return f"the sketch it was moved in from ({num_str(inset['of'])}) is gone"
-    try:
-        from .stations import inset_chains  # stations.ts: a later build step
-    except ImportError:
-        return "moving a profile in again needs stations.ts, which is not ported yet"
     datums = datum_traces(f["frame"])
-    moved = inset_chains(of["sketch"], by=inset["by"], keep=lambda: set(inset["keep"]), datums=datums, name=of["name"])
+    moved = inset_chains(of["sketch"], {"by": inset["by"], "keep": lambda loop: set(inset["keep"]), "datums": datums, "name": of["name"]})
     if isinstance(moved, str):
         return moved
     try:
