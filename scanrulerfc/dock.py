@@ -264,8 +264,19 @@ def make_tab(panel):
     return d.widget
 
 
+def hosted_tab_wanted(hooks):
+    """Whether ScanRuler's page is a tab of Agent Link's panel: only for an
+    Agent Link that cannot place an add-on's own dock (no "panel_layout"
+    service: headless, or before panel layouts). Otherwise the page is
+    its own dock, "ScanRuler", beside Model and Tasks."""
+    service = getattr(hooks, "service", None)
+    return service is None or service("panel_layout") is None
+
+
 def register_tab(hooks):
     """Agent Link's hooks module, handed in by agentlink_families."""
+    if not hosted_tab_wanted(hooks):
+        return
     if not any(t.get("title") == TAB_TITLE for t in hooks.TABS):
         try:  # the tab only while ScanRuler is the workbench in front
             hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER, workbench=WORKBENCH)
@@ -279,6 +290,29 @@ _dock = {}
 def live():
     """The Dock the workbench's keys go to (the last one made), or None."""
     return _dock.get("live")
+
+
+def _hosted_tab():
+    """Whether Agent Link's panel has the ScanRuler tab (an older Agent
+    Link); else the page is ScanRuler's own dock."""
+    try:
+        hooks = importlib.import_module("agentlink.hooks")
+        return any(t.get("title") == TAB_TITLE for t in hooks.TABS)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _agentlink_caller():
+    """Agent Link's "panel_caller" service (its clicks shown and logged as
+    the agent's are), or None alone."""
+    import scanrulerfc
+
+    if not scanrulerfc._hosted:
+        return None
+    try:
+        return importlib.import_module("agentlink.hooks").service("panel_caller")
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def open_panel(mw=None):
@@ -295,7 +329,7 @@ def open_panel(mw=None):
         return None
     import scanrulerfc
 
-    if scanrulerfc._hosted:
+    if scanrulerfc._hosted and _hosted_tab():
         try:
             show = importlib.import_module("agentlink.panel").show
             try:
@@ -334,7 +368,14 @@ def show_dock(mw=None):
     else:
         dw = QtWidgets.QDockWidget(DOCK_TITLE, mw)
         dw.setObjectName(DOCK_OBJECT)
-        d = Dock()
+        # Under Agent Link the keys run through it (shown and logged as
+        # the agent's), and the page reads its session.
+        caller = _agentlink_caller()
+        if caller is not None:
+            from . import runner
+
+            runner.set_hosted(caller._call)
+        d = Dock(panel=caller)
         dw.setWidget(d.widget)
         _dock.update(dock=dw, model=d)
     p = layout.placer()

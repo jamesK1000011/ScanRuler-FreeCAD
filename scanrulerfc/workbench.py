@@ -110,13 +110,16 @@ def make_class(Gui):
 
 
 def _own_panel(Gui):
-    """Alone, the ScanRuler dock beside the Combo View and the status strip;
-    under Agent Link the dock is its panel's ScanRuler tab instead."""
+    """The ScanRuler dock where the panel layout puts it (beside Model and
+    Tasks by default), alone or under Agent Link, and the status strip.
+    Only an older Agent Link that hosts the page as a tab of its panel
+    keeps it there."""
     import scanrulerfc
 
-    if scanrulerfc._hosted:
-        return
     from . import dock, statusbar
+
+    if scanrulerfc._hosted and dock._hosted_tab():
+        return
 
     try:
         mw = Gui.getMainWindow()
