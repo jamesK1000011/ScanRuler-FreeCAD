@@ -151,6 +151,10 @@ class Dock:
         for wid in ORDER:
             holder = QtWidgets.QScrollArea()
             holder.setWidgetResizable(True)
+            # Up and down only: the page follows the panel's width and its
+            # grids and rows reflow (pages/kit.reflow).
+            holder.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            holder.setMinimumWidth(0)
             self.slots[wid] = holder
             self.stack.addWidget(holder)
         lay.addWidget(self.stack, 1)
@@ -309,7 +313,7 @@ def open_panel(mw=None):
 
 def show_dock(mw=None):
     """The dock of its own (no Agent Link), placed where the panel layout
-    setting puts it (layout.py: right by default, a Combo View tab, or a
+    setting puts it (layout.py: a Combo View tab by default, the right side, or a
     slide-out over the 3D view)."""
     from PySide import QtWidgets
 
