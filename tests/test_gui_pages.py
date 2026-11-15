@@ -361,16 +361,19 @@ class Mesh(unittest.TestCase):
 
 
 class Reverse(unittest.TestCase):
-    def test_stub(self):
-        m = RV.build(fresh())
+    def test_keys_on_for_the_ported_engine(self):
+        m = RV.build(fresh(), read=lambda t, a=None: (False, None))
         self.assertEqual([s["header"] for s in m["sections"]],
                          ["Model", "Parameters", "Create feature", "Features", "Bodies", "Notes for the agent"])
         keys = sec(m, "create_feature")["keys"]
         self.assertEqual(len(keys), 26)
         self.assertEqual(sec(m, "create_feature")["grid"], 4)
-        self.assertFalse(any(k["enabled"] for k in keys))
-        self.assertTrue(all(k["tip"].endswith("coming with the engine port") for k in keys))
-        self.assertTrue(all(s["hint"] == "coming with the engine port" for s in m["sections"]))
+        later = [k for k in keys if k["id"] in W.REVERSE_LATER]
+        self.assertEqual(len(later), 9)
+        self.assertFalse(any(k["enabled"] for k in later))
+        self.assertTrue(all(k["tip"].endswith("coming with the engine port") for k in later))
+        self.assertTrue(all(k["enabled"] and not k["tip"].endswith("coming with the engine port") for k in keys if k not in later))
+        self.assertEqual(sec(m, "notes")["hint"], "coming with the engine port")
         self.assertEqual(keys[0]["command"], "ScanRuler_ReExtrude")
 
     @NEED
