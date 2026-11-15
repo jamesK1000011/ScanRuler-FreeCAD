@@ -76,7 +76,9 @@ scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
 scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
+scanrulerfc/reverse/network_cells.py
 scanrulerfc/reverse/network_curve.py
+scanrulerfc/reverse/network_map.py
 scanrulerfc/reverse/network_spline.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
@@ -87,6 +89,7 @@ scanrulerfc/reverse/scan_path.py
 scanrulerfc/reverse/sketch.py
 scanrulerfc/reverse/sketch_spline.py
 scanrulerfc/reverse/solver.py
+scanrulerfc/reverse/sparse.py
 scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
 scanrulerfc/reverse/surface_fit.py
@@ -154,6 +157,7 @@ tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
 tests/test_reverse_sketch_shapes.py
 tests/test_reverse_solver.py
+tests/test_reverse_sparse.py
 tests/test_reverse_stations.py
 tests/test_reverse_surface_fit.py
 tests/test_reverse_topo.py

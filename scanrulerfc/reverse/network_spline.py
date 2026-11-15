@@ -215,6 +215,25 @@ def basis_with_derivative_v(spans, t):
     return s, n0, n1
 
 
+def hypot3_v(x, y, z):
+    """Math.hypot(x, y, z) as V8 works it (js_hypot), over arrays: scaled by
+    the largest, the squares summed with Kahan's compensation."""
+    ax = np.abs(np.asarray(x, dtype=float))
+    ay = np.abs(np.asarray(y, dtype=float))
+    az = np.abs(np.asarray(z, dtype=float))
+    m = np.maximum(np.maximum(ax, ay), az)
+    safe = np.where(m > 0, m, 1.0)
+    s = np.zeros_like(m)
+    c = np.zeros_like(m)
+    for a in (ax, ay, az):
+        n = a / safe
+        summand = n * n - c
+        p = s + summand
+        c = (p - s) - summand
+        s = p
+    return np.where(m > 0, np.sqrt(s) * m, 0.0)
+
+
 def _poles3(poles):
     return np.asarray(poles, dtype=float).reshape(-1, 3)
 
