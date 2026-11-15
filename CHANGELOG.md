@@ -47,4 +47,4 @@
 - ScanRuler's measuring and plugins as tools for Agent Link; stands without
   it since 14 Nov 2026 (its own runner and error type).
 
-- Trim to scan says it isn't ready in FreeCAD yet: its cut with FreeCAD's mesh booleans doesn't give the original's result on a plain box (open issue). Boolean and every other mesh tool pass in real FreeCAD 1.0, 1.1 and newest.
+- Trim to scan says it isn't ready in FreeCAD yet: its cut with FreeCAD's mesh booleans doesn't give the original's result on a plain box (open issue). The likely cause, a cut handed back inside out in patches that meet in T-junctions, is now handled (such patches are faced outward one by one and taken as one solid); the FreeCAD test prints what the cut returned until it passes. Boolean and every other mesh tool pass in real FreeCAD 1.0, 1.1 and newest.

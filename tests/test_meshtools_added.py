@@ -263,8 +263,9 @@ class Boolean(unittest.TestCase):
             OV, OF = BO.outward(HV, HF)
             self.assertAlmostEqual(BO.volume(OV, OF[:n]), 8000, 6)
             self.assertAlmostEqual(BO.volume(OV, OF[n:]), -216, 6)
-        # An open piece is left as it came.
-        self.assertTrue(np.array_equal(BO.outward(V, F[1:, ::-1])[1], F[1:, ::-1]))
+        # An open piece (a cut's patches meeting in T-junctions) is turned by which way it faces.
+        self.assertTrue(np.array_equal(BO.outward(V, F[1:, ::-1])[1], F[1:]))
+        self.assertTrue(np.array_equal(BO.outward(V, F[1:])[1], F[1:]))
 
     def test_the_freecad_kernel_turns_its_result_outward(self):
         from unittest import mock
@@ -450,6 +451,17 @@ class Wrap(unittest.TestCase):
             WR.wrap_mesh(*box_mesh(2, 2, 2, 2), 1, grow=2)
 
 
+def cracked_box(mn, mx, z, walls_in, face_in):
+    """A box whose face at height z is gridded unlike its walls, so the two
+    meet in T-junctions, as FreeCAD's cut seams do; each wound either way."""
+    W, WF = cuboid(mn, mx, 4)
+    C, CF = cuboid(mn, mx, 3)
+    WF = WF[~np.isclose(W[WF].mean(axis=1)[:, 2], z)]
+    CF = CF[np.isclose(C[CF].mean(axis=1)[:, 2], z)]
+    V, F = joined((W, WF[:, ::-1] if walls_in else WF), (C, CF[:, ::-1] if face_in else CF))
+    return M.compact_edit(*BO.weld(V, F, 1e-6), 0)[:2]
+
+
 class Break(unittest.TestCase):
     def setUp(self):
         self.body = NominalSurface(*box_mesh(20, 20, 20, 8))
@@ -498,14 +510,67 @@ class Break(unittest.TestCase):
             V, F = box_mesh(20, 20, 20, 8)
             TR.prepare_body(V, F[1:], "Box")
 
-    @unittest.expectedFailure  # open: Trim's cut in real FreeCAD (handlers.TRIM_READY)
+    def slab(self, half=0.15):
+        body = TR.prepare_body(*box_mesh(20, 20, 20, 8), "Box")
+        FV, FF, _, deep, _ = TR.find_break(*sheet(), body[2], 0.3, None, TR.default_break_speck(body[2].bbox_diagonal))
+        EV, EF, _ = TR.extend_rim(FV, FF, body[2], M.MAX_STRETCH * half + TR.CLEARANCE, deep)
+        SV, SF, _, _ = SH.thicken_mesh(EV, EF, 2 * half, "both")
+        return body, (SV, SF), len(EF), TR._area(EV, EF)
+
+    def test_the_slab_is_a_closed_solid_faced_out_its_front_skin_on_the_breaks_facing(self):
+        _, (SV, SF), n, area = self.slab()
+        self.assertEqual(M.closedness(SF, len(SV)), {"open": 0, "bad": 0})
+        self.assertAlmostEqual(BO.volume(SV, SF) / (0.3 * area), 1, 2)
+        self.assertGreater(SV[SF[:n]][..., 2].mean(), 0.14)
+        self.assertLess(SV[SF[n:2 * n]][..., 2].mean(), -0.14)
+
+    def kernel_answers(self, h=0.15):
+        """Box minus slab, exactly, as a kernel might hand it back: clean;
+        wound inside out; and in patches meeting in T-junctions (the cut face
+        gridded unlike the walls), each patch wound either way."""
+        def halves(rebuild):
+            return joined(rebuild([-10, -10, h], [10, 10, 10], h), rebuild([-10, -10, -10], [10, 10, -h], -h))
+
+        def plain(mn, mx, z):
+            return cuboid(mn, mx, 4)
+
+        def cracked(walls_in, face_in):
+            return lambda mn, mx, z: cracked_box(mn, mx, z, walls_in, face_in)
+
+        V, F = halves(plain)
+        yield "clean", (V, F)
+        yield "inside out", (V, F[:, ::-1])
+        for w, f in ((True, True), (True, False), (False, True)):
+            yield f"patches {w} {f}", BO.outward(*halves(cracked(w, f)))
+
+    def test_the_cut_sorted_right_whatever_shape_the_kernels_answer_comes_in(self):
+        body, (SV, SF), n, _ = self.slab()
+        for name, answer in self.kernel_answers():
+            for flip in (False, True):
+                with self.subTest(name, flip=flip):
+                    _, _, _, mating_area, pieces, volume, dropped, specks = TR._cut_body(lambda *a: answer, *body[:2], body[3], SV, SF, n, flip)
+                    self.assertEqual((pieces, dropped, specks), (1, 1, 0))
+                    self.assertAlmostEqual(volume, 400 * (10 - 0.15), 3)
+                    self.assertAlmostEqual(mating_area, 400, 3)
+                    self.assertEqual([p["front" if flip else "back"] for p in TR.LAST_CUT["pieces"]].count(0), 1)
+
+    def test_outward_turns_patches_of_an_open_shell(self):
+        V2, F2 = BO.outward(*cracked_box([0, 0, 0], [2, 3, 4], 4, True, False))
+        self.assertAlmostEqual(BO.volume(V2, F2), 24, 6)
+
+    @unittest.expectedFailure  # open: Trim's cut in real FreeCAD (handlers.TRIM_READY); an unexpected success here means it works
     @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
     def test_a_box_trimmed_to_a_flat_sheet(self):
         body = TR.prepare_body(*box_mesh(20, 20, 20, 8), "Box")
         for offset, flip in ((0.15, False), (0.15, True)):
-            V, F, mating, gap, rep = TR.trim_to_scan(*sheet(), body, 0.3, offset, flip)
-            self.assertAlmostEqual(rep["volume"], 400 * (10 - offset), 0)
-            self.assertAlmostEqual(rep["matingArea"], 400, 0)
+            try:
+                V, F, mating, gap, rep = TR.trim_to_scan(*sheet(), body, 0.3, offset, flip)
+                self.assertAlmostEqual(rep["volume"], 400 * (10 - offset), 0)
+                self.assertAlmostEqual(rep["matingArea"], 400, 0)
+            except Exception as e:
+                diagnostic = f"Trim (offset {offset}, flip {flip}): {e}\nFreeCAD's cut: {TR.LAST_CUT}"
+                print(diagnostic, file=sys.stderr)
+                self.fail(diagnostic)
 
 
 class Session:
