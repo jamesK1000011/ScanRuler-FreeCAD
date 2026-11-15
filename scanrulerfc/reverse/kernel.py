@@ -308,12 +308,15 @@ def sew_routes(P, shapes, tolerance):
         faces = [f for s in shapes for f in s.Faces]
         for i, a in enumerate(faces):
             for b in faces[i + 1:]:
-                if a.BoundBox.isIntersection(b.BoundBox):
+                if _boxes_meet(a, b, tolerance):
                     fc.add(a, b)
         shell = P.Shell(faces) if hasattr(P, "Shell") else P.makeShell(faces)
         if shell.ShapeType != "Shell":
             shell = P.makeShell(faces)
         return fc.build(shell, tolerance, tolerance)
+
+    def shared_edges():
+        return share_seams(P, [f for s in shapes for f in s.Faces], tolerance)
 
     def tolerance_then_sew():
         raised = []
@@ -325,7 +328,85 @@ def sew_routes(P, shapes, tolerance):
         c.sewShape(tolerance)
         return c
 
-    return [("sewShape", sew_shape), ("ShapeFix.FaceConnect", face_connect), ("ShapeTolerance+sewShape", tolerance_then_sew)]
+    return [("sewShape", sew_shape), ("ShapeFix.FaceConnect", face_connect), ("shared edges", shared_edges), ("ShapeTolerance+sewShape", tolerance_then_sew)]
+
+
+def _boxes_meet(a, b, tolerance):
+    """Whether two faces' boxes, grown by the tolerance, meet (FreeCAD's
+    BoundBox.intersect(bb) answers a bool); True where it cannot say."""
+    try:
+        bb = a.BoundBox
+        bb.enlarge(tolerance)
+        return bool(bb.intersect(b.BoundBox))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _same_point(p, q, tol):
+    return (p - q).Length <= tol
+
+
+def _seam_of(P, e, c, tol):
+    """Whether two edges are one seam: their ends together (either way
+    round) and their middles too, within tol."""
+    a0, a1 = e.Vertexes[0].Point, e.Vertexes[-1].Point
+    b0, b1 = c.Vertexes[0].Point, c.Vertexes[-1].Point
+    if not ((_same_point(a0, b0, tol) and _same_point(a1, b1, tol)) or (_same_point(a0, b1, tol) and _same_point(a1, b0, tol))):
+        return False
+    m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+    return c.distToShape(P.Vertex(m))[0] <= tol
+
+
+def share_seams(P, faces, tolerance):
+    """The faces made into one shell with no sewing: each corner one vertex,
+    each seam one edge that both its patches hold (the first patch's,
+    given a curve on the second's surface), so the shell is connected by
+    construction. Sets share_seams.last = {vertices, edges} replaced."""
+    tol = max(tolerance, 1e-7)
+    # One vertex for each corner point.
+    canon_v = []
+    faces = list(faces)
+    vcount = 0
+    for i, f in enumerate(faces):
+        subs = []
+        for v in f.Vertexes:
+            c = next((x for x in canon_v if _same_point(x.Point, v.Point, tol)), None)
+            if c is None:
+                canon_v.append(v)
+            elif not c.isSame(v):
+                subs.append((v, c))
+        if subs:
+            faces[i] = f.replaceShape(subs)
+            vcount += len(subs)
+    # One edge for each seam.
+    canon_e = []
+    ecount = 0
+    for i, f in enumerate(faces):
+        subs = []
+        for e in f.Edges:
+            if getattr(e, "Degenerated", False):
+                continue
+            c = next((x for x in canon_e if not x[0].isSame(e) and x[1] != i and _seam_of(P, e, x[0], tol)), None)
+            if c is None:
+                canon_e.append((e, i))
+            else:
+                subs.append((e, c[0]))
+        if subs:
+            g = f.replaceShape(subs)
+            for _old, new in subs:
+                try:
+                    P.ShapeFix.Edge().fixAddPCurve(new, g, False, tol)
+                    P.ShapeFix.Edge().fixSameParameter(new)
+                except Exception:  # noqa: BLE001 — the face's own fix adds what is missing
+                    g.fix(tol, tol, tol)
+                    break
+            faces[i] = g
+            ecount += len(subs)
+    share_seams.last = {"vertices": vcount, "edges": ecount}
+    shell = P.Shell(faces)
+    if shell.ShapeType != "Shell":
+        shell = P.makeShell(faces)
+    return shell
 
 
 class Occt:
@@ -723,7 +804,7 @@ class Occt:
             except Exception as e:  # noqa: BLE001 — a route this FreeCAD lacks
                 self.last_sew["tried"].append((name, f"{type(e).__name__}: {e}"[:120]))
                 continue
-            self.last_sew["tried"].append((name, free))
+            self.last_sew["tried"].append((name, free) if name != "shared edges" else (name, free, getattr(share_seams, "last", None)))
             if best is None or free < best[0]:
                 best = (free, name, got)
             if free == 0:
