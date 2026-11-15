@@ -219,13 +219,18 @@ scanrulerfc/repeat_core.py
 scanrulerfc/reverse/__init__.py
 scanrulerfc/reverse/_js.py
 scanrulerfc/reverse/autoconstrain.py
+scanrulerfc/reverse/build.py
 scanrulerfc/reverse/buildtypes.py
 scanrulerfc/reverse/chain_outline.py
 scanrulerfc/reverse/corners.py
 scanrulerfc/reverse/datums.py
+scanrulerfc/reverse/doc.py
 scanrulerfc/reverse/expression.py
 scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
+scanrulerfc/reverse/handlers.py
+scanrulerfc/reverse/kernel.py
+scanrulerfc/reverse/kernel_thread.py
 scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
 scanrulerfc/reverse/network.py
@@ -238,6 +243,7 @@ scanrulerfc/reverse/network_map.py
 scanrulerfc/reverse/network_seed.py
 scanrulerfc/reverse/network_spline.py
 scanrulerfc/reverse/network_split.py
+scanrulerfc/reverse/origins.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/profiles.py
@@ -252,6 +258,7 @@ scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
 scanrulerfc/reverse/surface_fit.py
 scanrulerfc/reverse/sweep_route.py
+scanrulerfc/reverse/tools.json
 scanrulerfc/reverse/topo.py
 scanrulerfc/reverse/units.py
 scanrulerfc/reverse/vec.py
@@ -278,6 +285,8 @@ scanrulerfc/workspaces.py
 tests/meshes.py
 tests/meshkit.py
 tests/network_meshes.py
+tests/reverse_fakekernel.py
+tests/reverse_fixtures/kernel_builds.json
 tests/reverse_fixtures/network_curve_goldens.json
 tests/reverse_fixtures/network_read_goldens.json
 tests/reverse_fixtures/network_spline_goldens.json
@@ -321,9 +330,14 @@ tests/test_redteam_deviation.py
 tests/test_redteam_fits.py
 tests/test_repeat.py
 tests/test_reverse_autoconstrain.py
+tests/test_reverse_build.py
 tests/test_reverse_corners.py
+tests/test_reverse_doc.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
+tests/test_reverse_handlers.py
+tests/test_reverse_kernel.py
+tests/test_reverse_kernel_builds.py
 tests/test_reverse_network_body.py
 tests/test_reverse_network_cells.py
 tests/test_reverse_network_creases.py
@@ -334,6 +348,7 @@ tests/test_reverse_network_seed.py
 tests/test_reverse_network_spline.py
 tests/test_reverse_network_split.py
 tests/test_reverse_parameters.py
+tests/test_reverse_parity.py
 tests/test_reverse_part_file.py
 tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
@@ -355,6 +370,8 @@ tests/test_volume_maths.py
 tests/test_wear.py
 tests/test_wiring.py
 tests/test_workspaces.py
+tests/tools/make_reverse_kernel_fixtures.py
+tests/tools/reverse_goldens.mjs
 tests/tsxresolve.py
 tests/tsxsource.py
 tools/gen_icons.py
