@@ -25,6 +25,19 @@ NEED = unittest.skipUnless(T.available(), "ScanRuler's source is not here")
 HAS_QT = importlib.util.find_spec("PySide") is not None or importlib.util.find_spec("PySide6") is not None
 
 
+def qt_app():
+    """The QApplication already running in this process, or None. These
+    tests never make one: Qt's fonts and widgets without one abort real
+    FreeCAD's Qt, so they skip instead."""
+    if not HAS_QT:
+        return None
+    try:
+        from PySide import QtWidgets
+    except Exception:  # noqa: BLE001 — a shim that cannot load here
+        return None
+    return QtWidgets.QApplication.instance()
+
+
 def sphere_fit(c, r=5.0):
     return {"kind": "sphere", "center": list(c), "radius": r, "sigma": 0.01, "usedPoints": 100, "regionSize": 100}
 
@@ -208,8 +221,9 @@ class Model(unittest.TestCase):
         self.assertEqual(P.format_primary({"kind": "line"}), "")
         self.assertEqual(P.format_primary({"kind": "circle", "radius": 1}, "in"), "Ø 0.0787 in")
 
-    @unittest.skipUnless(HAS_QT, "Qt is not here")
     def test_widget(self):
+        if qt_app() is None:
+            self.skipTest("no QApplication in this process")
         P.widget(P.build(measured_state()))
 
 
@@ -228,9 +242,17 @@ class Fonts(unittest.TestCase):
             with open(f, "rb") as a, open(os.path.join(T.ROOT, "public", "fonts", os.path.basename(f)), "rb") as b:
                 self.assertEqual(a.read(), b.read())
 
-    @unittest.skipUnless(HAS_QT, "Qt is not here")
     def test_load(self):
+        if qt_app() is None:
+            self.skipTest("no QApplication in this process")
         self.assertEqual(set(FO.load()), set(FO.FAMILIES))
+
+    def test_load_without_an_application_is_the_fallbacks(self):
+        if qt_app() is not None:
+            self.skipTest("a QApplication is running")
+        FO._loaded.clear()
+        self.assertEqual(FO.load(), FO.FALLBACK)
+        self.assertEqual(FO._loaded, {})
 
 
 if __name__ == "__main__":
