@@ -54,11 +54,39 @@ def freecad_kernel():
     def run(op, a, b):
         ma, mb = to_mesh(*a), to_mesh(*b)
         out = ma.unite(mb) if op == "add" else ma.difference(mb) if op == "subtract" else ma.intersect(mb)
+        out.harmonizeNormals()  # each piece wound one way; outward() picks which
         pts, tris = out.Topology
         V = np.array([[p.x, p.y, p.z] for p in pts], dtype=float).reshape(-1, 3)
-        return V, np.array(tris, dtype=np.int64).reshape(-1, 3)
+        return outward(V, np.array(tris, dtype=np.int64).reshape(-1, 3))
 
     return run
+
+
+def outward(V, F):
+    """A mesh from FreeCAD's mesh kernel faced outward. Its booleans can hand
+    back a correct result wound inside out (a difference does, in FreeCAD
+    1.0 to 1.1), and Mesh.harmonizeNormals only makes each piece agree with
+    itself. So each closed piece is turned to face outward from what it
+    bounds: away from its inside when it lies inside an even number of the
+    other pieces (none, mostly), toward it — a hollow's wall — when inside
+    an odd number. Open pieces are left as they came."""
+    V = np.asarray(V, dtype=float)
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3).copy()
+    if len(F) == 0:
+        return V, F
+    lab = M.components(F, len(V))[F[:, 0]]
+    groups = [np.nonzero(lab == r)[0] for r in np.unique(lab).tolist()]
+    closed = [M.closedness(F[g], len(V))["open"] == 0 for g in groups]
+    shells = [g for g, c in zip(groups, closed) if c]
+    for i, g in enumerate(shells):
+        v = volume(V, F[g])
+        if v == 0:
+            continue
+        p = V[F[g[0], 0]]
+        depth = sum(abs(winding(V, F[h], p)) > 0.5 for j, h in enumerate(shells) if j != i)
+        if (v > 0) == (depth % 2 == 1):
+            F[g] = F[g][:, ::-1]
+    return V, F
 
 
 def subject_of(names):
