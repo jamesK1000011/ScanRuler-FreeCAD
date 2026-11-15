@@ -235,15 +235,11 @@ def object_at(view, x, y):
 def redirect(view, on):
     """The view's events to the scene graph (True) or back to the navigation
     style; quietly nothing where the view has no such call."""
-    for n in ("redirectToSceneGraph", "setRedirectToSceneGraph"):
-        fn = getattr(view, n, None)
-        if fn is not None:
-            try:
-                fn(bool(on))
-                return True
-            except Exception:  # noqa: BLE001
-                return False
-    return False
+    try:  # the call is on the view's viewer (View3DInventorViewerPy), not the view
+        view.getViewer().setRedirectToSceneGraph(bool(on))
+        return True
+    except Exception:  # noqa: BLE001 - an older or closed view
+        return False
 
 
 def view_widget(view, qt):
