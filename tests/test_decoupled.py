@@ -103,7 +103,8 @@ class Alone(unittest.TestCase):
         with open(os.path.join(ROOT, "package.xml"), encoding="utf-8") as f:
             xml = f.read()
         self.assertNotIn("<depend>Agent Link</depend>", xml)
-        self.assertIn("<freecadmin>1.1.0</freecadmin>", xml)
+        # 1.0: the oldest FreeCAD CI runs, as the rest of the suite.
+        self.assertIn("<freecadmin>1.0.0</freecadmin>", xml)
 
     def test_credit_lives_in_the_package(self):
         import scanrulerfc

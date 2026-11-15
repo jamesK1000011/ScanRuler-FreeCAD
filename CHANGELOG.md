@@ -1,8 +1,24 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # Changelog
 
-## Unreleased
+All notable changes to ScanRuler for FreeCAD, a port of ScanRuler by Stefan
+Hermann (CNC Kitchen). The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/). The dated versions below were
+never tagged: the first tagged release is being prepared.
 
+## [Unreleased]
+
+The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
+built to the end of ScanRuler's feature list, and the add-on ready for the
+Addon Manager.
+
+- Release preparation: Addon Manager metadata with the bug tracker and
+  readme links, the workbench's description, numpy (and scipy, optional)
+  declared, and FreeCAD 1.0 as the minimum CI runs; a README with what you
+  need, install, uninstall, privacy, and credits and licence; every file's
+  licence in its header or in `REUSE.toml`, with the LGPL text for the
+  shared privacy check.
 - GUI pass, round 4 (FreeCAD 1.1.3, macOS). The workspace toolbars swap
   live: the switch is applied to the toolbars themselves, again after
   FreeCAD's own restore and workbench activation, and a toolbar of another
