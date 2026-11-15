@@ -96,6 +96,7 @@ def dstate(session):
     if d["scan"] is not None and (d["scan"] is not st["scan"] or moved):
         d.update(align=None, scan=None, version=None, values=None, source="reference", target=None)
         d.pop("onReference", None)
+        d.pop("volumeResult", None)
     return d
 
 
@@ -358,6 +359,7 @@ def bind(session):
         except Exception as e:
             raise ToolError("failed", f"The reference could not be read: {e}")
         d.update(reference=ref, align=None, scan=None, values=None, source="reference", target=None)
+        d.pop("volumeResult", None)
         out = {"deviation": describe(d)}
         warn = []
         if ref["openEdges"]:
@@ -411,6 +413,7 @@ def bind(session):
         prev = d["align"]["total"] if (mode == "local" and d["align"]) else R.identity()
         res["total"] = R.compose(m, prev) if mode == "local" else m
         d.update(align=res, scan=scan, version=getattr(scan, "version", None), source="reference", target=None)
+        d.pop("volumeResult", None)
         measure_map(d, scan)
         out = {"deviation": describe(d), "moved": "The scan's vertices were moved onto the reference by transform: every place on the scan now reads in the reference's frame. Moving the part again (align_*, scan_scale) drops this alignment and its map."}
         warn = quality_warnings(res) + map_warnings(d)
@@ -637,6 +640,9 @@ def bind(session):
         out = volume_out(v, tol, a.get("regions", VOLUME_REGIONS), a.get("kinds") or KINDS)
         if v["scanOpenColumns"]:
             out["scanOpen"] = f"The scan is open: {v['scanOpenColumns']} columns of cells read through its holes by the winding number, unsure where it does not say. ScanRuler closes such holes with the reference first; this port does not."
+        # Where the Surface Deviation page's Volume error section reads it;
+        # cleared with the alignment it was found on.
+        d["volumeResult"] = out
         return out
 
     return {

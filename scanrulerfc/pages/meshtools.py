@@ -144,6 +144,39 @@ def tool_section(tool, m, ready=True, busy=False):
     return s
 
 
+# The run keys of the tools scanrulerfc/meshtools adds, and the tool each calls.
+RUN_KEYS = {"densify": "mesh_densify", "boolean": "mesh_boolean", "trim": "mesh_trim", "shell": "mesh_shell", "wrap": "mesh_wrap"}
+
+
+def call_for(key_id, ui=None):
+    """(tool, args) a run key calls with the section's fields, or None for a
+    key that opens or picks something in the panel. Fields left on auto are
+    left out, so the tool picks its own start value, as the original does."""
+    tool = RUN_KEYS.get(key_id)
+    if tool is None:
+        return None
+    ui = dict(ui or {})
+    m = dict(DEFAULTS)
+    m.update(ui.get("mesh") or {})
+    if key_id == "densify":
+        args = {} if m["densifyEdgeAuto"] else {"maxEdge": m["densifyEdge"]}
+    elif key_id == "boolean":
+        args = {"op": m["boolOp"]}
+        if ui.get("solids"):
+            args["solids"] = list(ui["solids"])
+    elif key_id == "trim":
+        args = {"offset": m["trimOffset"], "depth": m["trimDepth"], "flip": bool(m["trimFlip"])}
+        if ui.get("body") is not None:
+            args["body"] = ui["body"]
+    elif key_id == "shell":
+        args = {"side": m["shellSide"]}
+        if not m["shellThicknessAuto"]:
+            args["thickness"] = m["shellThickness"]
+    else:
+        args = {"gap": m["wrapGap"], "grow": m["wrapGrow"], "edges": m["wrapEdges"]}
+    return tool, args
+
+
 def build(st, ui=None, units="mm"):
     ui = dict(ui or {})
     ms = st.get("meshToolsState") or {}

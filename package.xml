@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>ScanRuler for FreeCAD</name>
-  <description>ScanRuler's scan measuring (fits, alignment, deviation, wall thickness, sections, mesh tools) and its plugins (scanner noise, thread match, wear repair, print fit from a scan, parts catalog, assembly manual, library pack), ported from ScanRuler by CNC Kitchen; tools for the Agent Link add-on.</description>
-  <version>0.2.0</version>
-  <date>2026-11-10</date>
+  <description>ScanRuler's scan measuring (fits, alignment, deviation, wall thickness, sections, mesh tools) and its plugins (scanner noise, thread match, wear repair, print fit from a scan, parts catalog, assembly manual, library pack), ported from ScanRuler by CNC Kitchen; as a ScanRuler workbench of its own, and tools for the Agent Link add-on.</description>
+  <version>0.3.0</version>
+  <date>2026-11-14</date>
   <maintainer email="jamesK1000011@users.noreply.github.com">jamesK1000011</maintainer>
   <license file="LICENSE">AGPL-3.0-only</license>
   <url type="repository" branch="main">https://github.com/jamesK1000011/ScanRuler-FreeCAD</url>
@@ -12,10 +12,13 @@
   <tag>metrology</tag>
   <tag>reverse engineering</tag>
   <tag>MCP</tag>
+  <icon>scanrulerfc/icons/ScanRulerWorkbench.svg</icon>
   <content>
-    <other>
-      <name>ScanRuler for FreeCAD</name>
+    <workbench>
+      <name>ScanRuler</name>
+      <classname>ScanRulerWorkbench</classname>
       <subdirectory>./</subdirectory>
-    </other>
+      <icon>scanrulerfc/icons/ScanRulerWorkbench.svg</icon>
+    </workbench>
   </content>
 </package>

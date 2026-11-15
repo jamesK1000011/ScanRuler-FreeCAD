@@ -53,7 +53,12 @@ def make_class(Gui):
         Icon = C.icon_path("ScanRulerWorkbench")
 
         def Initialize(self):
-            C.register(Gui)
+            # Its runner set at registration: under Agent Link the hosted
+            # family through panel._call, alone this add-on's handlers
+            # (runner.gui chooses at each call).
+            from . import runner
+
+            C.register(Gui, run=runner.gui())
             # appendToolbar takes the title as the toolbar's object name too:
             # the per-workspace ones carry their workspace in it, as
             # "Create element" is in both Measure workspaces.
@@ -64,6 +69,7 @@ def make_class(Gui):
 
         def Activated(self):
             _bottom_view_bar(Gui)
+            _own_panel(Gui)
             C.switch_workspace(C.current_workspace())
 
         def Deactivated(self):
@@ -73,6 +79,23 @@ def make_class(Gui):
             return "Gui::PythonWorkbench"
 
     return ScanRulerWorkbench
+
+
+def _own_panel(Gui):
+    """Alone, the ScanRuler dock beside the Combo View and the status strip;
+    under Agent Link the dock is its panel's ScanRuler tab instead."""
+    import scanrulerfc
+
+    if scanrulerfc._hosted:
+        return
+    from . import dock, statusbar
+
+    try:
+        mw = Gui.getMainWindow()
+        statusbar.install(mw)
+        dock.show_dock(mw)
+    except ImportError:  # no window (FreeCADCmd, tests): nothing to show
+        pass
 
 
 def _bottom_view_bar(Gui):

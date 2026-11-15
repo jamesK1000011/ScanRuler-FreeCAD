@@ -19,6 +19,7 @@
 import importlib
 
 from . import commands as C
+from . import statusbar
 from . import workspaces as W
 from .pages import deviation, flat2d, measure3d, meshtools, reverse, thickness
 
@@ -77,6 +78,22 @@ def dock_model(st, ui=None, current=W.DEFAULT_WORKSPACE, project=None, agent=Non
             "page": PAGES[ws].build(st, page_ui), "footer": W.CREDIT}
 
 
+def press(page, key_id, page_ui, run=None):
+    """A page key that runs a tool (the page's call_for), run through the
+    workbench's runner: {"tool", "args", "ok", "answer"}, or None for a key
+    that only opens something in the panel. Pure but for the runner."""
+    call = getattr(page, "call_for", None)
+    got = call(key_id, page_ui) if call is not None else None
+    if got is None:
+        return None
+    tool, args = got
+    res = (run or C.runner())(tool, args)
+    if res is None:  # no runner set: the command said so
+        return None
+    ok, out = res
+    return {"tool": tool, "args": args, "ok": ok, "answer": out}
+
+
 def ui_action(key, args, ui, current):
     """What a workbench key asks of the panel (commands.set_ui's fn), as a
     change to the panel's state: (workspace, ui). Pure."""
@@ -121,6 +138,7 @@ class Dock:
         self.session_fn = session_fn or (lambda: _session_from(panel))
         self.current = C.current_workspace()
         self.ui = {}
+        self.error = None
         self._seen = None
         self.widget = QtWidgets.QWidget(parent)
         lay = QtWidgets.QVBoxLayout(self.widget)
@@ -183,12 +201,18 @@ class Dock:
         if h["save"]:
             bits.append(h["save"])
         self.head.setText(" &nbsp; ".join(bits))
+        statusbar.feed(st, error=self.error)
         page = PAGES[self.current]
         self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key))
         self.stack.setCurrentWidget(self.slots[self.current])
 
     def key(self, section_id, key_id):
-        self.ui.setdefault(self.current, {})["pressed"] = (section_id, key_id)
+        page_ui = self.ui.setdefault(self.current, {})
+        page_ui["pressed"] = (section_id, key_id)
+        got = press(PAGES[self.current], key_id, page_ui)
+        if got is not None:
+            page_ui["last"] = got
+            self.error = None if got["ok"] else got["answer"].get("error", {}).get("message")
         self.refresh(force=True)
 
     def handle(self, key, *args):
@@ -200,6 +224,11 @@ class Dock:
 def make_tab(panel):
     """The "ScanRuler" tab of Agent Link's panel: register_tab(TAB_TITLE,
     make_tab, TAB_ORDER)."""
+    from . import runner
+
+    call = getattr(panel, "_call", None)
+    if call is not None:
+        runner.set_hosted(call)  # the workbench's keys now run as the agent's do
     d = Dock(panel)
     d.widget._scanruler_dock = d  # kept alive with its widget
     d.widget.fill = d.refresh  # the panel calls fill() each time the tab comes up

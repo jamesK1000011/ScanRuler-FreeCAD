@@ -175,6 +175,7 @@ scanrulerfc/icons/wsFlat.svg
 scanrulerfc/icons/wsMeasure.svg
 scanrulerfc/icons/wsMesh.svg
 scanrulerfc/icons/wsThickness.svg
+scanrulerfc/inputs.py
 scanrulerfc/legend.py
 scanrulerfc/lent.py
 scanrulerfc/linalg.py
@@ -210,6 +211,7 @@ scanrulerfc/pages/meshtools.py
 scanrulerfc/pages/reverse.py
 scanrulerfc/pages/thickness.py
 scanrulerfc/planar.py
+scanrulerfc/project_import.py
 scanrulerfc/qa_core.py
 scanrulerfc/render_layers.py
 scanrulerfc/repeat_core.py
@@ -280,6 +282,7 @@ tests/test_thread.py
 tests/test_upstream_011.py
 tests/test_volume_maths.py
 tests/test_wear.py
+tests/test_wiring.py
 tests/test_workspaces.py
 tests/tsxresolve.py
 tests/tsxsource.py
