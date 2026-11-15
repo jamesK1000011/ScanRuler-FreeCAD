@@ -268,7 +268,7 @@ def widget(model, on_key=None, parent=None):
     """A QWidget drawn from the model: caps headers with an (i) key that
     shows the original's text, the slot, rows, fields and keys, and the
     credit at the foot. on_key(section_id, key_id) for every key pressed."""
-    from PySide import QtCore, QtWidgets
+    from PySide import QtCore, QtGui, QtWidgets
 
     from . import fonts
 
@@ -284,7 +284,7 @@ def widget(model, on_key=None, parent=None):
         f = cap.font()
         if fam.get("Barlow Semi Condensed"):
             f.setFamily(fam["Barlow Semi Condensed"])
-        f.setLetterSpacing(f.AbsoluteSpacing, 1.2)
+        f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.2)
         f.setBold(True)
         cap.setFont(f)
         row.addWidget(cap)
