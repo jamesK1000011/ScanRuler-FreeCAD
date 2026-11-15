@@ -35,6 +35,8 @@ from .reverse.vec import add_scaled, cross, dot, normalize, sub
 
 # How near a grip the cursor has to be to take it, in screen pixels.
 PICK_PX = 8
+# A press let go within this many pixels is a click, not a drag of the view.
+CLICK_PX = 4
 # How far the number field stands off its arrow's tip, in pixels.
 FIELD_GAP_PX = 6
 # The ghost is built again once the hand has rested this long on a drag.
@@ -217,6 +219,19 @@ def mm_per_pixel(view, at, vector):
     return 1.0 / px if px > 1e-9 else 1.0
 
 
+def object_at(view, x, y):
+    """What lies under viewport pixels (x, y): {doc, object, element, point},
+    or None. Read through the view's own pick, which selects nothing."""
+    try:
+        info = view.getObjectInfo((int(x), int(y)))
+    except Exception:  # noqa: BLE001
+        return None
+    if not info or "x" not in info:
+        return None
+    return {"doc": info.get("Document"), "object": info.get("Object"), "element": info.get("Component") or "",
+            "point": [float(info["x"]), float(info["y"]), float(info["z"])]}
+
+
 def redirect(view, on):
     """The view's events to the scene graph (True) or back to the navigation
     style; quietly nothing where the view has no such call."""
@@ -323,6 +338,7 @@ class Overlay:
         self.screen = []
         self.lit = None
         self.held = None
+        self.pressed_at = None
         self.redirected = False
         self.drawn = None
         self.changed_at = 0.0
@@ -433,11 +449,18 @@ class Overlay:
             self._hide_bodies([])
             return
         holder = c.SoAnnotation() if g.get("through") else c.SoSeparator()
+        holder.addChild(self._unpickable())
+        # A box that picks on the body (a fillet's edges, a shell's faces)
+        # leaves the body in sight, the ghost see-through over it: a body
+        # FreeCAD hides cannot be clicked, where the original's could.
+        from .reverse.picks import PICKS
+
+        solid = g.get("solid") and (self.editor.record or {}).get("kind") not in PICKS
         self.stretch_node = c.SoMatrixTransform()
         holder.addChild(self.stretch_node)
         mat = c.SoMaterial()
         mat.diffuseColor.setValue(*rgb(g["color"]))
-        mat.transparency.setValue(0.0 if g.get("solid") else GHOST_TRANSPARENCY)
+        mat.transparency.setValue(0.0 if solid else GHOST_TRANSPARENCY)
         holder.addChild(mat)
         hints = c.SoShapeHints()
         hints.vertexOrdering.setValue(c.SoShapeHints.COUNTERCLOCKWISE)
@@ -466,7 +489,15 @@ class Overlay:
             faces.normalIndex.setValues(0, len(flat), flat)
         holder.addChild(faces)
         self.ghost_sep.addChild(holder)
-        self._hide_bodies(g.get("replaces") or [])
+        self._hide_bodies((g.get("replaces") or []) if solid else [])
+
+    def _unpickable(self):
+        """The ghost and the grips are not the part: a click goes through
+        them to what is under them (the grips are hit on the screen)."""
+        c = self.coin
+        ps = c.SoPickStyle()
+        ps.style.setValue(c.SoPickStyle.UNPICKABLE)
+        return ps
 
     def _hide_bodies(self, ids):
         fn = self.env.get("hide")
@@ -493,6 +524,7 @@ class Overlay:
         light = c.SoLightModel()
         light.model.setValue(c.SoLightModel.BASE_COLOR)
         self.grip_sep.addChild(light)
+        self.grip_sep.addChild(self._unpickable())
         for s in self.shapes:
             sep = c.SoSeparator()
             col = c.SoBaseColor()
@@ -562,12 +594,21 @@ class Overlay:
         ev = cb.getEvent()
         x, y = ev.getPosition().getValue()
         if ev.isOfType(c.SoMouseButtonEvent.getClassTypeId()):
+            modified = ev.wasShiftDown() or ev.wasCtrlDown()
             if c.SoMouseButtonEvent.isButtonPressEvent(ev, c.SoMouseButtonEvent.BUTTON1):
-                if self.press(x, y, ev.wasShiftDown() or ev.wasCtrlDown()):
+                if self.press(x, y, modified):
                     cb.setHandled()
+                elif not modified:
+                    # Watched only: the navigation keeps the press, and a
+                    # release close by is a click on the part.
+                    self.pressed_at = (x, y)
             elif c.SoMouseButtonEvent.isButtonReleaseEvent(ev, c.SoMouseButtonEvent.BUTTON1):
                 if self.release(x, y):
                     cb.setHandled()
+                elif self.pressed_at is not None:
+                    was, self.pressed_at = self.pressed_at, None
+                    if math.hypot(x - was[0], y - was[1]) <= CLICK_PX * (self.dpr or 1.0) and self.click(x, y):
+                        cb.setHandled()
             return
         if self.motion(x, y):
             cb.setHandled()
@@ -648,6 +689,25 @@ class Overlay:
                 self.redirected = False
         return True
 
+    def click(self, x, y):
+        """A click on the part, for the box: a pick on a body, an extrude's
+        end. FreeCAD's selection is put back as it was after it, so a click
+        for the box never selects anything."""
+        ed = self.editor
+        if not ed.wants_clicks():
+            return False
+        hit = object_at(self.view, x, y)
+        if hit is None:
+            return False
+        body = self.env.get("body_of", lambda d, o: None)(hit["doc"], hit["object"])
+        store = self.env.get("store", lambda: None)()
+        builder = store.builder if store is not None else None
+        restore = self.env.get("keep_selection", lambda: None)()
+        changed = ed.click_part(hit["point"], body, builder, self.env.get("features", lambda: [])())
+        if restore is not None:
+            self.env.get("later", lambda fn: fn())(restore)
+        return changed
+
     def commit_field(self, text):
         scope = self.env.get("scope", lambda: None)()
         self.editor.commit_field(text, scope, self.env.get("units", lambda: "mm")())
@@ -715,7 +775,40 @@ def _env():
                 except Exception:  # noqa: BLE001
                     pass
 
-    return {"store": store, "features": lambda: part().get("features") or [], "bodies": bodies, "units": lambda: "mm", "scope": scope, "context": context, "hide": hide}
+    def body_of(doc_name, obj_name):
+        """The body id of a ReverseBody clicked, or None (the scan, another object)."""
+        try:
+            o = FreeCAD.getDocument(doc_name).getObject(obj_name)
+        except Exception:  # noqa: BLE001
+            return None
+        if o is None or getattr(o, "Proxy", None).__class__.__name__ != "Body" or not hasattr(o, "BodyId"):
+            return None
+        v = o.BodyId
+        return int(v) if float(v).is_integer() else v
+
+    def keep_selection():
+        import FreeCADGui
+
+        was = [(s.DocumentName, s.ObjectName, list(s.SubElementNames)) for s in FreeCADGui.Selection.getSelectionEx("", 0)]
+
+        def restore():
+            now = [(s.DocumentName, s.ObjectName, list(s.SubElementNames)) for s in FreeCADGui.Selection.getSelectionEx("", 0)]
+            if now == was:
+                return
+            FreeCADGui.Selection.clearSelection()
+            for d, o, subs in was:
+                for sub in subs or [""]:
+                    FreeCADGui.Selection.addSelection(d, o, sub)
+
+        return restore
+
+    def later(fn):
+        from PySide import QtCore
+
+        QtCore.QTimer.singleShot(0, fn)  # after FreeCAD's own handling of the release
+
+    return {"store": store, "features": lambda: part().get("features") or [], "bodies": bodies, "units": lambda: "mm", "scope": scope, "context": context,
+            "hide": hide, "body_of": body_of, "keep_selection": keep_selection, "later": later}
 
 
 def session_for(doc):

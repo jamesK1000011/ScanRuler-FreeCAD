@@ -229,6 +229,35 @@ class Editor:
             self.field = None
             self._changed()
 
+    # ---- a click on the part
+    def wants_clicks(self):
+        """Whether a click on the part means something to the box: a pick
+        for a feature on a body's edges or faces, an end for an extrude."""
+        from .picks import PICKS
+
+        return self.open and (self.record["kind"] in PICKS or (self.record["kind"] == "extrude" and not self.record.get("face")))
+
+    def click_part(self, point, body_id=None, builder=None, features=()):
+        """A click on the part at `point`: on a body (body_id) for a feature
+        that picks there, the edge or face under it toggled; for an
+        extrude, its end put through the point. True if the box changed."""
+        from . import picks as K
+
+        if not self.open:
+            return False
+        r = self.record
+        nxt = None
+        field = K.PICKS.get(r["kind"])
+        if field and body_id is not None and builder is not None:
+            fp = K.pick_on_body(builder, body_id, point, field)
+            nxt = K.toggled(r, body_id, fp) if fp is not None else None
+        elif r["kind"] == "extrude":
+            nxt = K.extent_clicked(r, features, point)
+        if nxt is None or nxt == r:
+            return False
+        self._put(nxt)
+        return True
+
     # ---- the ghost
     def needs_ghost(self):
         return self.open and self.ghost_of != self.version_key()
