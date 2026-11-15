@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'flipNormals' key (plugins/mesh-tools/ui/meshIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>flipNormals</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M2.5 21v-8c5.5-4 13.5-4 19 0v8Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M8 10.5v7.5M5.8 15.8 8 18l2.2-2.2" stroke-dasharray="2 2.4" />
+<path d="M16 10.5V2.5M13.8 4.7 16 2.5l2.2 2.2" stroke="#1877c0" />
+</g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'moveBody' key (plugins/reverse/ui/reIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>moveBody</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.5 12.5h7v7h-7Z" stroke-dasharray="2 2.4" />
+<path d="m14.4 3.4 6.4 1.7-1.7 6.4-6.4-1.7Z" stroke="#1877c0" fill="#d9e8f5" />
+<path d="M7 11V7.5h3.5M7 7.5l4.5 4.5" stroke="#1877c0" stroke-width="1.1" />
+</g>
+</svg>

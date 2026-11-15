@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'loft' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>loft</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 18C4 12 8 10 8 5a4 1.8 0 0 0 8 0c0 5 4 7 4 13a8 3 0 0 1-16 0Z" stroke="#1877c0" fill="#d9e8f5" />
+<ellipse cx="12" cy="5" rx="4" ry="1.8" fill="#6b7280" fill-opacity=".13" />
+<path d="M4 18a8 3 0 0 0 16 0" />
+</g>
+</svg>

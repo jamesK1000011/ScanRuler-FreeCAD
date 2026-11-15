@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'dimDistance' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>dimDistance</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 4.5v15M20 4.5v15" />
+<path d="M4.8 12h14.4M7.6 9.2 4.8 12l2.8 2.8M16.4 9.2l2.8 2.8-2.8 2.8" stroke="#1877c0" />
+</g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'wsFlat' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>wsFlat</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3" y="3.5" width="18" height="13" rx="1.5" fill="#6b7280" fill-opacity=".13" />
+<circle cx="12" cy="10" r="3.5" stroke="#1877c0" />
+<path d="M3 20.5h18" />
+<path d="M6 20.5v-1.8M10 20.5v-1.8M14 20.5v-1.8M18 20.5v-1.8" stroke-width="1.1" />
+</g>
+</svg>

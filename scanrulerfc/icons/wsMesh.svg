@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'wsMesh' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>wsMesh</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 18 6 7l8-3 7 5-2 10Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M11 13 3 18m8-5L6 7m5 6 3-9m-3 9 10-4m-10 4 8 6" stroke="#1877c0" />
+</g>
+</svg>

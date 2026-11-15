@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'trimToScan' key (plugins/mesh-tools/ui/meshIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>trimToScan</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 21V14l3-2 3 2 3-3 3 2 3-2 3 1V21Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M3 3h18v6.5l-3-1-3 2-3-2-3 3-3-2-3 2Z" stroke="#1877c0" fill="#d9e8f5" />
+<path d="M3 11.5V16.5H21V9.5" stroke="#1877c0" stroke-dasharray="2 2.4" />
+</g>
+</svg>

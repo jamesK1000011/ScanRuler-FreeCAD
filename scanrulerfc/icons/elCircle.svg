@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'elCircle' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>elCircle</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="12" cy="12" r="8" stroke="#1877c0" />
+<path d="M10.5 12h3M12 10.5v3" stroke="#1877c0" stroke-width="1.1" />
+<circle cx="12.3" cy="3.4" r="1" stroke="none" fill="#6b7280" />
+<circle cx="18.3" cy="6.5" r="1" stroke="none" fill="#6b7280" />
+<circle cx="19.5" cy="13.5" r="1" stroke="none" fill="#6b7280" />
+<circle cx="14.5" cy="20" r="1" stroke="none" fill="#6b7280" />
+<circle cx="6.5" cy="18.3" r="1" stroke="none" fill="#6b7280" />
+<circle cx="3.6" cy="11" r="1" stroke="none" fill="#6b7280" />
+<circle cx="6.3" cy="5.8" r="1" stroke="none" fill="#6b7280" />
+</g>
+</svg>
