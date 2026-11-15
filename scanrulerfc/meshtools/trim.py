@@ -342,24 +342,70 @@ def _spread(values):
     return {"min": float(read[0]), "p05": q(0.05), "median": q(0.5), "p95": q(0.95), "max": float(read[-1]), "measured": int(len(read))}
 
 
+LAST_CUT = {}  # what the last cut's kernel handed back, read by the tests when FreeCAD's answer is not the one expected
+
+
+def _solids(V, F, tol):
+    """The kernel's result as solids: points it gave twice in single
+    precision merged, and patches that only touch along a T-junction seam
+    (FreeCAD's cuts leave them) taken as the one solid they bound — a patch
+    joins another when its open edge's points lie on it."""
+    V, F = B.weld(V, F, tol)
+    pieces = B.pieces_of(V, F)
+    opened = [i for i, (PV, PF) in enumerate(pieces) if M.closedness(PF, len(PV))["open"]]
+    lab = list(range(len(pieces)))
+
+    def root(i):
+        while lab[i] != i:
+            i = lab[i]
+        return i
+
+    for i in opened:
+        PV, PF = pieces[i]
+        loops, _ = M.boundary_loops(PF, len(PV))
+        rim = PV[np.unique(np.concatenate([np.asarray(l) for l, _ in loops]))] if loops else PV[:0]
+        for j in opened:
+            if j == i or root(i) == root(j) or not len(rim):
+                continue
+            near, _, _, _ = G.NearSurface(*pieces[j], tol * 10).nearest(rim)
+            if near.any():
+                lab[root(i)] = root(j)
+    out = {}
+    for i, piece in enumerate(pieces):
+        out.setdefault(root(i), []).append(piece)
+    solids = []
+    for group in out.values():
+        Vs, Fs, off = [], [], 0
+        for PV, PF in group:
+            Vs.append(PV)
+            Fs.append(PF + off)
+            off += len(PV)
+        solids.append((np.vstack(Vs), np.vstack(Fs)))
+    return solids
+
+
 def _cut_body(kernel, BV, BF, body_volume, SV, SF, n_front, flip):
     """The body minus the slab, the pieces on the kept side, one mesh with
     its mating face marked. SF's first n_front triangles are its front skin,
     the next n_front its back skin, the rest its rim wall."""
+    LAST_CUT.clear()
+    LAST_CUT.update({"slabVolume": B.volume(SV, SF), "slabClosed": M.closedness(SF, len(SV)), "flip": flip, "pieces": []})
     try:
         RV, RF = kernel("subtract", (BV, BF), (SV, SF))
     except Exception as e:  # the kernel's own failure, in its words
         raise M.MeshError(f"FreeCAD's mesh boolean would not take the break as a slab to cut with ({e}). A larger offset can help, or the break smoothed first — Smooth on a marked region.")
+    RV = np.asarray(RV, dtype=float)
+    RF = np.asarray(RF, dtype=np.int64).reshape(-1, 3)
+    LAST_CUT.update({"result": (len(RV), len(RF)), "resultVolume": B.volume(RV, RF), "resultClosed": M.closedness(RF, len(RV))})
+    pts = np.vstack([BV, SV])
+    tol = max(1e-6, 1e-6 * float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0))))  # the kernel's points come back in single precision
     eps = 1e-3
     on_body = G.NearSurface(BV, BF, eps)
     on_slab = G.NearSurface(SV, SF, eps)
     speck = SPECK_SHARE * body_volume
     kept, volume, dropped, specks = [], 0.0, 0, 0
-    for PV, PF in B.pieces_of(RV, RF):
+    for PV, PF in _solids(RV, RF, tol):
         v = B.volume(PV, PF)
-        if v < speck:
-            specks += 1
-            continue
         c = PV[PF].mean(axis=1)
         fb, _, _, _ = on_body.nearest(c)
         fs, _, _, tri = on_slab.nearest(c)
@@ -368,6 +414,12 @@ def _cut_body(kernel, BV, BF, body_volume, SV, SF, n_front, flip):
         ahead = int((cut & (kind == 1)).sum())
         behind = int((cut & (kind == -1)).sum())
         wall = int((cut & (kind == 0)).sum())
+        LAST_CUT["pieces"].append({"volume": round(v, 3), "triangles": len(PF), "open": M.closedness(PF, len(PV))["open"], "body": int(fb.sum()),
+                                   "front": ahead, "back": behind, "wall": wall, "neither": int((~fb & ~fs).sum())})
+        v = abs(v)  # a piece wound inside out is still that much material
+        if v < speck:
+            specks += 1
+            continue
         if wall > 0:
             raise M.MeshError("The break, carried out past the body, still ends inside it somewhere — the cut would not go through. Mark the break out to where the part’s surface leaves the body.")
         if ahead > 0 and behind > 0:

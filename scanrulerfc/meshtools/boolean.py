@@ -69,7 +69,12 @@ def outward(V, F):
     itself. So each closed piece is turned to face outward from what it
     bounds: away from its inside when it lies inside an even number of the
     other pieces (none, mostly), toward it — a hollow's wall — when inside
-    an odd number. Open pieces are left as they came."""
+    an odd number. A piece that is open by its edges — FreeCAD's cut seams
+    often meet in T-junctions, so a solid comes back as patches that touch
+    without sharing edges — is turned patch by patch, by which way its
+    largest triangles face: a point just off a triangle, on the side it
+    faces, is outside the material when a ray from it crosses the whole
+    result an even number of times, whatever way anything is wound."""
     V = np.asarray(V, dtype=float)
     F = np.asarray(F, dtype=np.int64).reshape(-1, 3).copy()
     if len(F) == 0:
@@ -86,7 +91,62 @@ def outward(V, F):
         depth = sum(abs(winding(V, F[h], p)) > 0.5 for j, h in enumerate(shells) if j != i)
         if (v > 0) == (depth % 2 == 1):
             F[g] = F[g][:, ::-1]
+    patches = [g for g, c in zip(groups, closed) if not c]
+    if patches:
+        T0 = V[F]
+        off = 1e-4 * float(np.linalg.norm(V.max(axis=0) - V.min(axis=0)))
+        for g in patches:
+            for h in edge_patches(F[g]):
+                if facing_in(V, F[g[h]], T0, off):
+                    F[g[h]] = F[g[h]][:, ::-1]
     return V, F
+
+
+def edge_patches(F):
+    """The triangles of F grouped by shared edges (a T-junction or a lone
+    shared point does not join them): a list of index arrays."""
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3)
+    a, b = F.reshape(-1), F[:, [1, 2, 0]].reshape(-1)
+    key = np.minimum(a, b) * (int(F.max()) + 1) + np.maximum(a, b)
+    tri = np.repeat(np.arange(len(F)), 3)
+    order = np.argsort(key, kind="stable")
+    same = key[order][1:] == key[order][:-1]
+    pairs = np.stack([tri[order][:-1][same], tri[order][1:][same]], axis=1)
+    lab = M.components(pairs[:, [0, 1, 1]], len(F)) if len(pairs) else np.arange(len(F))
+    return [np.nonzero(lab == r)[0] for r in np.unique(lab).tolist()]
+
+
+RAY = np.array([0.5773, 0.6181, 0.5331])  # off every axis and diagonal, so it meets no edge of a gridded part head on
+
+
+def crossings(T, p, d=RAY):
+    """How many of the triangles T (k, 3, 3) a ray from p along d crosses."""
+    e1, e2 = T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]
+    h = np.cross(d, e2)
+    a = np.einsum("ij,ij->i", e1, h)
+    ok = np.abs(a) > 1e-12
+    f = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)
+    s = p - T[:, 0]
+    u = f * np.einsum("ij,ij->i", s, h)
+    q = np.cross(s, e1)
+    v = f * (q @ d)
+    t = f * np.einsum("ij,ij->i", e2, q)
+    return int((ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0)).sum())
+
+
+def facing_in(V, Fg, T_all, off, votes=5):
+    """Whether a patch's triangles mostly face into the material bounded by
+    all of T_all: up to `votes` of its largest triangles asked."""
+    T = V[Fg]
+    n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
+    size = np.linalg.norm(n, axis=1)
+    inward = 0
+    asked = np.argsort(-size)[:votes]
+    asked = asked[size[asked] > 0]
+    for i in asked:
+        p = T[i].mean(axis=0) + off * n[i] / size[i]
+        inward += crossings(T_all, p) % 2
+    return 2 * inward > len(asked)
 
 
 def subject_of(names):
