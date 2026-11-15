@@ -161,10 +161,17 @@ def head_row(s):
     return out
 
 
-def columns_for(width, per):
-    """How many columns a key grid of per columns gets in a page this wide."""
+def columns_for(width, per, key_w=0):
+    """How many columns a key grid of per columns gets in a page this wide;
+    key_w (its widest key's natural width): no more columns than fit whole
+    keys, so no label is cut ("Delete Fac" in a 350 px panel)."""
     per = max(1, int(per or 1))
-    return min(per, 2) if 0 < width < NARROW else per
+    cols = min(per, 2) if 0 < width < NARROW else per
+    if key_w > 0 and width > 0:
+        # The page's and the group's margins and a scroll bar's width.
+        room = width - 2 * MARGIN - GROUP_MARGINS[0] - GROUP_MARGINS[2] - 16
+        cols = min(cols, max(1, int((room + SPACING) // (key_w + SPACING))))
+    return cols
 
 
 def stacked(width):
@@ -180,7 +187,13 @@ def reflow(width, grids, rows, down, across, fields=()):
     g = r = 0
     for item in grids:
         lay, buttons, per = item[0], item[1], item[2]
-        cols = columns_for(width, per)
+        key_w = 0
+        for b in buttons:
+            try:
+                key_w = max(key_w, b.sizeHint().width())
+            except Exception:  # noqa: BLE001 — a stand-in without a size
+                pass
+        cols = columns_for(width, per, key_w)
         if cols != item[3]:
             for b in buttons:
                 lay.removeWidget(b)
