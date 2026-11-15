@@ -21,6 +21,8 @@
 # Every edit is one transaction: edit(container, verb, name, change) opens
 # "Reverse: <verb> <name>", writes PartJson, recomputes, adds and removes
 # the bodies to match, and commits; undo puts PartJson and the bodies back.
+# One edit is one build however often FreeCAD re-runs the container in it
+# (_SETTLED); Results and Status are Output and NoRecompute.
 # FreeCAD is imported where a document is touched, so this module imports
 # anywhere.
 
@@ -35,7 +37,7 @@ CREDIT = "Reverse engineer — ScanRuler by Stefan Hermann (CNC Kitchen), ported
 PALETTE = ["#1877c0", "#e8590c", "#2e7d46", "#b5179e", "#c99a0a", "#0f9b9b", "#b3361c", "#6d4bbd"]
 
 # FreeCAD's property attributes (App::PropertyType).
-_READ_ONLY, _TRANSIENT, _OUTPUT = 1, 2, 8
+_READ_ONLY, _TRANSIENT, _OUTPUT, _NO_RECOMPUTE = 1, 2, 8, 16
 
 # The Builder of each container, by document and object name: the prefix
 # cache an undo or an edit further down rebuilds from.
@@ -43,6 +45,17 @@ _BUILDERS = {}
 # Where the scan's sections and elements come from (the scan family sets
 # it): fn(doc) -> {sections, elements, modelCenter}.
 CONTEXT = {"of": None}
+# While an edit runs, by container: the inputs its build was made from (None
+# until it is made). FreeCAD runs the container again in the same edit
+# however it is written: its Group puts it after its bodies in the
+# dependency graph, so every body recompute re-runs it, and adding or
+# removing a body touches it. Those runs find the inputs unchanged and keep
+# the build, so one edit is one build; outside an edit every run builds.
+_SETTLED = {}
+
+
+def _inputs(obj):
+    return tuple(str(getattr(obj, n, "")) for n in ("PartJson", "ScanRef", "Regions", "StepFiles"))
 
 
 def body_color(i):
@@ -149,12 +162,19 @@ class Container:
             ("Regions", "App::PropertyFileIncluded", "Fit surface regions, packed", 0),
             ("StepFiles", "App::PropertyFileIncluded", "The imported STEP files (reverse-steps.json)", 0),
             ("ScanRef", "App::PropertyString", "The scan state the frames refer to", 0),
-            ("Results", "App::PropertyString", "What the last build said of each feature", _OUTPUT | _TRANSIENT),
-            ("Status", "App::PropertyString", "ok, or how many features failed", _OUTPUT),
+            ("Results", "App::PropertyString", "What the last build said of each feature", _OUTPUT | _TRANSIENT | _NO_RECOMPUTE),
+            ("Status", "App::PropertyString", "ok, or how many features failed", _OUTPUT | _NO_RECOMPUTE),
             ("Credit", "App::PropertyString", "Whose engine this is", _READ_ONLY),
         ):
             if name not in have:
                 obj.addProperty(kind, name, "Reverse", doc, mode)
+        # The build's own answers: written in execute, they must not touch
+        # the container for another recompute (older documents too).
+        for name in ("Results", "Status"):
+            try:
+                obj.setPropertyStatus(name, ["Output", "NoRecompute"])
+            except Exception:  # noqa: BLE001 — a FreeCAD without the call: the mode above stands
+                pass
         if "Group" not in have:
             try:
                 obj.addExtension("App::GroupExtensionPython")
@@ -168,6 +188,9 @@ class Container:
     def execute(self, obj):
         import Part
 
+        k = _key(obj)
+        if k in _SETTLED and _SETTLED[k] == _inputs(obj):
+            return  # this edit's build stands: its bodies or its Group re-ran it
         try:
             part = part_of(obj.PartJson)
         except Exception as e:  # noqa: BLE001 — nothing can build: the one case that raises
@@ -179,6 +202,8 @@ class Container:
         hidden = set(part.get("hiddenBodies") or [])
         solids = [builder_of(obj).body(b["id"]) for b in out["bodies"] if not b["surface"] and b["id"] not in hidden]
         obj.Shape = Part.makeCompound([s for s in solids if s is not None])
+        if k in _SETTLED:
+            _SETTLED[k] = _inputs(obj)
 
     def dumps(self):
         return None
@@ -279,6 +304,8 @@ def edit(container, verb, name, change):
     own = not getattr(doc, "HasPendingTransaction", False)
     if own:
         doc.openTransaction(transaction_label(verb, name))
+    key = _key(container)
+    _SETTLED[key] = None
     try:
         part = part_of(container.PartJson)
         new = change(part)
@@ -288,7 +315,8 @@ def edit(container, verb, name, change):
         doc.recompute()
         sync_bodies(container)
         # A body added to or taken from the Group touches the container
-        # again; the build is already done, so only the bodies recompute.
+        # again, and the bodies' recompute re-runs it: the build is done
+        # (_SETTLED), so only the bodies take their shapes.
         if hasattr(container, "purgeTouched"):
             container.purgeTouched()
         doc.recompute()
@@ -296,6 +324,8 @@ def edit(container, verb, name, change):
         if own:
             doc.abortTransaction()
         raise
+    finally:
+        _SETTLED.pop(key, None)
     if own:
         doc.commitTransaction()
     return json.loads(container.Results or "[]")
