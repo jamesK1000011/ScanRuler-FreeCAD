@@ -65,6 +65,10 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(kit.columns_for(280, 3), 2)
         self.assertEqual(kit.columns_for(280, 1), 1)
         self.assertEqual(kit.columns_for(0, 3), 3)  # not laid out yet
+        # Whole keys only: four 90 px keys don't fit a 354 px panel, three do.
+        self.assertEqual(kit.columns_for(354, 4, 90), 3)
+        self.assertEqual(kit.columns_for(600, 4, 90), 4)
+        self.assertEqual(kit.columns_for(354, 4, 400), 1)
         self.assertTrue(kit.stacked(280))
         self.assertFalse(kit.stacked(340))
 
