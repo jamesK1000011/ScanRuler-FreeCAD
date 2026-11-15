@@ -21,6 +21,8 @@ from . import scanstate as S
 
 GROUP = "manual"
 INFO = "Assembly instructions (ScanRuler, ported): steps from bodies in their assembled places, each part's way in checked, the words linted, an HTML manual with a picture per step."
+# A long job: Agent Link queues and times it (hooks.md, HEAVY).
+HEAVY = {"manual_render"}
 FACES_MAX = 5000
 SAMPLES = 16
 CLEAR = 2.0

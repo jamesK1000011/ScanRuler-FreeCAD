@@ -42,6 +42,8 @@ from .dev_volume import KINDS, MAX_REGIONS, VOLUME_REGIONS, volume_deviation, vo
 
 GROUP = "deviation"
 INFO = "The scan against a reference part (ScanRuler, ported): open the reference, best-fit the scan onto it, map, read patches and volumes, export."
+# A long job: Agent Link queues and times it (hooks.md, HEAVY).
+HEAVY = {"deviation_align"}
 
 KEY = "deviation"
 CAD = (".step", ".stp", ".iges", ".igs", ".brep", ".brp")

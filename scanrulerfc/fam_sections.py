@@ -23,6 +23,8 @@ from .chainsegment import arcs_of_chain, place_segments, profile_curves, segment
 
 GROUP = "sections"
 INFO = "Sections of the scan (ScanRuler, ported): cut it with a plane, read the polylines, fit lines and arcs, write the profile as a sketch."
+# A long job: Agent Link queues and times it (hooks.md, HEAVY).
+HEAVY = {"section_fit"}
 
 GET_LIMIT = 4000
 GET_MAX = 50000

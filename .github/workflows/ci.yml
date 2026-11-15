@@ -36,11 +36,6 @@ jobs:
           repository: jamesK1000011/AgentLink-FreeCAD
           path: agentlink-addon
       - uses: actions/checkout@v5
-        # AddonKit for FreeCAD, the library Agent Link needs.
-        with:
-          repository: jamesK1000011/AddonKit-FreeCAD
-          path: addonkit-lib
-      - uses: actions/checkout@v5
         # Workshop for FreeCAD: Make asks this add-on's scan-thread reader.
         with:
           repository: jamesK1000011/Workshop-FreeCAD
@@ -57,7 +52,7 @@ jobs:
       - name: FreeCAD imports
         run: |
           echo "FREECAD_LIB=$CONDA_PREFIX/lib" >> "$GITHUB_ENV"
-          echo "PYTHONPATH=$GITHUB_WORKSPACE/agentlink-addon:$GITHUB_WORKSPACE/addonkit-lib:$GITHUB_WORKSPACE/workshop-addons/Common:$GITHUB_WORKSPACE/workshop-addons/Make:$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/agentlink-addon:$GITHUB_WORKSPACE/workshop-addons/Common:$GITHUB_WORKSPACE/workshop-addons/Make:$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           python -c "import sys; sys.path.append('$CONDA_PREFIX/lib'); import FreeCAD, Part, Mesh; print('FreeCAD', FreeCAD.Version()[:3])"
       - name: Tests
         timeout-minutes: 25
