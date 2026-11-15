@@ -192,10 +192,33 @@ def _call(view, names, *args):
     raise AttributeError(names[0])
 
 
+def coin_project(view, p):
+    """A point on the view in its viewport's pixels (y up), as Coin draws
+    it: a portrait viewport widens the view volume by 1 / aspect, which
+    FreeCAD's getPointOnViewport leaves out (its points are off in a tall
+    3D view). Raises where the view has no Coin render manager."""
+    from pivy import coin
+
+    rm = view.getViewer().getSoRenderManager()
+    cam, vp = rm.getCamera(), rm.getViewportRegion()
+    a = vp.getViewportAspectRatio()
+    vv = cam.getViewVolume(a)
+    if 0 < a < 1.0:
+        vv.scale(1.0 / a)
+    out = coin.SbVec3f()
+    vv.projectToScreen(coin.SbVec3f(*[float(c) for c in p]), out)
+    w, h = vp.getViewportSizePixels().getValue()
+    x, y = out.getValue()[:2]
+    return float(x) * w, float(y) * h
+
+
 def project(view, p, vector):
     """A point of the part on the view, in its viewport's pixels (y up)."""
-    got = _call(view, ("getPointOnViewport", "getPointOnScreen"), vector(*p))
-    return float(got[0]), float(got[1])
+    try:
+        return coin_project(view, p)
+    except Exception:  # noqa: BLE001 - no Coin here (a stand-in view): FreeCAD's own call
+        got = _call(view, ("getPointOnViewport", "getPointOnScreen"), vector(*p))
+        return float(got[0]), float(got[1])
 
 
 def pick_ray(view, x, y):
