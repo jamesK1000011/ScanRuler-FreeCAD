@@ -64,6 +64,14 @@ scanrulerfc/planar.py
 scanrulerfc/qa_core.py
 scanrulerfc/render_layers.py
 scanrulerfc/repeat_core.py
+scanrulerfc/reverse/__init__.py
+scanrulerfc/reverse/_js.py
+scanrulerfc/reverse/autoconstrain.py
+scanrulerfc/reverse/datums.py
+scanrulerfc/reverse/regions.py
+scanrulerfc/reverse/sketch.py
+scanrulerfc/reverse/sketch_spline.py
+scanrulerfc/reverse/solver.py
 scanrulerfc/scanstate.py
 scanrulerfc/schema.py
 scanrulerfc/section_core.py
@@ -106,6 +114,7 @@ tests/test_redteam_boundary.py
 tests/test_redteam_deviation.py
 tests/test_redteam_fits.py
 tests/test_repeat.py
+tests/test_reverse_autoconstrain.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_thickness.py
