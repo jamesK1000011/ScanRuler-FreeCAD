@@ -109,6 +109,7 @@ scanrulerfc/wear_core.py
 tests/meshes.py
 tests/meshkit.py
 tests/reverse_fakekernel.py
+tests/reverse_fixtures/kernel_builds.json
 tests/reverse_fixtures/part_roundtrip.json
 tests/reverse_fixtures/step_keys_goldens.json
 tests/synth.py
@@ -147,7 +148,9 @@ tests/test_reverse_corners.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_kernel.py
+tests/test_reverse_kernel_builds.py
 tests/test_reverse_parameters.py
+tests/test_reverse_parity.py
 tests/test_reverse_part_file.py
 tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
@@ -165,3 +168,5 @@ tests/test_thread.py
 tests/test_upstream_011.py
 tests/test_volume_maths.py
 tests/test_wear.py
+tests/tools/make_reverse_kernel_fixtures.py
+tests/tools/reverse_goldens.mjs
