@@ -117,6 +117,9 @@ def group_title(s):
 # or field's label stacks above its button or box (the panel stands beside
 # the tree or slides out over the view, 300 px or less).
 NARROW = 320
+# A field's label goes above its box or list below this width, so the list
+# gets the whole row ("Center to ce…" was cut in a 330 px dock).
+FIELD_NARROW = 400
 LONG_CHECK = 28
 # Dense, so a whole section fits without scrolling beside the tree: the
 # space between rows and groups, a page's margins, a group's inner margins.
@@ -148,10 +151,11 @@ def stacked(width):
     return 0 < width < NARROW
 
 
-def reflow(width, grids, rows, down, across):
+def reflow(width, grids, rows, down, across, fields=()):
     """Lay the page out for width: each grid [layout, buttons, per, cols]
     re-placed when its column count changes; each row (a QBoxLayout) set to
-    down (stacked) or across. What changed: (grids, rows)."""
+    down (stacked) or across; each field row the same under FIELD_NARROW.
+    What changed: (grids, rows)."""
     g = r = 0
     for item in grids:
         lay, buttons, per = item[0], item[1], item[2]
@@ -163,11 +167,12 @@ def reflow(width, grids, rows, down, across):
                 lay.addWidget(b, i // cols, i % cols)
             item[3] = cols
             g += 1
-    want = down if stacked(width) else across
-    for row in rows:
-        if row.direction() != want:
-            row.setDirection(want)
-            r += 1
+    for group, narrow in ((rows, stacked(width)), (fields, 0 < width < FIELD_NARROW)):
+        want = down if narrow else across
+        for row in group:
+            if row.direction() != want:
+                row.setDirection(want)
+                r += 1
     return g, r
 
 
@@ -192,7 +197,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
     # reflow on each resize (reflow), long labels wrap.
     root.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
     root.setMinimumWidth(0)
-    grids, rows = [], []
+    grids, rows, fields = [], [], []
 
     def info_button(title, paras):
         dot = QtWidgets.QToolButton()
@@ -249,7 +254,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 row.addWidget(lab, 1)
         else:
             row.addWidget(label(fd["label"]), 1)
-            rows.append(row)
+            fields.append(row)
             if k == "select":
                 w = QtWidgets.QComboBox()
                 w.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
@@ -375,7 +380,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
     class Reflow(QtCore.QObject):
         def eventFilter(self, obj, ev):  # noqa: N802 (Qt)
             if ev.type() == QtCore.QEvent.Resize:
-                reflow(obj.width(), grids, rows, down, across)
+                reflow(obj.width(), grids, rows, down, across, fields)
             return False
 
     root._reflow = Reflow(root)  # kept with its page

@@ -101,6 +101,26 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(g.at["Cone"], (1, 0))
         self.assertEqual(row.d, "across")
 
+    def test_field_label_above_its_list_in_a_narrow_dock(self):
+        """A field's label goes above its list under FIELD_NARROW, so the list
+        gets the whole row ("Center to ce…" was cut at 330 px)."""
+        from scanrulerfc.pages import kit
+
+        class Row:
+            d = "across"
+
+            def direction(self):
+                return self.d
+
+            def setDirection(self, d):  # noqa: N802
+                self.d = d
+
+        slot, field = Row(), Row()
+        kit.reflow(330, [], [slot], "down", "across", [field])
+        self.assertEqual((slot.d, field.d), ("across", "down"))
+        kit.reflow(450, [], [slot], "down", "across", [field])
+        self.assertEqual(field.d, "across")
+
     def test_dense_and_info_on_the_title_row(self):
         from scanrulerfc.pages import kit
 
