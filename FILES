@@ -378,6 +378,7 @@ tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
 tests/test_reverse_scan_builds.py
 tests/test_reverse_scan_context.py
+tests/test_reverse_sew_diag.py
 tests/test_reverse_sketch_shapes.py
 tests/test_reverse_solver.py
 tests/test_reverse_sparse.py
