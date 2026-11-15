@@ -68,6 +68,9 @@ scanrulerfc/reverse/__init__.py
 scanrulerfc/reverse/_js.py
 scanrulerfc/reverse/autoconstrain.py
 scanrulerfc/reverse/datums.py
+scanrulerfc/reverse/expression.py
+scanrulerfc/reverse/features.py
+scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/regions.py
 scanrulerfc/reverse/sketch.py
 scanrulerfc/reverse/sketch_spline.py
@@ -115,6 +118,9 @@ tests/test_redteam_deviation.py
 tests/test_redteam_fits.py
 tests/test_repeat.py
 tests/test_reverse_autoconstrain.py
+tests/test_reverse_expression.py
+tests/test_reverse_features.py
+tests/test_reverse_parameters.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_thickness.py
