@@ -305,14 +305,12 @@ def sew_routes(P, shapes, tolerance):
 
     def face_connect():
         fc = P.ShapeFix.FaceConnect()
-        faces = [f for s in shapes for f in s.Faces]
+        shell = shell_of(P, [f for s in shapes for f in s.Faces], tolerance)
+        faces = shell.Faces  # the pairs named from the shell's own faces
         for i, a in enumerate(faces):
             for b in faces[i + 1:]:
                 if _boxes_meet(a, b, tolerance):
                     fc.add(a, b)
-        shell = P.Shell(faces) if hasattr(P, "Shell") else P.makeShell(faces)
-        if shell.ShapeType != "Shell":
-            shell = P.makeShell(faces)
         return fc.build(shell, tolerance, tolerance)
 
     def shared_edges():
@@ -329,6 +327,31 @@ def sew_routes(P, shapes, tolerance):
         return c
 
     return [("sewShape", sew_shape), ("ShapeFix.FaceConnect", face_connect), ("shared edges", shared_edges), ("ShapeTolerance+sewShape", tolerance_then_sew)]
+
+
+def shell_of(P, faces, tolerance):
+    """A Part.Shell holding every face, for ShapeFix.FaceConnect (which takes
+    nothing else). Part.Shell(faces) answers a Compound on FreeCAD 1.1.3
+    while the faces are not yet connected; a sewShape(), however partial,
+    leaves one shell of them all, whose Shells[0] is a Part.Shell."""
+    faces = list(faces)
+    c = P.Compound(faces)
+    c.sewShape(tolerance)
+    shells = c.Shells
+    if len(shells) == 1 and len(shells[0].Faces) == len(faces):
+        return shells[0]
+    for make in (getattr(P, "Shell", None), getattr(P, "makeShell", None)):
+        if make is None:
+            continue
+        try:
+            got = make(faces)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(got, P.Shell):
+            return got
+        if len(got.Shells) == 1 and len(got.Shells[0].Faces) == len(faces):
+            return got.Shells[0]
+    raise KernelError("the faces do not make one shell to connect.")
 
 
 def _boxes_meet(a, b, tolerance):
