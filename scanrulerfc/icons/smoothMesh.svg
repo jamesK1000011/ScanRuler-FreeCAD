@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'smoothMesh' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>smoothMesh</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="m2.5 16 2-3 2 2.5 2-4.5 2 3.5 2-5 2 4 2-5 2 3.5 2-3 1.5 1.5" stroke-width="1.1" opacity=".5" />
+<path d="M2.5 15.5C7 14 12 11 21.5 9.5" stroke="#1877c0" />
+<path d="M2.5 20h19" fill="#6b7280" fill-opacity=".13" />
+</g>
+</svg>

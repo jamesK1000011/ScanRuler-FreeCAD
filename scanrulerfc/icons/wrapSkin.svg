@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'wrapSkin' key (plugins/mesh-tools/ui/meshIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>wrapSkin</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7 8h5v6H7Z" fill="#6b7280" fill-opacity=".13" />
+<circle cx="15" cy="10.5" r="3.5" fill="#6b7280" fill-opacity=".13" />
+<path d="M8 15.5h7v3H8Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M3.5 12c0-5.5 3.5-8.5 9-8.5 5 0 8 3 8 7.5 0 5.5-3 9.5-8.5 9.5S3.5 17.5 3.5 12Z" stroke="#1877c0" />
+</g>
+</svg>

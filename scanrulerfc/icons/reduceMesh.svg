@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'reduceMesh' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>reduceMesh</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 4h18v16H3Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M6 4v16M3 8h6M3 12h6M3 16h6" stroke-width="1.1" />
+<path d="M9 4v16L21 4" stroke="#1877c0" />
+</g>
+</svg>

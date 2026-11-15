@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'pickPoints' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>pickPoints</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="7" cy="7" r="3.6" stroke="#1877c0" />
+<circle cx="7" cy="7" r="1.6" stroke="none" fill="#1877c0" />
+<path d="M11 10v11l2.9-2.5 2 4.3 1.9-.9-2-4.2 3.9-.3Z" fill="#6b7280" fill-opacity=".13" />
+</g>
+</svg>

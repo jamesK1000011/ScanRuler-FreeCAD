@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'deleteSurface' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>deleteSurface</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 20V9l6-5h12v16Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M12 9.5c3 0 5.5 1.2 5.5 3.5S15 16.5 12 16.5 6.5 15.3 6.5 13 9 9.5 12 9.5Z" stroke="#1877c0" fill="#d9e8f5" stroke-dasharray="2 2.4" />
+<path d="m9.5 11 5 4.5m0-4.5-5 4.5" stroke="#1877c0" />
+</g>
+</svg>

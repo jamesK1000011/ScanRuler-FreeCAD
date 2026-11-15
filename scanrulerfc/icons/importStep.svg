@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'importStep' key (plugins/reverse/ui/reIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>importStep</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.5 2.5h6.5l3 3V12" />
+<path d="M10 2.5v3h3M3.5 2.5V12" />
+<path d="M8 9v6.5h4.5M10.5 13.5l2 2-2 2" stroke="#1877c0" stroke-width="1.1" />
+<path d="M14.5 12.5h6v8h-6Z" stroke="#1877c0" fill="#d9e8f5" />
+</g>
+</svg>

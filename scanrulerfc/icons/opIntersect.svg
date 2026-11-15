@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'opIntersect' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>opIntersect</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M14 9.08V3H3v11h6.08" stroke-width="1.1" opacity=".5" stroke-dasharray="2 2.4" />
+<path d="M14 9.08A6 6 0 1 1 9.08 14" stroke-width="1.1" opacity=".5" stroke-dasharray="2 2.4" />
+<path d="M14 9.08V14H9.08A6 6 0 0 1 14 9.08Z" stroke="#1877c0" fill="#d9e8f5" />
+</g>
+</svg>

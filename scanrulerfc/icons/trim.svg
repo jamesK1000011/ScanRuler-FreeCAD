@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'trim' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>trim</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M2 17h4.9M17.1 17H22M5 21l1.9-4M12 6.22 14 2M19 21l-1.9-4M12 6.22 10 2" stroke-width="1.1" opacity=".5" stroke-dasharray="2 2.4" />
+<path d="M6.9 17h10.2L12 6.22Z" stroke="#1877c0" fill="#d9e8f5" />
+</g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'alignSheet' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>alignSheet</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 19 19 7" stroke-width="1.1" opacity=".5" stroke-dasharray="2 2.4" />
+<path d="M3 19h18" />
+<path d="M14.2 10.6A14 14 0 0 1 16.86 17.05M15.22 15.29l1.64 1.76 1.1-2.14" stroke="#1877c0" />
+<circle cx="3" cy="19" r="1.5" stroke="none" fill="#6b7280" />
+</g>
+</svg>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'spline' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>spline</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 17C7 5 10 5 12 12s5 7 9-5" />
+<circle cx="3" cy="17" r="1.7" stroke="none" fill="#1877c0" />
+<circle cx="7.7" cy="8.3" r="1.7" stroke="none" fill="#1877c0" />
+<circle cx="12" cy="12" r="1.7" stroke="none" fill="#1877c0" />
+<circle cx="16.3" cy="15.7" r="1.7" stroke="none" fill="#1877c0" />
+<circle cx="21" cy="7" r="1.7" stroke="none" fill="#1877c0" />
+</g>
+</svg>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'scan' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>scan</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="12" cy="4" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="7" cy="6.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="17" cy="6.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="4.5" cy="11.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="9.5" cy="10.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="14.5" cy="10.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="19.5" cy="11.5" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="7" cy="16" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="12" cy="15" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="17" cy="16" r="1.15" stroke="none" fill="#6b7280" />
+<circle cx="12" cy="20" r="1.15" stroke="none" fill="#6b7280" />
+</g>
+</svg>

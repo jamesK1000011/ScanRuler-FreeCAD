@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'mesh' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>mesh</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="m3 17 5-11 9-2 4 9-7 8Z" fill="#6b7280" fill-opacity=".13" />
+<path d="m12 12-9 5m9-5L8 6m4 6 5-8m-5 8 9 1m-9-1 2 9" stroke-width="1.1" />
+<circle cx="12" cy="12" r="1.7" stroke="none" fill="#1877c0" />
+</g>
+</svg>

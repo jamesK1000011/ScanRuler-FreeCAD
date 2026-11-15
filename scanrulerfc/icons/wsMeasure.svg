@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'wsMeasure' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>wsMeasure</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="6" cy="16.5" r="3.5" stroke="#1877c0" fill="#d9e8f5" />
+<circle cx="18" cy="16.5" r="3.5" stroke="#1877c0" fill="#d9e8f5" />
+<path d="M6 12.5V4.5M18 12.5V4.5" stroke-width="1.1" />
+<path d="M6 7h12M8 5 6 7l2 2M16 5l2 2-2 2" />
+</g>
+</svg>
