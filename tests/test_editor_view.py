@@ -87,12 +87,13 @@ class _Event:
 def stand_in_coin():
     coin = types.ModuleType("coin_stand_in")
     for n in ("SoSeparator", "SoAnnotation", "SoMatrixTransform", "SoMaterial", "SoShapeHints", "SoCoordinate3", "SoNormal", "SoNormalBinding",
-              "SoIndexedFaceSet", "SoLightModel", "SoBaseColor", "SoDrawStyle", "SoLineSet", "SoTransform", "SoCone"):
+              "SoIndexedFaceSet", "SoLightModel", "SoPickStyle", "SoBaseColor", "SoDrawStyle", "SoLineSet", "SoTransform", "SoCone"):
         setattr(coin, n, type(n, (_Node,), {}))
     coin.SoShapeHints.COUNTERCLOCKWISE = 1
     coin.SoShapeHints.UNKNOWN_SHAPE_TYPE = 0
     coin.SoNormalBinding.PER_VERTEX_INDEXED = 5
     coin.SoLightModel.BASE_COLOR = 0
+    coin.SoPickStyle.UNPICKABLE = 2
     coin.SbVec3f = lambda *a: a
     coin.SbRotation = lambda a, b: (a, b)
     coin.SbMatrix = lambda *a: a
@@ -157,6 +158,11 @@ class StandInView:
 
     def getSize(self):  # noqa: N802
         return (800, 600)
+
+    def getObjectInfo(self, pos):  # noqa: N802
+        """The scan under every pixel, as a plane at z = 30."""
+        x, y = pos
+        return {"Document": "D", "Object": "Scan", "Component": "Facet1", "x": x - 400.0, "y": y - 300.0, "z": 30.0}
 
     def redirectToSceneGraph(self, on):  # noqa: N802
         self.redirected = on
@@ -293,7 +299,9 @@ class OverlayInAView(unittest.TestCase):
         self.coin = stand_in_coin()
         self.hidden = []
         env = {**self.p.env, "features": lambda: self.p.store.part()["features"], "units": lambda: "mm",
-               "hide": lambda ids, on: self.hidden.append((list(ids), on))}
+               "hide": lambda ids, on: self.hidden.append((list(ids), on)), "body_of": lambda d, o: None,
+               "keep_selection": lambda: (lambda: self.restored.append(True)), "later": lambda fn: fn()}
+        self.restored = []
         self.ov = V.Overlay(self.ed, self.view, self.coin, stand_in_qt(), _Vec, env)
 
     def test_attached_drawn_and_taken_away(self):
@@ -363,6 +371,19 @@ class OverlayInAView(unittest.TestCase):
         m = self.ov.stretch_node.matrix.value
         self.assertAlmostEqual(m[10], 2.0)  # Z scaled from 0..10 to 0..20
 
+    def test_a_click_on_the_part_sets_the_extrude_s_end_and_selects_nothing(self):
+        self.ov.tick()
+        # A drag of the view: the navigation's, and nothing for the box.
+        self.assertFalse(self.view.send(_Event("btn", 100, 100, press=True)))
+        self.view.send(_Event("loc", 160, 140))
+        self.assertFalse(self.view.send(_Event("btn", 160, 140, press=False)))
+        self.assertEqual(self.ed.record["extent"]["to"], 10)
+        # A click: the scan's point is 30 over the sketch plane.
+        self.assertFalse(self.view.send(_Event("btn", 100, 100, press=True)))
+        self.assertTrue(self.view.send(_Event("btn", 101, 100, press=False)))
+        self.assertEqual(self.ed.record["extent"], {"kind": "distance", "from": 0, "to": 30})
+        self.assertEqual(self.restored, [True])  # FreeCAD's selection put back as it was
+
     def test_a_replaced_body_is_hidden_and_shown_again(self):
         self.ov.ghost_sep.removeAllChildren()
         self.ed.set_ghost({"status": "ok", "mesh": {"positions": [0, 0, 0, 1, 0, 0, 0, 1, 0], "indices": [0, 1, 2]}, "color": "#1877c0", "replaces": [2], "solid": True})
@@ -370,6 +391,15 @@ class OverlayInAView(unittest.TestCase):
         self.assertEqual(self.hidden, [([2], True)])
         self.ov.detach()
         self.assertEqual(self.hidden[-1], ([2], False))
+
+    def test_a_box_that_picks_on_the_body_keeps_it_in_sight(self):
+        self.ed.open_new("fillet", self.p.store.part(), [{"id": 2, "surface": False, "box": None}])
+        self.ed.set_ghost({"status": "ok", "mesh": {"positions": [0, 0, 0, 1, 0, 0, 0, 1, 0], "indices": [0, 1, 2]}, "color": "#1877c0", "replaces": [2], "solid": True})
+        self.ov.draw_ghost()
+        self.assertEqual(self.hidden, [])
+        mat = next(n for n in walk(self.ov.ghost_sep) if type(n).__name__ == "SoMaterial")
+        self.assertEqual(mat.transparency.value, V.GHOST_TRANSPARENCY)
+        self.assertTrue(any(type(n).__name__ == "SoPickStyle" for n in walk(self.ov.ghost_sep)))
 
 
 if __name__ == "__main__":

@@ -253,7 +253,10 @@ def editor_section(ed, units="mm"):
     s["fields"] = [dict(K.number(r["path"], r["label"], r["value"], UNIT_OF.get(r["kind"], ""), integer=r["kind"] == "integer",
                                  hint=f"{r['expr']} (an expression over the parameters)" if r.get("expr") else None))
                    for r in ed.slots()]
-    s["hint"] = preview_line(ed, units)
+    from ..reverse.picks import picks_line
+
+    picked = picks_line(ed.record)
+    s["hint"] = f"{picked}\n{preview_line(ed, units)}" if picked else preview_line(ed, units)
     s["keys"] = [K.key("editor-create", ed.create_label(), ed.create() is not None, "Enter does the same", primary=True),
                  K.key("editor-cancel", "Cancel", True, "Close the box; nothing is made")]
     return s

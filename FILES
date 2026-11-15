@@ -256,6 +256,7 @@ scanrulerfc/reverse/network_split.py
 scanrulerfc/reverse/origins.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
+scanrulerfc/reverse/picks.py
 scanrulerfc/reverse/preview.py
 scanrulerfc/reverse/profiles.py
 scanrulerfc/reverse/regions.py
@@ -370,6 +371,7 @@ tests/test_reverse_network_split.py
 tests/test_reverse_parameters.py
 tests/test_reverse_parity.py
 tests/test_reverse_part_file.py
+tests/test_reverse_picks.py
 tests/test_reverse_preview.py
 tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
