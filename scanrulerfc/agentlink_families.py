@@ -9,7 +9,7 @@
 #
 # Everything past the families hooks into Agent Link where this Agent Link
 # has the hook. An older Agent Link lacks some (render.register_layer, the
-# printability wall readers, thread scan readers): each is
+# printability wall readers, thread scan readers, services): each is
 # tried on its own and skipped when missing or failing, so importing this
 # module never raises because of the Agent Link it runs in.
 
@@ -144,9 +144,17 @@ def _thread_reader():
 
 
 def _register():
-    # The add-on told it runs under Agent Link (its own dock stays away).
+    # ScanRuler's assembly manual for whoever owns a Manual tab (Workshop
+    # Documents asks hooks.service("manual_maker")), and the add-on told it
+    # runs under Agent Link (its own dock stays away).
     scanrulerfc._hosted = True
+    from agentlink import hooks
+
+    from .manual_maker import ManualMaker
+
+    if hasattr(hooks, "provide"):
+        hooks.provide("manual_maker", ManualMaker())
 
 
-for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("hosted", _register)):
+for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("services", _register)):
     _hook(_name, _call)

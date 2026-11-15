@@ -76,6 +76,7 @@ scanrulerfc/heightmap_core.py
 scanrulerfc/lent.py
 scanrulerfc/linalg.py
 scanrulerfc/manual_core.py
+scanrulerfc/manual_maker.py
 scanrulerfc/mesh_core.py
 scanrulerfc/meshgraph.py
 scanrulerfc/meshio.py

@@ -3,7 +3,8 @@
 # family layer (agentlink_families and scanrulerfc.agentlink.*) imports with
 # Agent Link blocked; the tools' declarations are data (data/tools.json)
 # and match what Agent Link is given; the add-on's own runner answers as
-# the hosted tools do.
+# the hosted tools do; the manual maker runs manual_plan then
+# manual_render through whatever runner it is handed.
 import glob
 import json
 import os
@@ -202,11 +203,15 @@ class SameAnswers(unittest.TestCase):
         self.assertEqual(listed, list(entries))
         self.assertEqual(fl.SKIPPED, [])
 
-    def test_family_layer_says_hosted(self):
+    def test_family_layer_says_hosted_and_provides_the_manual_maker(self):
+        from agentlink import hooks
+
         import scanrulerfc
         import scanrulerfc.agentlink_families as fl
+        from scanrulerfc.manual_maker import ManualMaker
 
         self.assertTrue(scanrulerfc._hosted)
+        self.assertIsInstance(hooks.service("manual_maker"), ManualMaker)
         self.assertEqual(fl.CREDIT, scanrulerfc.CREDIT)
 
     def test_refusals_cross_the_boundary_unchanged(self):
@@ -218,6 +223,62 @@ class SameAnswers(unittest.TestCase):
         with self.assertRaises(ToolError) as c:
             T["scan_nearest"].fn({"at": {"point": [0, 0, 0]}})
         self.assertEqual((c.exception.code, c.exception.message), ("no_scan", "No scan is open — open one with scan_open first."))
+
+
+class ManualMakerService(unittest.TestCase):
+    def _runner(self, answers):
+        calls = []
+
+        def run(tool, args):
+            calls.append((tool, args))
+            return answers[tool]
+
+        return run, calls
+
+    def test_plan_then_render_through_the_runner(self):
+        from scanrulerfc import CREDIT
+        from scanrulerfc.manual_maker import ManualMaker
+
+        run, calls = self._runner({"manual_plan": (True, {"steps": []}),
+                                   "manual_render": (True, {"file": {"path": "/x/manual.html", "name": "manual.html", "bytes": 10}, "steps": 2, "lint": {"step 1": ["passive"]}})})
+        rows = [{"title": "Base", "bodies": ["Base"], "note": ""}, {"title": "Lid on", "bodies": ["Lid", "Screw"], "note": "Press the lid down."}, {"title": "Empty", "bodies": [], "note": ""}]
+        ok, out = ManualMaker().make(run, rows, "Box")
+        self.assertTrue(ok)
+        self.assertEqual(out, {"file": {"path": "/x/manual.html", "name": "manual.html", "bytes": 10}, "steps": 2, "credit": CREDIT, "lint": {"step 1": ["passive"]}})
+        self.assertEqual([c[0] for c in calls], ["manual_plan", "manual_render"])
+        self.assertEqual(calls[0][1], {"fromBodies": True, "steps": [
+            {"id": "s1", "place": [{"part": "Base"}], "text": "Base"},
+            {"id": "s2", "place": [{"part": "Lid"}, {"part": "Screw"}], "text": "Press the lid down.", "notes": "Lid on"}],
+            "settings": {"title": "Box"}})
+        self.assertEqual(calls[1][1], {})
+
+    def test_a_refusal_comes_back_and_render_is_not_asked(self):
+        from scanrulerfc.manual_maker import ManualMaker
+
+        no = {"error": {"code": "not_found", "message": "Part 'Lid': no body 'Lid' in the document."}}
+        run, calls = self._runner({"manual_plan": (False, no)})
+        self.assertEqual(ManualMaker().make(run, [{"title": "Lid", "bodies": ["Lid"]}], ""), (False, no))
+        self.assertEqual([c[0] for c in calls], ["manual_plan"])
+        self.assertNotIn("settings", calls[0][1])
+
+    def test_no_parts_ticked_is_refused_without_a_call(self):
+        from scanrulerfc.manual_maker import ManualMaker
+
+        run, calls = self._runner({})
+        ok, out = ManualMaker().make(run, [{"title": "x", "bodies": []}], "")
+        self.assertFalse(ok)
+        self.assertEqual(out["error"]["code"], "invalid_input")
+        self.assertEqual(calls, [])
+
+    def test_documents_reads_the_answer(self):
+        # Workshop Documents' make_manual reads file["path"], steps, lint, credit.
+        from scanrulerfc.manual_maker import ManualMaker
+
+        run, _ = self._runner({"manual_plan": (True, {}), "manual_render": (True, {"file": {"path": "/m.html"}, "steps": 1})})
+        ok, out = ManualMaker().make(run, [{"title": "A", "bodies": ["A"], "note": ""}], "")
+        self.assertTrue(ok)
+        self.assertEqual((out["file"]["path"], out["steps"], out["lint"]), ("/m.html", 1, {}))
+        self.assertTrue(out["credit"])
 
 
 if __name__ == "__main__":
