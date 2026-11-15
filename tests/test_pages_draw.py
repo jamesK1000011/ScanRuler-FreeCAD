@@ -54,5 +54,62 @@ class EveryPageDraws(unittest.TestCase):
                         page.widget(page.build(st), on_key=lambda *a: None)
 
 
+class FitsTheWidth(unittest.TestCase):
+    """The page follows its panel's width: key grids drop to two columns and
+    labels stack above their buttons under 320 px; labels wrap."""
+
+    def test_columns_and_stacking(self):
+        from scanrulerfc.pages import kit
+
+        self.assertEqual(kit.columns_for(360, 3), 3)
+        self.assertEqual(kit.columns_for(280, 3), 2)
+        self.assertEqual(kit.columns_for(280, 1), 1)
+        self.assertEqual(kit.columns_for(0, 3), 3)  # not laid out yet
+        self.assertTrue(kit.stacked(280))
+        self.assertFalse(kit.stacked(340))
+
+    def test_reflow(self):
+        from scanrulerfc.pages import kit
+
+        class Grid:
+            def __init__(self):
+                self.at = {}
+
+            def removeWidget(self, b):  # noqa: N802
+                self.at.pop(b, None)
+
+            def addWidget(self, b, r, c):  # noqa: N802
+                self.at[b] = (r, c)
+
+        class Row:
+            d = "across"
+
+            def direction(self):
+                return self.d
+
+            def setDirection(self, d):  # noqa: N802
+                self.d = d
+
+        g, row = Grid(), Row()
+        keys = ["Plane", "Cylinder", "Sphere", "Cone", "Section", "Point"]
+        grids = [[g, keys, 3, 3]]
+        self.assertEqual(kit.reflow(280, grids, [row], "down", "across"), (1, 1))
+        self.assertEqual(g.at["Cone"], (1, 1))
+        self.assertEqual(row.d, "down")
+        self.assertEqual(kit.reflow(280, grids, [row], "down", "across"), (0, 0))
+        kit.reflow(360, grids, [row], "down", "across")
+        self.assertEqual(g.at["Cone"], (1, 0))
+        self.assertEqual(row.d, "across")
+
+    def test_labels_wrap(self):
+        mods = fake_pyside()
+        with mock.patch.dict(sys.modules, mods):
+            page = importlib.import_module("scanrulerfc.pages.measure3d")
+            page.widget(page.build(fresh()), on_key=lambda *a: None)
+        qw = mods["PySide.QtWidgets"]
+        qw.QLabel.return_value.setWordWrap.assert_any_call(True)
+        qw.QWidget.return_value.setMinimumWidth.assert_any_call(0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -113,6 +113,47 @@ def group_title(s):
     return W.title_case(s["header"]) if s.get("header") else ""
 
 
+# Narrower than this, the page's key grids drop to two columns and a slot's
+# or field's label stacks above its button or box (the panel stands beside
+# the tree or slides out over the view, 300 px or less).
+NARROW = 320
+LONG_CHECK = 28
+
+
+def columns_for(width, per):
+    """How many columns a key grid of per columns gets in a page this wide."""
+    per = max(1, int(per or 1))
+    return min(per, 2) if 0 < width < NARROW else per
+
+
+def stacked(width):
+    """Whether a label stacks above its button or box in a page this wide."""
+    return 0 < width < NARROW
+
+
+def reflow(width, grids, rows, down, across):
+    """Lay the page out for width: each grid [layout, buttons, per, cols]
+    re-placed when its column count changes; each row (a QBoxLayout) set to
+    down (stacked) or across. What changed: (grids, rows)."""
+    g = r = 0
+    for item in grids:
+        lay, buttons, per = item[0], item[1], item[2]
+        cols = columns_for(width, per)
+        if cols != item[3]:
+            for b in buttons:
+                lay.removeWidget(b)
+            for i, b in enumerate(buttons):
+                lay.addWidget(b, i // cols, i % cols)
+            item[3] = cols
+            g += 1
+    want = down if stacked(width) else across
+    for row in rows:
+        if row.direction() != want:
+            row.setDirection(want)
+            r += 1
+    return g, r
+
+
 def widget(model, on_key=None, on_field=None, parent=None):
     """A QWidget drawn from any page model (every page's, 3D Measure's too):
     a group box per section titled as FreeCAD titles them, with an (i) key,
@@ -128,6 +169,11 @@ def widget(model, on_key=None, on_field=None, parent=None):
         raise RuntimeError("A ScanRuler page widget needs a QApplication (FreeCAD's GUI).")
     root = QtWidgets.QWidget(parent)
     lay = QtWidgets.QVBoxLayout(root)
+    # The page follows its panel's width (never wider): grids and rows
+    # reflow on each resize (reflow), long labels wrap.
+    root.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+    root.setMinimumWidth(0)
+    grids, rows = [], []
 
     def info_button(title, paras):
         dot = QtWidgets.QToolButton()
@@ -154,18 +200,33 @@ def widget(model, on_key=None, on_field=None, parent=None):
         if on_field:
             on_field(sid, fid, v)
 
+    def label(text):
+        lab = QtWidgets.QLabel(text)
+        lab.setWordWrap(True)
+        return lab
+
     def field(s, fd, box):
         row = QtWidgets.QHBoxLayout()
         k = fd.get("kind", "select")
         if k == "check":
-            w = QtWidgets.QCheckBox(fd["label"])
+            long_ = len(fd["label"]) > LONG_CHECK
+            # A long label wraps beside its box (a check box's own text
+            # cannot), and a click on it ticks the box.
+            w = QtWidgets.QCheckBox("" if long_ else fd["label"])
             w.setChecked(fd["value"])
             w.toggled.connect(lambda v, sid=s["id"], fid=fd["id"]: emit(sid, fid, bool(v)))
             row.addWidget(w)
+            if long_:
+                lab = label(fd["label"])
+                lab.mousePressEvent = lambda _e, w=w: w.isEnabled() and w.toggle()
+                row.addWidget(lab, 1)
         else:
-            row.addWidget(QtWidgets.QLabel(fd["label"]))
+            row.addWidget(label(fd["label"]), 1)
+            rows.append(row)
             if k == "select":
                 w = QtWidgets.QComboBox()
+                w.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+                w.setMinimumContentsLength(6)
                 vals = [o["value"] for o in fd["options"]]
                 for o in fd["options"]:
                     w.addItem(o["label"], o["value"])
@@ -222,6 +283,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
     def keys(s, box):
         grid = QtWidgets.QGridLayout()
         per = s.get("grid") or 1
+        made = []
         for i, k in enumerate(s["keys"]):
             b = QtWidgets.QPushButton(button_text(k["label"]))
             b.setToolTip(k["tip"])
@@ -233,6 +295,8 @@ def widget(model, on_key=None, on_field=None, parent=None):
             if on_key:
                 b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
             grid.addWidget(b, i // per, i % per)
+            made.append(b)
+        grids.append([grid, made, per, per])
         box.addLayout(grid)
 
     def section_w(s, box):
@@ -249,7 +313,8 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 # Datum …), not slot rows: 3D Measure failed to open on them.
                 continue
             row = QtWidgets.QHBoxLayout()
-            row.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])))
+            row.addWidget(label("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])), 1)
+            rows.append(row)
             b = QtWidgets.QPushButton(button_text(sl["button"]["label"]))
             b.setToolTip(sl["button"].get("tip") or "")
             b.setEnabled(sl["button"]["enabled"])
@@ -259,7 +324,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             box.addLayout(row)
         for r in s["rows"]:
             reading = r.get("reading") or r.get("value") or ""
-            box.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> %s  <b>%s</b>" % (r.get("color", SCAN_DOT), r["name"], reading)))
+            box.addWidget(label("<span style='color:%s'>●</span> %s  <b>%s</b>" % (r.get("color", SCAN_DOT), r["name"], reading)))
         for fd in s["fields"]:
             field(s, fd, box)
         keys(s, box)
@@ -273,4 +338,14 @@ def widget(model, on_key=None, on_field=None, parent=None):
     for s in model["sections"]:
         section_w(s, lay)
     lay.addStretch(1)
+    down, across = QtWidgets.QBoxLayout.TopToBottom, QtWidgets.QBoxLayout.LeftToRight
+
+    class Reflow(QtCore.QObject):
+        def eventFilter(self, obj, ev):  # noqa: N802 (Qt)
+            if ev.type() == QtCore.QEvent.Resize:
+                reflow(obj.width(), grids, rows, down, across)
+            return False
+
+    root._reflow = Reflow(root)  # kept with its page
+    root.installEventFilter(root._reflow)
     return root
