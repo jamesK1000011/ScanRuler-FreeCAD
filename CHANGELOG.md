@@ -13,6 +13,17 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- Surface Deviation's Split view, ported from ScanRuler by Stefan Hermann (CNC
+  Kitchen): the key opens a two-pane 3D viewer with the scan on the left,
+  coloured by its deviation map while Colour plot is on, and the reference on
+  the right, their cameras linked both ways. It needs a scan and a reference.
+- Reverse engineer: a fillet's, chamfer's, shell's, moved face's or deleted
+  face's edges and faces are clicked on the part, and an extrude's end is
+  clicked through a point, as in ScanRuler; a click selects nothing in
+  FreeCAD.
+- Patch networks sew on FreeCAD 1.1.3: a seam left open is sewn again at a
+  looser tolerance relative to the model, and open edges are read by
+  sameness rather than hash codes.
 - Reverse engineer's feature editor, ported from ScanRuler by Stefan Hermann
   (CNC Kitchen): a Create feature key opens the feature's box (its numbers,
   the preview line, Create or Save changes, Cancel) instead of making the
