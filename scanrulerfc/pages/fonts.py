@@ -35,10 +35,18 @@ def files():
 def load():
     """Add the fonts to Qt's database once; {family: the family name Qt
     reports, or the fallback where Qt could not read the file}. WOFF2 needs a
-    FreeType with Brotli on Linux and Windows; macOS's Core Text reads it."""
+    FreeType with Brotli on Linux and Windows; macOS's Core Text reads it.
+    Without a QApplication (FreeCADCmd, a test run) Qt's font database must
+    not be touched — real FreeCAD's Qt aborts the process — so the
+    fallbacks are answered and nothing is kept, to load once one exists."""
     if _loaded:
         return dict(_loaded)
-    from PySide import QtGui
+    try:
+        from PySide import QtGui, QtWidgets
+    except ImportError:
+        return dict(FALLBACK)
+    if QtWidgets.QApplication.instance() is None:
+        return dict(FALLBACK)
 
     for fam, (fs, _lic) in FAMILIES.items():
         got = None

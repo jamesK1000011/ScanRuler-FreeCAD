@@ -110,6 +110,9 @@ def widget(model, on_key=None, on_field=None, parent=None):
 
     from . import fonts
 
+    if QtWidgets.QApplication.instance() is None:
+        # A widget with no application aborts real FreeCAD's Qt: refuse first.
+        raise RuntimeError("A ScanRuler page widget needs a QApplication (FreeCAD's GUI).")
     fam = fonts.load()
     root = QtWidgets.QWidget(parent)
     lay = QtWidgets.QVBoxLayout(root)

@@ -340,6 +340,8 @@ def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60):
     pictures and saved images too, which a Qt overlay would not."""
     from pivy import coin  # lazy: only inside FreeCAD's GUI
 
+    if not coin.SoDB.isInitialized():  # outside FreeCAD's GUI (a test run): nodes need the database
+        coin.SoDB.init()
     root = coin.SoAnnotation()
     cam = coin.SoOrthographicCamera()
     cam.viewportMapping = coin.SoCamera.LEAVE_ALONE
