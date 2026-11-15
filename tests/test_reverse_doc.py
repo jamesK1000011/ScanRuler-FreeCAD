@@ -91,6 +91,43 @@ class Pure(unittest.TestCase):
         self.assertEqual(out["parameters"][0]["value"], 4)
 
 
+class OneBuildAnEdit(unittest.TestCase):
+    """A stand-in for FreeCAD's recompute: an object runs when touched, and
+    adding to its Group touches it — as matching the bodies does."""
+
+    def test_matching_the_bodies_does_not_build_again(self):
+        class Doc:
+            HasPendingTransaction = True  # joined, as inside Agent Link's own
+
+            def recompute(self):
+                if box.touched:
+                    box.touched = False
+                    box.builds += 1
+
+        class Box:
+            PartJson, Results = dumps(D.empty_part()), "[]"
+            touched, builds = False, 0
+            Document = Doc()
+
+            def touch(self):
+                self.touched = True
+
+            def purgeTouched(self):
+                self.touched = False
+
+            def addObject(self, o):
+                self.touched = True
+
+        box = Box()
+        real = D.sync_bodies
+        D.sync_bodies = lambda c: c.addObject(object())
+        try:
+            D.edit(box, "add", "Cube", lambda p: p)
+        finally:
+            D.sync_bodies = real
+        self.assertEqual(box.builds, 1)
+
+
 @unittest.skipUnless(HAVE_FC, "needs FreeCAD")
 class InADocument(unittest.TestCase):
     def setUp(self):
@@ -136,19 +173,24 @@ class InADocument(unittest.TestCase):
         self.assertEqual(by_id[2].Label, "Bracket")
 
     def test_the_container_builds_once_an_edit(self):
+        # Counted at build_part, which execute looks up as it runs: FreeCAD
+        # keeps the proxy's execute from when Proxy was set, so a patch of
+        # Container.execute afterwards is never called.
         calls = []
-        real = D.Container.execute
+        real = D.build_part
 
-        def counted(proxy, obj):
-            calls.append(obj.Name)
-            return real(proxy, obj)
+        def counted(*a, **k):
+            calls.append(self.c.Name)
+            return real(*a, **k)
 
-        D.Container.execute = counted
+        D.build_part = counted
         try:
             self.add(cube_features())
+            self.assertEqual(calls, [self.c.Name])
+            self.add(cube_features(side=5, at=20, sid=3, eid=4))
         finally:
-            D.Container.execute = real
-        self.assertEqual(calls, [self.c.Name])
+            D.build_part = real
+        self.assertEqual(calls, [self.c.Name] * 2)
 
     def test_a_failing_feature_is_said_not_raised(self):
         def change(p):

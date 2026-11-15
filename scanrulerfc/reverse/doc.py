@@ -287,6 +287,10 @@ def edit(container, verb, name, change):
         container.touch()
         doc.recompute()
         sync_bodies(container)
+        # A body added to or taken from the Group touches the container
+        # again; the build is already done, so only the bodies recompute.
+        if hasattr(container, "purgeTouched"):
+            container.purgeTouched()
         doc.recompute()
     except Exception:
         if own:
