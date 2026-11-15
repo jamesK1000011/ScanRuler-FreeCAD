@@ -156,6 +156,7 @@ class SplitView:
         self.shown = None
         self.last = None
         self.timer = None
+        self.on_closed = None  # fn(): the person closed its tab (the key let up)
 
     @property
     def open(self):
@@ -201,6 +202,8 @@ class SplitView:
             return
         if not _alive(self.view):
             self.close()
+            if self.on_closed is not None:
+                self.on_closed()
             return
         key = contents_key(self.session_fn(), self.colour_plot_fn())
         if key != self.shown:

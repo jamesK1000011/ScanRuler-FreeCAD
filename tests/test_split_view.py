@@ -10,6 +10,7 @@ import os
 import sys
 import types
 import unittest
+import unittest.mock
 
 import numpy as np
 
@@ -182,6 +183,73 @@ class TheKey(unittest.TestCase):
         self.assertEqual(DK.split_view_key("ViewSplit", True, lambda: no_ref), SV.NEEDS)
         self.assertFalse(C._state["view"]["ViewSplit"])
         self.assertIsNone(DK.split_view_key("ViewSplit", False, lambda: no_ref))
+
+    def test_the_reason_goes_to_the_report_view(self):
+        no_ref = session(reference=False)
+        SV._live["split"] = SV.SplitView(Gui(), stand_in_coin(), QT, lambda: no_ref)
+        self.addCleanup(SV._live.__setitem__, "split", None)
+        self.addCleanup(C._state["view"].pop, "ViewSplit", None)
+        said = []
+        with unittest.mock.patch.object(C, "_say", said.append):
+            DK.split_view_key("ViewSplit", True, lambda: no_ref)
+        self.assertEqual(said, [f"ScanRuler: Split view: {SV.NEEDS}"])
+
+    def test_a_closed_tab_lets_the_key_up(self):
+        s = session()
+        SV._live["split"] = SV.SplitView(Gui(), stand_in_coin(), QT, lambda: s)
+        self.addCleanup(SV._live.__setitem__, "split", None)
+        self.addCleanup(C._state["view"].pop, "ViewSplit", None)
+        C._state["view"]["ViewSplit"] = True
+        self.assertIsNone(DK.split_view_key("ViewSplit", True, lambda: s))
+        SV._live["split"].view.close()  # the person closed the tab
+        SV._live["split"].tick()
+        self.assertFalse(C._state["view"]["ViewSplit"])
+
+
+class RunAsACommand(unittest.TestCase):
+    """FreeCADGui.runCommand(name) — Agent Link's cmd_run — calls a
+    checkable command's Activated with 0 and leaves its action as it was:
+    each run is a press. A click hands the action's new state."""
+
+    def setUp(self):
+        spec = next(x for x in _view_specs() if x["command"] == "ScanRuler_ViewSplit")
+        self.cmd = C.ViewCommand(spec)
+        self.sent = []
+        p = unittest.mock.patch.object(C, "_to_panel", lambda *a: self.sent.append(a))
+        p.start()
+        self.addCleanup(p.stop)
+        self.addCleanup(C._state["view"].pop, "ViewSplit", None)
+        C._state["view"].pop("ViewSplit", None)
+
+    def test_each_run_is_a_press(self):
+        for _ in range(3):
+            self.cmd.Activated(0)
+        self.assertEqual([a[2] for a in self.sent], [True, False, True])
+
+    def test_a_click_hands_the_new_state(self):
+        self.cmd.Activated(True)
+        self.cmd.Activated(False)
+        self.cmd.Activated(None)
+        self.assertEqual([a[2] for a in self.sent], [True, False, True])
+
+
+def _view_specs():
+    import scanrulerfc.workspaces as W
+
+    out = []
+
+    def walk_specs(x):
+        if isinstance(x, dict):
+            if str(x.get("command", "")).startswith("ScanRuler_View"):
+                out.append(x)
+            for v in x.values():
+                walk_specs(v)
+        elif isinstance(x, (list, tuple)):
+            for v in x:
+                walk_specs(v)
+
+    walk_specs([getattr(W, n) for n in dir(W) if n.isupper()])
+    return out
 
 
 if __name__ == "__main__":

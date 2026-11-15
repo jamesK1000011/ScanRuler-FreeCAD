@@ -282,14 +282,21 @@ def split_view_key(key, on, session_fn):
     if key == "ViewColourPlot":
         sv = split_view._live["split"]
         return sv.show() if sv is not None and sv.open else None
-    why = split_view.toggle(on, session_fn, colour_plot)
-    if why and on:
+    def let_up():
         C._state["view"]["ViewSplit"] = False
         try:
             for a in C._actions("ScanRuler_ViewSplit"):
                 a.setChecked(False)
         except Exception:  # noqa: BLE001 — no window: the state is enough
             pass
+
+    why = split_view.toggle(on, session_fn, colour_plot)
+    if why:
+        C._say(f"ScanRuler: Split view: {why}")  # the Report view, where a cmd_run's caller looks
+    if why and on:
+        let_up()
+    if split_view._live["split"] is not None:
+        split_view._live["split"].on_closed = let_up  # its tab closed: the next press opens it
     return why
 
 

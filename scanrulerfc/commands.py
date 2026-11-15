@@ -439,7 +439,11 @@ class ViewCommand(_Base):
         return ws is None or _state["workspace"] in ws
 
     def Activated(self, checked=None):
-        on = bool(checked) if checked is not None else not _state["view"].get(self.spec["key"], False)
+        # A click hands the action's new state. FreeCADGui.runCommand(name)
+        # (Agent Link's cmd_run) hands 0 and leaves the action as it was, so
+        # a state that matches what the key shows now is a press: it toggles.
+        was = bool(_state["view"].get(self.spec["key"], self.spec["key"] in _VIEW_ON))
+        on = not was if checked is None or bool(checked) == was else bool(checked)
         native = self.spec.get("native")
         if native == CLIP_COMMAND:
             on = toggle_section()
@@ -451,6 +455,8 @@ class ViewCommand(_Base):
             except Exception as e:  # noqa: BLE001 — FreeCAD's command; say why it did not run
                 _say(f"ScanRuler: {native}: {e}")
         _state["view"][self.spec["key"]] = on
+        for a in _actions(self.spec["command"]):
+            a.setChecked(on)
         return _to_panel("view", self.spec["key"], on)
 
 
