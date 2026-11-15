@@ -206,11 +206,10 @@ def mesh_apply_wrap(session, a):
     return out
 
 
-# Trim to scan cuts with FreeCAD's mesh booleans. In real FreeCAD (1.0, 1.1,
-# newest) the cut still leaves nothing on the break's side of a simple box, so
-# until that is found the tool says it isn't ready rather than tell the person
-# to flip a side that is right. The algorithm itself is ported and tested.
-TRIM_READY = False
+# Trim to scan cuts with FreeCAD's mesh booleans; on since 5be1e43 passed in
+# real FreeCAD 1.0, 1.1 and newest. Off again here if FreeCAD's mesh kernel
+# ever stops giving the original's result.
+TRIM_READY = True
 TRIM_NOT_READY = ("Trim to scan isn't ready in FreeCAD yet: its cut with FreeCAD's mesh booleans doesn't "
                   "give the original's result. Use Cut with a plane, or Boolean subtract, for now.")
 
