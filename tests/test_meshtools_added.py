@@ -554,6 +554,33 @@ class Break(unittest.TestCase):
                     self.assertAlmostEqual(mating_area, 400, 3)
                     self.assertEqual([p["front" if flip else "back"] for p in TR.LAST_CUT["pieces"]].count(0), 1)
 
+    def test_a_hollows_inner_wall_stays_with_the_piece_round_it(self):
+        # A box with a sealed hollow above the break: the original's cut
+        # (Manifold) carries the hollow's wall through; FreeCAD's mesh
+        # difference drops a shell meeting nothing of the slab, or hands it
+        # back as a piece of its own. Either way it stays with the kept half
+        # — and goes with the dropped half when the side is flipped.
+        h = 0.15
+        void = cuboid([-4, -4, 2], [4, 4, 6], 4)
+        void_in = (void[0], void[1][:, ::-1])
+        body = TR.prepare_body(*joined(cuboid([-10] * 3, [10] * 3, 8), void_in), "Box")
+        self.assertAlmostEqual(body[3], 8000 - 256, 3)
+        FV, FF, _, deep, _ = TR.find_break(*sheet(), body[2], 0.3, None, TR.default_break_speck(body[2].bbox_diagonal))
+        EV, EF, _ = TR.extend_rim(FV, FF, body[2], M.MAX_STRETCH * h + TR.CLEARANCE, deep)
+        SV, SF, _, _ = SH.thicken_mesh(EV, EF, 2 * h, "both")
+        top, bottom = cuboid([-10, -10, h], [10, 10, 10], 4), cuboid([-10, -10, -10], [10, 10, -h], 4)
+        answers = {"wall dropped": joined(top, bottom), "wall kept": joined(top, bottom, void_in), "wall alone, inside out": joined(top, bottom, void)}
+        for name, answer in answers.items():
+            answer = BO.outward(*answer) if name != "wall dropped" else answer
+            for flip in (False, True):
+                with self.subTest(name, flip=flip):
+                    V, F, _, mating_area, pieces, volume, dropped, specks = TR._cut_body(lambda *a, answer=answer: answer, *body[:2], body[3], SV, SF, len(EF), flip)
+                    self.assertEqual((pieces, dropped, specks), (1, 1, 0))
+                    self.assertAlmostEqual(volume, 400 * (10 - h) - (0 if flip else 256), 3)
+                    self.assertAlmostEqual(BO.volume(V, F), volume, 3)
+                    self.assertAlmostEqual(mating_area, 400, 3)
+                    self.assertEqual(TR.LAST_CUT["restored"], 1 if name == "wall dropped" else 0)
+
     def test_outward_turns_patches_of_an_open_shell(self):
         V2, F2 = BO.outward(*cracked_box([0, 0, 0], [2, 3, 4], 4, True, False))
         self.assertAlmostEqual(BO.volume(V2, F2), 24, 6)
@@ -571,6 +598,21 @@ class Break(unittest.TestCase):
                 print(diagnostic, file=sys.stderr)
                 self.fail(diagnostic)
 
+
+    @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
+    def test_a_hollow_box_trimmed_keeps_its_inner_wall(self):
+        void = cuboid([-4, -4, 2], [4, 4, 6], 4)
+        body = TR.prepare_body(*joined(box_mesh(20, 20, 20, 8), (void[0], void[1][:, ::-1])), "Box")
+        for flip in (False, True):
+            try:
+                V, F, mating, gap, rep = TR.trim_to_scan(*sheet(), body, 0.3, 0.15, flip)
+                self.assertAlmostEqual(rep["volume"], 400 * (10 - 0.15) - (0 if flip else 256), 0)
+                self.assertAlmostEqual(BO.volume(V, F), rep["volume"], 0)
+                self.assertEqual(rep["pieces"], 1)
+            except Exception as e:
+                diagnostic = f"Hollow trim (flip {flip}): {e}\nFreeCAD's cut: {TR.LAST_CUT}"
+                print(diagnostic, file=sys.stderr)
+                self.fail(diagnostic)
 
 class Session:
     def __init__(self, V, F):
