@@ -11,7 +11,7 @@ A scan is a cloud of noisy samples of a surface. Every number you give rests on 
 - **Groups.** The scan tools are in groups: `scan`, `elements`, `align`, `dimensions`, `sections`, `flat`, `deviation`, `thickness`, `meshtools`, `scan-noise`, `scan-thread`, `wear`, `catalog`, `manual`, `pack`, `fit-scan`. `tool_groups { enable: ["scan", "elements", "align", "dimensions"] }` lists those a measuring task needs; enable `deviation`, `thickness`, `sections` when it gets there. Any tool runs by name either way.
 - **`scan_info` before acting and after**: the scan's box says where the part lies; the elements and dimensions what is measured. `session_state` is the FreeCAD document — the scan is not in it.
 - **Every answer is in millimetres**, angles in degrees.
-- **One undo step per change**, as for the document: `history_undo`, `history_checkpoint` / `history_restore`.
+- **One undo step per change**, as for the document: `history_undo`; checkpoints and restoring one are the SafetyNet add-on's tools, when it is installed.
 - **Keep the context small**: `limit` on point queries, pictures at the default size, `report_get` once at the end.
 - **Task list:** open and inspect → noise floor and tolerance → datums → fit and dimension → sections, deviation, thickness as asked → report and files.
 
