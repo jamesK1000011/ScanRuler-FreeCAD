@@ -76,6 +76,7 @@ scanrulerfc/reverse/doc.py
 scanrulerfc/reverse/expression.py
 scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
+scanrulerfc/reverse/handlers.py
 scanrulerfc/reverse/kernel.py
 scanrulerfc/reverse/kernel_thread.py
 scanrulerfc/reverse/loops.py
@@ -93,6 +94,7 @@ scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
 scanrulerfc/reverse/surface_fit.py
 scanrulerfc/reverse/sweep_route.py
+scanrulerfc/reverse/tools.json
 scanrulerfc/reverse/topo.py
 scanrulerfc/reverse/units.py
 scanrulerfc/reverse/vec.py
@@ -149,6 +151,7 @@ tests/test_reverse_corners.py
 tests/test_reverse_doc.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
+tests/test_reverse_handlers.py
 tests/test_reverse_kernel.py
 tests/test_reverse_kernel_builds.py
 tests/test_reverse_parameters.py
