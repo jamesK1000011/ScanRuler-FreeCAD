@@ -6,6 +6,8 @@
 
 import math
 
+from ._js import js_hypot
+
 
 def sub(a, b):
     return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -24,7 +26,7 @@ def cross(a, b):
 
 
 def length(a):
-    return math.hypot(a[0], a[1], a[2])
+    return js_hypot(a[0], a[1], a[2])
 
 
 def scale(a, s):

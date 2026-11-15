@@ -22,6 +22,34 @@ def js_round(x):
     return float(math.floor(x + 0.5)) if abs(x) < 2 ** 52 else float(x)
 
 
+def js_hypot(*xs):
+    """Math.hypot as V8 works it: scaled by the largest, the squares summed
+    with Kahan's compensation. Python's math.hypot rounds otherwise in about
+    a third of cases, and the build steps are hashed."""
+    m = 0.0
+    for x in xs:
+        a = abs(x)
+        if math.isinf(a):
+            return math.inf
+        if a != a:
+            m = math.nan
+        elif a > m:
+            m = a
+    if m != m:
+        return math.nan
+    if m == 0:
+        return 0.0
+    s = 0.0
+    c = 0.0
+    for x in xs:
+        n = abs(x) / m
+        summand = n * n - c
+        p = s + summand
+        c = (p - s) - summand
+        s = p
+    return math.sqrt(s) * m
+
+
 def fmod(a, b):
     """JavaScript's `%`: the sign of the dividend."""
     if b == 0 or not math.isfinite(a):

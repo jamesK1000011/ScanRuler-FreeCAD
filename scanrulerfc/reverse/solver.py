@@ -14,7 +14,7 @@ import math
 import numpy as np
 
 from ..linalg import cholesky_solve, solve_linear, sym_eigen
-from ._js import fmod
+from ._js import fmod, js_hypot
 from .datums import trace_line, trace_of, trace_offset
 from .sketch import anchor_point, distance_along, dot2, len2, normalize2, perp2, spline_joint, sub2
 from .sketch_spline import is_closed, nearest_on_spline, spline_at, spline_curve, spline_dir_at, spline_end
@@ -211,7 +211,7 @@ def solve_sketch(sketch, pull=None, quick=False, datums=None):
                 ay = xs[o + 1]
                 dx = xs[o + 2] - ax
                 dy = xs[o + 3] - ay
-                ln = math.hypot(dx, dy)
+                ln = js_hypot(dx, dy)
                 if ln > 0:
                     dx /= ln
                     dy /= ln

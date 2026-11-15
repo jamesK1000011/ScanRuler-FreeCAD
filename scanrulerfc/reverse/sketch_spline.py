@@ -9,6 +9,8 @@
 
 import math
 
+from ._js import js_hypot
+
 import numpy as np
 
 HANDLE_REACH = 1 / 3
@@ -31,7 +33,7 @@ def _chords(points, closed):
     for k in range(spline_segment_count(n, closed)):
         a = points[k]
         b = points[(k + 1) % n]
-        out.append(math.hypot(b[0] - a[0], b[1] - a[1]))
+        out.append(js_hypot(b[0] - a[0], b[1] - a[1]))
     return out
 
 
@@ -153,7 +155,7 @@ def eval_spline(fit, k, u):
     n = len(pts)
     p0 = pts[k]
     p1 = pts[(k + 1) % n]
-    h = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    h = js_hypot(p1[0] - p0[0], p1[1] - p0[1])
     m0 = fit["tangents"][k]
     m1 = fit["tangents"][(k + 1) % n]
     u2 = u * u
@@ -170,7 +172,7 @@ def eval_spline_derivative(fit, k, u):
     n = len(pts)
     p0 = pts[k]
     p1 = pts[(k + 1) % n]
-    h = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    h = js_hypot(p1[0] - p0[0], p1[1] - p0[1])
     m0 = fit["tangents"][k]
     m1 = fit["tangents"][(k + 1) % n]
     u2 = u * u
@@ -195,7 +197,7 @@ def _arc_length(fit):
             s = 0.0
             for g in range(len(_GAUSS_X)):
                 d = eval_spline_derivative(fit, k, u0 + half * (1 + _GAUSS_X[g]))
-                s += _GAUSS_W[g] * math.hypot(d[0], d[1])
+                s += _GAUSS_W[g] * js_hypot(d[0], d[1])
             total += s * half
     return total
 
@@ -222,7 +224,7 @@ def spline_curve(e):
     closed = is_closed(e)
 
     def chord(i):
-        return math.hypot(pts[(i + 1) % n][0] - pts[i][0], pts[(i + 1) % n][1] - pts[i][1])
+        return js_hypot(pts[(i + 1) % n][0] - pts[i][0], pts[(i + 1) % n][1] - pts[i][1])
 
     handles = [None] * n
     if not closed and n >= 2:
@@ -244,7 +246,7 @@ def spline_curve(e):
         before = pts[(i - 1 + n) % n if closed else max(0, i - 1)]
         after = pts[(i + 1) % n if closed else min(n - 1, i + 1)]
         d = [after[0] - before[0], after[1] - before[1]]
-        ln = math.hypot(d[0], d[1])
+        ln = js_hypot(d[0], d[1])
         tangents.append([d[0] / ln, d[1] / ln] if ln > 1e-12 else [1, 0])
     length = 0.0
     for i in range(spline_segments_of(e)):
@@ -277,7 +279,7 @@ def spline_deriv_at(fit, t):
 
 def spline_dir_at(fit, t):
     d = spline_deriv_at(fit, t)
-    ln = math.hypot(d[0], d[1])
+    ln = js_hypot(d[0], d[1])
     return [d[0] / ln, d[1] / ln] if ln > 1e-12 else [1, 0]
 
 
@@ -342,7 +344,7 @@ def nearest_on_spline(fit, p, per_segment=16):
     if fit["closed"]:
         t = math.fmod(math.fmod(t, s) + s, s)
     point = spline_at(fit, t)
-    return {"t": t, "point": point, "dist": math.hypot(point[0] - p[0], point[1] - p[1])}
+    return {"t": t, "point": point, "dist": js_hypot(point[0] - p[0], point[1] - p[1])}
 
 
 def _lerp(a, b, u):
@@ -354,7 +356,7 @@ def _segment_bezier(fit, k):
     n = len(pts)
     p0 = pts[k]
     p1 = pts[(k + 1) % n]
-    h = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    h = js_hypot(p1[0] - p0[0], p1[1] - p0[1])
     m0 = fit["tangents"][k]
     m1 = fit["tangents"][(k + 1) % n]
     return [[p0[0], p0[1]], [p0[0] + (h * m0[0]) / 3, p0[1] + (h * m0[1]) / 3], [p1[0] - (h * m1[0]) / 3, p1[1] - (h * m1[1]) / 3], [p1[0], p1[1]]], h
@@ -518,7 +520,7 @@ def spline_scatter(e):
 
 
 def fit_points_along(chain, count, closed):
-    if closed and len(chain) > 1 and math.hypot(chain[0][0] - chain[-1][0], chain[0][1] - chain[-1][1]) < 1e-9:
+    if closed and len(chain) > 1 and js_hypot(chain[0][0] - chain[-1][0], chain[0][1] - chain[-1][1]) < 1e-9:
         pts = list(chain[:-1])
     else:
         pts = list(chain)
@@ -526,7 +528,7 @@ def fit_points_along(chain, count, closed):
         pts.append(pts[0])
     run = [0.0]
     for i in range(1, len(pts)):
-        run.append(run[i - 1] + math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
+        run.append(run[i - 1] + js_hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
     total = run[-1]
     if not (total > 1e-9):
         return None
