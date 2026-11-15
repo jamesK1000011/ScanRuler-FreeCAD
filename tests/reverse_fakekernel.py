@@ -34,6 +34,15 @@ class Shape:
         self.pieces = pieces
 
 
+class Sheet:
+    """A flat sheet across space: the plane coordinate `axis` = `at`."""
+
+    def __init__(self, axis, at):
+        self.axis, self.at = axis, at
+        self.pieces = []
+        self.faces = [next(_ids)]
+
+
 class FakeKernel:
     coarse_fuzz = 1e-3
 
@@ -75,6 +84,38 @@ class FakeKernel:
         for s in shapes[1:]:
             acc = self.fuse_tracked(acc, s)["shape"]
         return acc
+
+    def sheet(self, pieces, d, frm, to):
+        """A line drawn across the sketch swept along Z: the plane it stands
+        in (x = a line's x, or y = its y)."""
+        a, b = pieces[0]["a"], pieces[0]["b"]
+        return Sheet(0, a[0]) if abs(a[0] - b[0]) < 1e-9 else Sheet(1, a[1])
+
+    def split(self, shape, tools):
+        self.calls.append("split")
+        pieces = list(shape.pieces)
+        for t in tools:
+            out = []
+            for p in pieces:
+                ax, at = t.axis, t.at
+                if p.box[0][ax] < at < p.box[1][ax]:
+                    hi1, lo2 = list(p.box[1]), list(p.box[0])
+                    hi1[ax] = lo2[ax] = at
+                    out += [Piece((list(p.box[0]), hi1)), Piece((lo2, list(p.box[1])))]
+                else:
+                    out.append(p)
+            pieces = out
+        return [Shape([p]) for p in pieces]
+
+    def traced_history(self, before, after):
+        return {}
+
+    def thicken_tracked(self, sheet, thickness, way):
+        lo, hi = [0.0, 0.0, 0.0], [10.0, 10.0, 10.0]
+        a, b = (sheet.at, sheet.at + thickness) if way == "out" else (sheet.at - thickness, sheet.at) if way == "in" else (sheet.at - thickness / 2, sheet.at + thickness / 2)
+        lo[sheet.axis], hi[sheet.axis] = a, b
+        piece = Piece((lo, hi))
+        return {"shape": Shape([piece]), "history": {}, "skin": {piece.faces[0]: sheet.faces[0]}, "wall": {"least": thickness, "at": [0, 0, 0], "points": 48}}
 
     # ---- booleans
     def fuse_tracked(self, a, b):
@@ -138,7 +179,7 @@ class FakeKernel:
         return True
 
     def is_surface(self, s):
-        return False
+        return isinstance(s, Sheet)
 
     def solid_count(self, s):
         return len(s.pieces)
@@ -150,12 +191,16 @@ class FakeKernel:
         return sum(p.volume for p in s.pieces)
 
     def face_hashes(self, s):
-        return [h for p in s.pieces for h in p.faces]
+        return list(s.faces) if isinstance(s, Sheet) else [h for p in s.pieces for h in p.faces]
 
     def face_count(self, s):
         return len(self.face_hashes(s))
 
     def bounds(self, s):
+        if isinstance(s, Sheet):
+            lo, hi = [-1e3] * 3, [1e3] * 3
+            lo[s.axis] = hi[s.axis] = s.at
+            return {"min": lo, "max": hi}
         return {"min": [min(p.box[0][i] for p in s.pieces) for i in range(3)], "max": [max(p.box[1][i] for p in s.pieces) for i in range(3)]}
 
     extent = bounds

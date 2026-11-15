@@ -232,7 +232,7 @@ class AtWork(unittest.TestCase):
         self.assertEqual(s["fields"]["radius"], 1)
         self.assertTrue(s["fields"]["chain"])
         self.assertEqual(self.call("reverse_feature_schema", kind="extrude")["fields"]["extent"], {"kind": "distance", "from": 0, "to": 10})
-        self.assertIn("builds", self.call("reverse_feature_schema", kind="loft"))
+        self.assertNotIn("builds", self.call("reverse_feature_schema", kind="loft"))  # build step 10 is in
         self.refused("reverse_build_stop", "unavailable")
         self.assertEqual(self.call("reverse_build")["bodies"], [])
 

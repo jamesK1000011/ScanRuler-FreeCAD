@@ -142,14 +142,14 @@ OCCT_CALLS = {
 # step brings it (with the step).
 KERNEL_OPS = {
     "face": "face", "extrude": "extrude", "revolve": "revolve", "screw": "screw", "sheet": "sheet", "surfaceThrough": "surface_through",
-    "sweep": "sweep", "loft": "loft", "loftFold": None, "pattern": "pattern", "split": "split", "distanceToPoint": "distance_to_point",
-    "tracedHistory": "traced_history", "distanceBetween": "distance_between", "crossing": None, "sheetNormals": None, "splitFaces": None,
-    "sewFaces": None, "sheetPieces": None, "sewSheet": None, "sewPatches": "sew_patches", "box": "box", "halfSpace": "half_space", "fuse": "fuse",
+    "sweep": "sweep", "loft": "loft", "loftFold": "loft_fold", "pattern": "pattern", "split": "split", "distanceToPoint": "distance_to_point",
+    "tracedHistory": "traced_history", "distanceBetween": "distance_between", "crossing": "crossing", "sheetNormals": "sheet_normals", "splitFaces": "split_faces",
+    "sewFaces": "sew_faces", "sheetPieces": None, "sewSheet": None, "sewPatches": "sew_patches", "box": "box", "halfSpace": "half_space", "fuse": "fuse",
     "fuseAll": "fuse_all", "keepingSplits": "keeping_splits", "fuzzyBooleans": "fuzzy_booleans", "coarseFuzz": "coarse_fuzz",
     "fuseTracked": "fuse_tracked", "cutTracked": "cut_tracked", "commonTracked": "common_tracked", "filletTracked": "fillet_tracked",
     "filletRadii": "fillet_radii", "filletVariable": "fillet_variable", "chamferTracked": "chamfer_tracked", "chamferAngled": "chamfer_angled",
     "edgeSides": "edge_sides", "deleteFaces": "delete_faces", "shellTracked": "shell_tracked", "collapsingRounds": None, "clearance": "clearance",
-    "offsetSolid": "offset_solid", "faceOffsetLimits": None, "thickenTracked": None, "mirrorTracked": "mirror_tracked", "draftFaces": "draft_faces",
+    "offsetSolid": "offset_solid", "faceOffsetLimits": None, "thickenTracked": "thicken_tracked", "mirrorTracked": "mirror_tracked", "draftFaces": "draft_faces",
     "offsetFaceTracked": "offset_face_tracked", "threadTracked": "thread_tracked", "offsetFacesTracked": "offset_faces_tracked", "faceCopy": "face_copy",
     "faceNormals": "face_normals", "facePoints": "face_points", "faceHashes": "face_hashes", "faces": "faces", "edges": "edges", "cut": "cut",
     "solids": "solids", "facesOf": "faces_of", "common": "common", "isClosedSolid": "is_closed_solid", "isValid": "is_valid", "isSurface": "is_surface",
@@ -161,8 +161,8 @@ KERNEL_OPS = {
     "fromBrep": "from_brep", "copy": "copy", "release": "release",
 }
 # The build step that brings each op KERNEL_OPS leaves out (design §7.1).
-LATER_STEP = {"loftFold": 10, "crossing": 11, "sheetNormals": 11, "splitFaces": 10, "sewFaces": 11, "sheetPieces": 11, "sewSheet": 11,
-              "collapsingRounds": 13, "faceOffsetLimits": 13, "thickenTracked": 10, "voids": 13, "measuredVolume": 13, "exportStepMended": 10,
+LATER_STEP = {"sheetPieces": 11, "sewSheet": 11,
+              "collapsingRounds": 13, "faceOffsetLimits": 13, "voids": 13, "measuredVolume": 13, "exportStepMended": 10,
               "readBackEdges": 10, "readBackParts": 10, "verifyStep": 10, "oddEdges": 13, "shortEdges": 13, "smallConics": 10, "narrowFaces": 13,
               "sectionPieces": 13, "probe": 13, "readStepNames": 10}
 
@@ -1021,6 +1021,44 @@ def on_copy(occt, kernel, solid, face_hashes, fn):
     return {**result, "history": history}
 
 
+THICKEN_RETRY_TOLERANCE = 1e-4
+THICKEN_WALL_POINTS = 48
+
+
+def _wall_along_edge(o, base, solid, frm):
+    """kernelThicken wallAlongEdge: from points spread along the base's
+    open edges, the distance to the solid's far skin — its faces neither
+    thickened from nor meeting those along an edge. {least, at, points},
+    or None."""
+    base_faces = parse_history(o.edgeToFaceMap(base, HASH_BOUND))
+    edges = [e for e in o.getSubShapes(base, "edge") if len(set(base_faces.get(o.hashCode(e, HASH_BOUND), []))) == 1]
+    if not edges:
+        return None
+    meets = set()
+    for hs in parse_history(o.edgeToFaceMap(solid, HASH_BOUND)).values():
+        if any(h in frm for h in hs):
+            meets.update(hs)
+    far = [f for f in o.getSubShapes(solid, "face") if o.hashCode(f, HASH_BOUND) not in meets]
+    if not far:
+        return None
+    skin = o.makeCompound(far)
+    lengths = [o.curveLength(e) for e in edges]
+    total = sum(lengths)
+    if not total > 0:
+        return None
+    least, at, points = math.inf, [0, 0, 0], 0
+    for e, ln in zip(edges, lengths):
+        n = max(1, round(THICKEN_WALL_POINTS * ln / total))
+        r = o.curveParameters(e)
+        for j in range(n):
+            p = list(o.curvePointAtParam(e, r["first"] + (r["last"] - r["first"]) * (j + 0.5) / n))
+            d = o.distanceBetween(o.makeVertex(*p), skin)
+            points += 1
+            if d < least:
+                least, at = d, p
+    return {"least": least, "at": at, "points": points} if points else None
+
+
 # ---- the kernel (kernel.ts ReKernel) ------------------------------------------------------------------
 
 
@@ -1220,6 +1258,144 @@ class Kernel:
             return as_solid(self.occt, self.occt.loft([self.wire(p["outer"]) for p in profiles], True, ruled))
 
         return run("Lofting", go)
+
+    def loft_fold(self, shape, normal=None, faces=None, trimmed=False):
+        """Where a smooth loft's skin crosses itself, or None (loft_fold.py)."""
+        from .loft_fold import loft_fold
+
+        return run("Reading the loft", lambda: loft_fold(self.occt, shape, normal, faces, trimmed))
+
+    def crossing(self, a, b, deflection):
+        """Where two shapes' surfaces cross, as polylines of the kernel's
+        section of the one by the other; empty where they do not."""
+
+        def go():
+            o = self.occt
+            cut = o.section(a, b)
+            if o.isNull(cut) or o.subShapeCount(cut, "edge") == 0:
+                return []
+            wire = o.wireframe(cut, deflection)
+            g = wire["edgeGroups"]
+            return [wire["points"][g[i]:g[i] + g[i + 1]] for i in range(0, len(g) - 2, 3)]
+
+        return run("Crossing the shapes", go)
+
+    def sheet_normals(self, sheet, points):
+        """A sheet's unit normals at points on it: the surface's own normal at
+        the nearest point of the face each point lies nearest."""
+
+        def go():
+            o = self.occt
+            faces = o.getSubShapes(sheet, "face")
+            if not faces:
+                raise KernelError("the sheet has no faces.")
+            out = []
+            for p in points:
+                face = faces[0]
+                if len(faces) > 1:
+                    v = o.makeVertex(*p)
+                    face = min(faces, key=lambda f: o.distanceBetween(v, f))
+                u, w = o.uvFromPoint(face, p)
+                out.append(normalize(o.surfaceNormal(face, u, w)) or [0, 0, 1])
+            return out
+
+        return run("Reading the sheet", go)
+
+    def split_faces(self, shape, tools):
+        """Every face the tools cut the shape into, each once though the
+        fragments share them — for a trim to test against the scan."""
+
+        def go():
+            o = self.occt
+            seen = set()
+            out = []
+            for f in o.getSubShapes(o.split(shape, list(tools)), "face"):
+                h = o.hashCode(f, HASH_BOUND)
+                if h not in seen:
+                    seen.add(h)
+                    out.append(f)
+            return out
+
+        return run("Splitting", go)
+
+    def sew_faces(self, faces, tolerance):
+        """The faces sewn into a shell, a solid where it closes — healed to
+        the tolerance, and its faces on one surface made one (what cut them
+        apart were the other tools' cells, not anything of the part's)."""
+
+        def go():
+            o = self.occt
+            if not faces:
+                raise KernelError("no faces to sew.")
+            sewn = o.sewAndSolidify(list(faces), tolerance)
+            if o.getShapeType(sewn) != "solid":
+                return sewn
+            solid = sewn
+            try:
+                solid = o.healSolid(sewn, tolerance)
+            except Exception:  # noqa: BLE001 — the sewn solid as it is
+                pass
+            try:
+                unified = o.unifySameDomain(solid)
+                if not o.isNull(unified) and o.getShapeType(unified) == "solid" and self.is_closed_solid(unified):
+                    return unified
+            except Exception:  # noqa: BLE001 — not unified: the faces stay as they were cut
+                pass
+            return solid
+
+        return run("Sewing the faces", go)
+
+    def thicken_tracked(self, sheet, thickness, way):
+        """kernelThicken thickenSheet: the sheet made a solid of the
+        thickness, along its normals (out), against them (in) or half each
+        way — offset back by half first and thickened as one. {shape,
+        history, skin (solid face hash -> sheet face hash; none both ways),
+        wall (the thinnest along the sheet's edge, or None)}."""
+
+        def go():
+            o = self.occt
+            if not thickness > 0:
+                raise KernelError("the thickness must be positive.")
+            said = f"the kernel's thickening of the sheet {'both ways' if way == 'both' else 'along its normal' if way == 'out' else 'against its normal'} by {thickness:g} mm"
+            base = sheet
+            if way == "both":
+                try:
+                    base = o.offset(sheet, -thickness / 2, 1e-3)
+                except Exception as e:  # noqa: BLE001
+                    raise KernelError(f"{said} failed: the sheet does not offset back by half of it ({e}).") from e
+                if o.isNull(base) or o.subShapeCount(base, "face") == 0:
+                    raise KernelError(f"{said} failed: the sheet does not offset back by half of it.")
+            hashes = self.face_hashes(base)
+
+            def attempt(tolerance):
+                try:
+                    made = tracked(o, o.thickenWithHistory(base, -thickness if way == "in" else thickness, tolerance, hashes, HASH_BOUND))
+                except Exception as e:  # noqa: BLE001
+                    raise KernelError(f"{said} failed ({e}).") from e
+                solids = o.subShapeCount(made["shape"], "solid")
+                if solids != 1 or not self.is_closed_solid(made["shape"]):
+                    raise KernelError(f"{said} came out broken: {'the kernel' + chr(39) + 's own check finds it no closed solid' if solids == 1 else f'it is {solids} solids, not one'}.")
+                return made
+
+            try:
+                made = attempt(1e-6)
+            except KernelError as first:
+                try:
+                    made = attempt(THICKEN_RETRY_TOLERANCE)
+                except KernelError:
+                    raise first from None
+            after = set(self.face_hashes(made["shape"]))
+            frm = {}
+            for h in hashes:
+                if h in after:
+                    frm[h] = h
+                for n in made["history"].get(h, []):
+                    if n in after:
+                        frm[n] = h
+            wall = _wall_along_edge(o, base, made["shape"], set(frm))
+            return {**made, "skin": {} if way == "both" else frm, "wall": wall}
+
+        return run("Thickening", go)
 
     def pattern(self, shape, mode, origin, d, count, step):
         from .features import pattern_pitch

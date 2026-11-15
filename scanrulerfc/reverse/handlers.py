@@ -735,9 +735,10 @@ def schema_of(kind, part=None):
         d = start_feature(kind)
         fields = {k: v for k, v in d.items() if k not in ("kind", "radiusTyped", "estimate", "thicknessFrom", "symmetry", "snap", "reading", "fitting", "error", "lean", "history", "sized", "internal",
                                                       "paint", "floodDeg", "toleranceTyped", "placing", "future", "picked", "tool", "suggested", "nextId")}
-    later = {"sheet", "split", "loft", "sweep", "thicken", "surface", "trim", "network"}
+    from .build import LATER
+
     return {"kind": kind, "label": KIND_LABELS[kind], "fields": fields, "picks": "edges and faces: indices from reverse_body_describe, or fingerprints",
-            **({"builds": "not yet in this port (build steps 10 and 11)"} if kind in later else {})}
+            **({"builds": "not yet in this port (build steps 10 and 11)"} if kind in LATER else {})}
 
 
 def tool_names():

@@ -15,16 +15,18 @@
 # build whose first steps match a kept one starts from there.
 #
 # The ported steps are the solids (extrude, revolve and coil, extract,
-# import) and the body features (shell, fillet, chamfer, hole, thread,
-# cutPlane, mirror, combine, pattern, draft, moveFace, deleteFace, offset,
-# moveBody). The rest (sheet, split, loft, sweep, thicken, fit surface,
-# trim, patch network; extrude to next, to last, to a body or a curved face)
-# fail with LATER, naming the build step that brings them. Imports nothing
-# from FreeCAD: the kernel is handed in.
+# import, loft, sweep) and the body features (shell, fillet, chamfer, hole,
+# thread, cutPlane, mirror, combine, pattern, draft, moveFace, deleteFace,
+# offset, moveBody, split); the sheets and the steps read off the scan
+# (sheet, thicken, fit surface, trim, patch network) are build_sheets.py's.
+# An extrude to next, to last, to a body or a curved face fails with
+# LATER_WORDS, naming the build step that brings it. Imports nothing from
+# FreeCAD: the kernel is handed in.
 
 import math
 
-from .buildtypes import boxes_meet, diagonal_of, mesh_deflection, pick_each, step_keys
+from .build_sheets import SheetPlays
+from .buildtypes import StepFailed, boxes_meet, diagonal_of, mesh_deflection, pick_each, step_keys
 from .features import island_id, pattern_pitch, ISLAND_IDS
 from .origins import compose_history, origins_after, same_surface
 from .topo import describe_edge, describe_face, edge_distance, face_distance, match_edge, match_face, match_tolerance, read_topology, split_edges, tangent_chain
@@ -35,7 +37,7 @@ VOLUME_SLACK = 0.002
 HOLE_LEAD_MM = 0.01
 SPLIT_TIE = 1e-3
 STATES_KEPT = 64
-LATER = {"sheet": 10, "split": 10, "loft": 10, "sweep": 10, "thicken": 10, "surface": 11, "trim": 11, "network": 11}
+LATER = {}
 LATER_WORDS = "{what} is not built in this FreeCAD port yet (build step {n} of the port brings it)."
 
 
@@ -98,12 +100,10 @@ DISPATCH = {
     "failed": "fail", "sketch": "place_sketch", "extrude": "solid", "revolve": "solid", "extract": "solid", "import": "import",
     "moveBody": "move_body", "offsetBody": "body", "mirror": "body", "shell": "body", "fillet": "body", "chamfer": "body", "hole": "body",
     "thread": "body", "cutPlane": "body", "boolean": "body", "pattern": "body", "draft": "body", "moveFace": "body", "deleteFace": "body",
+    "split": "body", "sheet": "later_play", "loft": "later_play", "sweep": "later_play", "thicken": "later_play", "surface": "later_play",
+    "trim": "later_play", "network": "later_play",
     **{k: "later" for k in LATER},
 }
-
-
-class StepFailed(Exception):
-    """A step that cannot be made, in the words its row says."""
 
 
 def tools_of(step):
@@ -236,12 +236,13 @@ def trace_copies(before, after, motions):
     return {"history": history, "copies": copies}
 
 
-class Builder:
+class Builder(SheetPlays):
     """build.ts Builder on the kernel given (kernel.Kernel, or anything
     with its methods)."""
 
     def __init__(self, kernel):
         self.kernel = kernel
+        self._later_init()
         self.bodies = {}
         self.aliases = {}
         self.issued = set()
@@ -547,12 +548,16 @@ class Builder:
 
     def _snapshot(self, results):
         return {"bodies": dict(self.bodies), "aliases": dict(self.aliases), "issued": set(self.issued), "pieces": {k: list(v) for k, v in self.pieces.items()},
-                "stages": {k: dict(v) for k, v in self.stages.items()}, "results": [dict(r) for r in results]}
+                "stages": {k: dict(v) for k, v in self.stages.items()}, "results": [dict(r) for r in results],
+                "fitted": dict(self.fitted), "smooth": set(self.smooth_lofts)}
 
     def _restore(self, state):
         if state is None:
             self.bodies, self.aliases, self.issued, self.pieces, self.stages = {}, {}, set(), {}, {}
+            self.fitted, self.smooth_lofts = {}, set()
             return
+        self.fitted = dict(state.get("fitted") or {})
+        self.smooth_lofts = set(state.get("smooth") or ())
         self.bodies = dict(state["bodies"])
         self.aliases = dict(state["aliases"])
         self.issued = set(state["issued"])
@@ -621,6 +626,8 @@ class Builder:
                 return
             if kind == "sketch":
                 results.append({"id": step["id"], "status": "ok", "sketchFrame": step.get("frame")})
+                return
+            if self.play_later(step, fail, results):
                 return
             if kind in ("extrude", "revolve", "extract"):
                 solid = primitive_solid(k, step["primitive"]) if kind == "extract" else self.solid_of(step, sketch_of(step.get("sketchId")))
@@ -698,7 +705,7 @@ class Builder:
             for t in tools_of(step):
                 for h, o in ((self.bodies.get(self.resolve(t)) or {}).get("origins") or {}).items():
                     before[h] = o
-        if body.get("surface") and kind not in ("pattern", "boolean"):
+        if body.get("surface") and kind not in ("pattern", "boolean", "split"):
             fail(step["id"], "A sheet is not worked on as a solid — split a body with it, or thicken it first. A sheet takes a Pattern, a Split (by sheets or solids) and a Combine (trimmed by a solid, or sewn to a sheet).")
             return
         tools = [self.bodies.get(self.resolve(t)) for t in tools_of(step)] if kind == "boolean" else []
@@ -1405,6 +1412,8 @@ class Builder:
             shape = k.pattern(row, "linear", step["origin"], step["grid"]["dir"], step["grid"]["count"], step["grid"]["step"]) if step.get("grid") else row
             traced = trace_copies(k.faces(body["shape"]), k.faces(shape), copy_motions(step))
             return {"shape": shape, "history": traced["history"], "copies": traced["copies"]}
+        if kind == "split":
+            return self.split_body(step, body)
         raise StepFailed(f"No feature of kind {kind} works on a body.")
 
 

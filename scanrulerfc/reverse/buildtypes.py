@@ -71,6 +71,10 @@ def boxes_meet(a, b):
     return True
 
 
+class StepFailed(Exception):
+    """A step that cannot be made, in the words its row says."""
+
+
 def halton(i, base):
     """The i-th point of the van der Corput sequence in a base."""
     f = 1
