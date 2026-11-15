@@ -72,6 +72,7 @@ scanrulerfc/reverse/buildtypes.py
 scanrulerfc/reverse/chain_outline.py
 scanrulerfc/reverse/corners.py
 scanrulerfc/reverse/datums.py
+scanrulerfc/reverse/doc.py
 scanrulerfc/reverse/expression.py
 scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
@@ -145,6 +146,7 @@ tests/test_repeat.py
 tests/test_reverse_autoconstrain.py
 tests/test_reverse_build.py
 tests/test_reverse_corners.py
+tests/test_reverse_doc.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_kernel.py
