@@ -76,7 +76,7 @@ class CallMap(unittest.TestCase):
 
     def test_the_patch_network_finds_its_ops(self):
         # network_body.py calls the kernel by these names.
-        for name in ("surface_through", "surface_area", "release", "distance_to_point", "copy", "sew_patches", "is_closed_solid", "edges", "face_points", "extent"):
+        for name in ("surface_through", "surface_area", "release", "distance_to_point", "copy", "sew_patches", "is_closed_solid", "edges", "open_edges", "face_points", "extent"):
             self.assertTrue(callable(getattr(K.Kernel, name, None)), name)
 
     def test_topo_reads_bodies_through_the_kernel(self):

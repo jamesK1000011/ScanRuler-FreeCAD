@@ -20,7 +20,8 @@ sys.path.insert(0, HERE)
 
 from network_meshes import grid_network, network, sphere_scan  # noqa: E402
 from scanrulerfc.reverse.network import read_network  # noqa: E402
-from scanrulerfc.reverse.network_body import GRID_PER_SPAN, empty_report, network_body, network_ghost, patch_grid, side_sampler  # noqa: E402
+from scanrulerfc.reverse.network_body import GRID_PER_SPAN, SEW_TOLERANCE, empty_report, network_body, network_ghost, patch_grid, sew_tolerances, side_sampler  # noqa: E402
+from scanrulerfc.reverse.network_spline import curve_point  # noqa: E402
 from scanrulerfc.reverse.scan_path import ScanPaths, closest_on_triangles  # noqa: E402
 from scanrulerfc.reverse.surface_fit import grid_area  # noqa: E402
 
@@ -151,6 +152,45 @@ class NetworkBody(unittest.TestCase):
         self.assertEqual(grid["rows"], reading["fit"]["patches"][0]["net"].nu * GRID_PER_SPAN + 1)
         empty = empty_report(dict(reading, fit=None))
         self.assertEqual((empty["patches"], empty["closed"]), ([], False))
+
+    def test_a_seam_left_open_is_sewn_again_looser(self):
+        """FreeCAD 1.1.3's OCCT left two seams of a sphere's network open at
+        the original's tolerance: the patches are sewn again at looser ones,
+        relative to the model, before the network is refused."""
+        reading = read_network(self.scan, grid_network(1, 2, 2, on_sphere, 1))
+        fit = reading["fit"]
+        seam = fit["curves"][fit["shared"][0]["curve"]]
+        mid = curve_point(seam["poles"], seam["spans"], 0.5)
+
+        class Stubborn(GridKernel):
+            def __init__(self, tries):
+                super().__init__()
+                self.tries, self.tried = tries, []
+
+            def sew_patches(self, faces, tolerance, closed):
+                self.tried.append(tolerance)
+                return {**super().sew_patches(faces, tolerance, closed), "tolerance": tolerance}
+
+            def open_edges(self, shape):
+                return [] if len(self.tried) >= self.tries else [list(mid)]
+
+        k = Stubborn(2)  # the second, looser sewing closes the seam
+        out = network_body(k, reading)
+        self.assertEqual(len(k.tried), 2)
+        self.assertEqual(k.tried[0], max(SEW_TOLERANCE, 2 * out["report"]["worstGap"]))
+        self.assertGreater(k.tried[1], k.tried[0])
+        never = Stubborn(99)
+        with self.assertRaises(ValueError) as e:
+            network_body(never, reading)
+        self.assertIn(f"curve {fit['shared'][0]['curve']} (gap", str(e.exception))
+        self.assertGreaterEqual(len(never.tried), 2)
+        self.assertEqual(never.tried, sorted(never.tried))
+
+    def test_the_tolerances_tried(self):
+        self.assertEqual(sew_tolerances(1e-3, 100), [1e-3, 1e-2, 0.1])
+        self.assertEqual(sew_tolerances(1e-3, 1), [1e-3])  # a small part: no looser than its own share
+        self.assertEqual(sew_tolerances(1e-3, 5), [1e-3, 0.005])
+        self.assertEqual(sew_tolerances(0.5, 100), [0.5])  # a fit already looser than the cap
 
 
 if __name__ == "__main__":

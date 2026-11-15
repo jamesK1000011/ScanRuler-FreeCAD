@@ -35,8 +35,38 @@ from .surface_fit import GRID_AREA_SLACK, GRID_RETRIES, grid_area
 GRID_PER_SPAN = 3
 GHOST_SIDE = 48
 SEW_TOLERANCE = 1e-3
+# Sewing tried again, looser, where seams stay open at the original's
+# tolerance: OCCT's sewing also has to match the seams' ends, not only the
+# faces' gap the fit reads (FreeCAD 1.1.3's OCCT left two seams of a sphere's
+# network open at gaps of 0.1 µm). Each try is the first times a factor, and
+# at least a share of the model's diagonal, never more than SEW_MAX_SHARE of
+# it: a seam is never closed across a gap the part would show.
+SEW_RETRY_FACTORS = (10, 100)
+SEW_RETRY_SHARE = (1e-4, 1e-3)
+SEW_MAX_SHARE = 1e-3
 GAP_SAMPLES = 8
 PATCH_GRID = 9
+
+
+def sew_tolerances(first, diagonal):
+    """The tolerances a network's patches are sewn at, in turn: the
+    original's, then looser ones relative to the model (see SEW_RETRY_*)."""
+    out = [first]
+    cap = max(first, diagonal * SEW_MAX_SHARE)
+    for f, share in zip(SEW_RETRY_FACTORS, SEW_RETRY_SHARE):
+        t = min(cap, max(first * f, diagonal * share))
+        if t > out[-1] * (1 + 1e-9):
+            out.append(t)
+    return out
+
+
+def open_edge_mids(k, shape):
+    """The middles of the edges of a sewn shape that bound one face only.
+    Read by sameness where the kernel can (open_edges), not through face
+    hashes, whose meaning moved with OCCT 7.8's hashing."""
+    if hasattr(k, "open_edges"):
+        return k.open_edges(shape)
+    return [e["mid"] for e in k.edges(shape, mesh_deflection(diagonal_of(k, shape))) if len(e["faceHashes"]) < 2]
 
 
 def _ms():
@@ -169,22 +199,23 @@ def network_body(k, reading):
         worst_gap = max([0.0] + [s["gap"] for s in shared])
         sides = sum(len(p["sides"]) for p in fit["patches"])
         closed = len(fit["shared"]) * 2 == sides
-        tolerance = max(SEW_TOLERANCE, 2 * worst_gap)
-        shape = k.copy(faces[0]) if len(faces) == 1 else k.sew_patches(faces, tolerance, closed)
-        if closed and not k.is_closed_solid(shape):
+        first = max(SEW_TOLERANCE, 2 * worst_gap)
+        ladder = [first]
+        n = 0
+        while True:
+            tolerance = ladder[n]
+            shape = k.copy(faces[0]) if len(faces) == 1 else k.sew_patches(faces, tolerance, closed)
+            if closed and not k.is_closed_solid(shape):
+                k.release(shape)
+                shape = k.sew_patches(faces, tolerance, False)
+            solid = closed and k.is_closed_solid(shape)
+            not_sewn = _not_sewn(fit, open_edge_mids(k, shape), tolerance)
+            if n == 0:
+                ladder = sew_tolerances(first, diagonal_of(k, shape))
+            if not not_sewn or n + 1 >= len(ladder) or len(faces) == 1:
+                break
             k.release(shape)
-            shape = k.sew_patches(faces, tolerance, False)
-        solid = closed and k.is_closed_solid(shape)
-        opened = [e for e in k.edges(shape, mesh_deflection(diagonal_of(k, shape))) if len(e["faceHashes"]) < 2]
-        not_sewn = []
-        t = np.arange(17) / 16
-        for e in opened:
-            for s in fit["shared"]:
-                f = fit["curves"][s["curve"]]
-                Q = curve_points_v(f["poles"], f["spans"], t)
-                near = float(hypot3_v(Q[:, 0] - e["mid"][0], Q[:, 1] - e["mid"][1], Q[:, 2] - e["mid"][2]).min())
-                if near < 10 * tolerance + 1e-6 and s["curve"] not in not_sewn:
-                    not_sewn.append(s["curve"])
+            n += 1
         if not_sewn:
             k.release(shape)
             gap_of = {s["curve"]: s["gap"] for s in shared}
@@ -205,6 +236,20 @@ def network_body(k, reading):
         return {"shape": shape, "report": report, "faceOf": face_of}
     finally:
         k.release(*faces)
+
+
+def _not_sewn(fit, mids, tolerance):
+    """The shared curves an open edge lies along: seams the sewing left."""
+    out = []
+    t = np.arange(17) / 16
+    for m in mids:
+        for s in fit["shared"]:
+            f = fit["curves"][s["curve"]]
+            Q = curve_points_v(f["poles"], f["spans"], t)
+            near = float(hypot3_v(Q[:, 0] - m[0], Q[:, 1] - m[1], Q[:, 2] - m[2]).min())
+            if near < 10 * tolerance + 1e-6 and s["curve"] not in out:
+                out.append(s["curve"])
+    return out
 
 
 def network_ghost(reading):
