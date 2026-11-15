@@ -186,6 +186,29 @@ class NetworkBody(unittest.TestCase):
         self.assertGreaterEqual(len(never.tried), 2)
         self.assertEqual(never.tried, sorted(never.tried))
 
+    def test_a_closed_network_that_sews_into_no_solid_is_refused(self):
+        from scanrulerfc.reverse.network_body import NOT_SOLID
+
+        reading = read_network(self.scan, closed_network())
+
+        class NoSolid(GridKernel):
+            def __init__(self):
+                super().__init__()
+                self.tried = []
+
+            def sew_patches(self, faces, tolerance, closed):
+                self.tried.append(tolerance)
+                return {"faces": list(faces), "closed": False}
+
+            def open_edges(self, shape):
+                return []
+
+        k = NoSolid()
+        with self.assertRaises(ValueError) as e:
+            network_body(k, reading)
+        self.assertEqual(str(e.exception), NOT_SOLID)
+        self.assertGreater(len(set(k.tried)), 1)  # the looser sewings tried first
+
     def test_the_tolerances_tried(self):
         self.assertEqual(sew_tolerances(1e-3, 100), [1e-3, 1e-2, 0.1])
         self.assertEqual(sew_tolerances(1e-3, 1), [1e-3])  # a small part: no looser than its own share

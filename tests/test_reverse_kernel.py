@@ -565,3 +565,44 @@ class SharedSeams(unittest.TestCase):
         self.assertEqual(self.fixed, common)  # the shared edge given a curve on the second patch
         corners = {id(v) for f in got.Faces for v in f.Vertexes}
         self.assertEqual(len(corners), 6)
+
+
+class ShellOf(unittest.TestCase):
+    """FaceConnect is handed a Part.Shell however FreeCAD answers Part.Shell(faces)."""
+
+    def P(self, sewn_shells, shell_answer):
+        import types
+
+        class Shell:
+            def __init__(self, faces):
+                self.Faces = faces
+
+        class Comp:
+            def __init__(self, faces):
+                self.faces = faces
+                self.Shells = []
+
+            def sewShape(self, tol):
+                self.Shells = sewn_shells(self.faces)
+
+        def make(faces):
+            return shell_answer(faces, Shell)
+
+        return types.SimpleNamespace(Compound=Comp, Shell=Shell, makeShell=make), Shell
+
+    def test_a_partial_sewing_s_one_shell(self):
+        P, Shell = self.P(lambda f: [types_shell(f)], lambda f, S: None)
+        got = K.shell_of(P, ["a", "b"], 1e-3)
+        self.assertEqual(got.Faces, ["a", "b"])
+
+    def test_part_shell_when_the_sewing_splits_them(self):
+        P, Shell = self.P(lambda f: [types_shell(f[:1]), types_shell(f[1:])], lambda f, S: S(f))
+        got = K.shell_of(P, ["a", "b"], 1e-3)
+        self.assertIsInstance(got, Shell)
+        self.assertEqual(got.Faces, ["a", "b"])
+
+
+def types_shell(faces):
+    import types
+
+    return types.SimpleNamespace(Faces=list(faces))

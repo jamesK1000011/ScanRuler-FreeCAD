@@ -41,6 +41,8 @@ SEW_TOLERANCE = 1e-3
 # network open at gaps of 0.1 µm). Each try is the first times a factor, and
 # at least a share of the model's diagonal, never more than SEW_MAX_SHARE of
 # it: a seam is never closed across a gap the part would show.
+NOT_SOLID = ("The patches close round the part but did not sew into a solid — the kernel's sewing left a seam open; "
+             "give the strips more spans, or draw the curves again.")
 SEW_RETRY_FACTORS = (10, 100)
 SEW_RETRY_SHARE = (1e-4, 1e-3)
 SEW_MAX_SHARE = 1e-3
@@ -212,7 +214,8 @@ def network_body(k, reading):
             not_sewn = _not_sewn(fit, open_edge_mids(k, shape), tolerance)
             if n == 0:
                 ladder = sew_tolerances(first, diagonal_of(k, shape))
-            if not not_sewn or n + 1 >= len(ladder) or len(faces) == 1:
+            done = not not_sewn and (solid or not closed)
+            if done or n + 1 >= len(ladder) or len(faces) == 1:
                 break
             k.release(shape)
             n += 1
@@ -221,6 +224,12 @@ def network_body(k, reading):
             gap_of = {s["curve"]: s["gap"] for s in shared}
             named = ", ".join(f"curve {c} (gap {to_fixed(gap_of[c] * 1000, 1)} µm)" for c in not_sewn)
             raise ValueError(f"The patches did not sew along {named} — their faces stand apart there; give the strip across it more spans, or draw the curve again.")
+        if closed and not solid and len(faces) > 1:
+            # Closed all round, the network is a solid or nothing: a skin
+            # left open somewhere is refused rather than passed off as a
+            # sheet (FreeCAD 1.1.3's sewing left one so).
+            k.release(shape)
+            raise ValueError(NOT_SOLID)
         middles = []
         for f in faces:
             pts = k.face_points(f)
