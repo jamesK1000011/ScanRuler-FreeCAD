@@ -124,6 +124,9 @@ tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_parameters.py
 tests/test_reverse_part_file.py
+tests/test_reverse_regions.py
+tests/test_reverse_sketch_shapes.py
+tests/test_reverse_solver.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_thickness.py
