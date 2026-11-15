@@ -5,13 +5,19 @@ the same handler Agent Link's family binds (scanrulerfc/handlers) in a
 context of its own for the document, one undo transaction per changing
 call (data/tools.json "changes"), and answers in the shape Agent Link's
 panel._call does: the tool's answer as JSON data (NaN as null), or
-{"error": {"code", "message"}} with ok False. Under Agent Link the panels
-get panel._call instead. No Agent Link import here."""
+{"error": {"code", "message"}} with ok False. Arguments are checked
+against the tool's inputSchema first and refused as Agent Link's server
+refuses them (inputs.py). Each call that goes through moves scanstate's
+version (scanstate.touched). Under Agent Link the panels get panel._call
+instead (gui()). No Agent Link import here."""
 import json
 import math
 import os
+import sys
+import types
 
-from . import errors, handlers
+from . import errors, handlers, inputs
+from . import scanstate as S
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 _DECLARED = {}
@@ -155,8 +161,14 @@ def answer(fn, args):
         out = fn(args)
     except errors.REFUSED as e:
         return False, {"error": {"code": e.code, "message": e.message}}
+    except ValueError as e:  # as Agent Link's server takes one
+        return False, {"error": {"code": "invalid_input", "message": str(e)}}
     except Exception as e:  # noqa: BLE001 — a panel shows a failure, never a crash
         return False, {"error": {"code": "failed", "message": f"{type(e).__name__}: {e}"}}
+    if isinstance(out, dict) and "_png" in out:
+        # A picture rides beside the answer for an agent, as Agent Link's
+        # server takes it off: not JSON.
+        out = {k: v for k, v in out.items() if k != "_png"}
     return True, plain(out)
 
 
@@ -170,16 +182,70 @@ def local(doc_fn=None, table=None, ctx=None):
         fn = table.get(tool)
         if fn is None:
             return False, {"error": {"code": "not_found", "message": f"{tool}: not a tool of ScanRuler for FreeCAD."}}
+        schema = declared().get(tool, {}).get("inputSchema")
+        if schema is not None:
+            try:
+                inputs.check(schema, args)
+            except errors.ToolError as e:
+                return False, {"error": {"code": e.code, "message": e.message}}
         c = ctx if ctx is not None else context_for((doc_fn or _active_doc)())
         doc = c.doc
         if not changes(tool) or doc is None:
-            return answer(lambda a: fn(c, a), args)
-        doc.openTransaction(tool)
-        ok, out = answer(lambda a: fn(c, a), args)
-        if ok:
-            doc.commitTransaction()
+            ok, out = answer(lambda a: fn(c, a), args)
         else:
-            doc.abortTransaction()
+            doc.openTransaction(tool)
+            ok, out = answer(lambda a: fn(c, a), args)
+            if ok:
+                doc.commitTransaction()
+            else:
+                doc.abortTransaction()
+        if ok:
+            S.touched(c, tool)
         return ok, out
 
     return run
+
+
+# --- the runner the workbench's commands and panels use ----------------------
+
+_HOSTED = {"call": None}
+
+
+def set_hosted(call):
+    """Agent Link's panel._call(tool, args) -> (ok, result), handed in when
+    Agent Link makes the ScanRuler tab (dock.make_tab); None takes it back."""
+    _HOSTED["call"] = call
+
+
+def gui(doc_fn=None):
+    """runner(tool, args) -> (ok, result) for the workbench (commands.
+    set_runner at registration): under Agent Link, once its panel is there,
+    the hosted family through panel._call, so the call is shown and logged
+    as the agent's are; alone, local() over this add-on's handlers. Chosen
+    at each call, so it holds whichever loads first."""
+    alone = local(doc_fn)
+
+    def run(tool, args=None):
+        import scanrulerfc
+
+        call = _HOSTED["call"]
+        if scanrulerfc._hosted and call is not None:
+            return call(tool, dict(args or {}))
+        return alone(tool, args)
+
+    run.alone = alone
+    return run
+
+
+class _Module(types.ModuleType):
+    """This module, callable: scanrulerfc.runner() is the runner the
+    workbench's commands use (commands.runner()), while scanrulerfc.runner
+    stays this module (local, gui, Context …)."""
+
+    def __call__(self):
+        from . import commands
+
+        return commands.runner()
+
+
+sys.modules[__name__].__class__ = _Module

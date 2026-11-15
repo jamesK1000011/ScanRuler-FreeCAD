@@ -82,3 +82,14 @@ def install(mw=None):
     if key not in _installed:
         _installed[key] = StatusBar(mw.statusBar())
     return _installed[key]
+
+
+def feed(st, busy=False, error=None, percent=None, message=None):
+    """What the dock hands on at each refresh: the strip on every window it
+    is installed in shows the session's state (nothing when none is)."""
+    if not _installed:
+        return None
+    m = model(st, busy, error, percent, message)
+    for bar in _installed.values():
+        bar.show(m)
+    return m

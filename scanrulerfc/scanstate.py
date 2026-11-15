@@ -3,6 +3,7 @@
 # The part of ScanRuler's session that holds the scan (src/core/types.ts,
 # src/core/meshUnits.ts), ported to numpy.
 
+import itertools
 import os
 
 import numpy as np
@@ -132,7 +133,27 @@ class Scan:
 
 
 def fresh():
-    return {"scan": None, "elements": [], "dimensions": [], "next": 1, "dimNext": 1, "counters": {}, "marked": None, "scaled": None}
+    return {"scan": None, "elements": [], "dimensions": [], "next": 1, "dimNext": 1, "counters": {}, "marked": None, "scaled": None,
+            "version": 0, "last_tool": None}
+
+
+# One count for every session, so a version never comes round again (not
+# even when scan_open starts the state afresh): the dock compares it.
+_TICKS = itertools.count(1)
+
+
+def touched(session, tool):
+    """After a call went through (the add-on's runner, or Agent Link's
+    family layer): the session's version moves and last_tool names the
+    tool, so the dock refreshes and turns to that tool's workspace. Every
+    call counts, not only the ones that change the document (data/tools.json
+    "changes"): a fit, an alignment or a map changes what the panels show
+    without touching the document. The snapshot tools only read the shots."""
+    if tool.startswith("snapshot_") or getattr(session, "family_state", None) is None:
+        return  # a session that keeps no state (a catalog-only caller): nothing to show
+    st = state(session)
+    st["version"] = next(_TICKS)
+    st["last_tool"] = tool
 
 
 def state(session):

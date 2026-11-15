@@ -149,12 +149,14 @@ class Commands(unittest.TestCase):
         seen = []
         C.set_ui(lambda key, *a: seen.append((key,) + a))
         try:
-            C.load("/tmp/old.scanruler")
+            # Not there: refused in words, the panel not told (a real one:
+            # test_wiring.ProjectImport).
+            self.assertIsNone(C.load("/tmp/no-such-old.scanruler"))
             with self.assertRaises(ValueError):
                 C.load("/tmp/x.stl")
         finally:
             C.set_ui(None)
-        self.assertEqual(seen, [("load-scanruler", "/tmp/old.scanruler")])
+        self.assertEqual(seen, [])
 
     def test_placeholder_runner_says_so(self):
         C.set_runner(None)

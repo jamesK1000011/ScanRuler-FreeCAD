@@ -153,6 +153,25 @@ CALLS = [
 ]
 
 
+# Bad arguments: refused by the local runner as Agent Link's server refuses
+# them (its check_input before the tool), and the ones it takes in another
+# dress (a number as text, a synonym, an enum's case) taken the same way.
+BAD_CALLS = [
+    ("scan_info", {"verbose": True}),
+    ("element_fit", {"at": {"point": [0, 0, 10]}}),
+    ("element_fit", {"kind": "blob", "at": {"point": [0, 0, 10]}}),
+    ("element_fit", {"kind": "PLANE", "at": {"point": [0, 0, 10]}}),
+    ("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": 5}),
+    ("scan_open", {"units": "furlong"}),
+    ("scan_open", {"discard": "maybe"}),
+    ("snapshot_latest", {"index": "1"}),
+    ("snapshot_latest", {"index": 1.5}),
+    ("mesh_wrap", {}),
+    ("mesh_apply_wrap", {}),
+    ("mesh_export", {"part": "whole"}),
+]
+
+
 @unittest.skipUnless(HAVE_AL, "Agent Link is not importable here")
 class SameAnswers(unittest.TestCase):
     def _scan(self, ctx):
@@ -178,16 +197,25 @@ class SameAnswers(unittest.TestCase):
         local = runner.Context(out_dir=tempfile.mkdtemp())
         self._scan(local)
         run = runner.local(ctx=local)
+        from agentlink.protocol import check_input
+
         seen = set()
-        for name, args in CALLS:
+        for name, args in CALLS + BAD_CALLS:
             try:
-                want = (True, runner.plain(T[name].fn(dict(args))))
+                a = dict(args)
+                check_input(T[name].schema, a)  # what Agent Link's server does first
+                out = T[name].fn(a)
+                if isinstance(out, dict):
+                    out.pop("_png", None)
+                want = (True, runner.plain(out))
             except ToolError as e:
                 want = (False, {"error": {"code": e.code, "message": e.message}})
             got = run(name, dict(args))
-            self.assertEqual(got, want, name)
+            self.assertEqual(got, want, (name, args))
             seen.add(T[name].group)
-        self.assertGreaterEqual(len(seen), 15)
+        self.assertGreaterEqual(len(seen), 16)
+        refused = [run(n, dict(a)) for n, a in BAD_CALLS]
+        self.assertGreaterEqual(sum(1 for ok, out in refused if not ok and out["error"]["code"] == "invalid_input"), 7)
         importlib.import_module("scanrulerfc")
 
     def test_declarations_are_what_agent_link_lists(self):

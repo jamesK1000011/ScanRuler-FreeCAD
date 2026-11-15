@@ -10,6 +10,7 @@ from agentlink import hooks
 from agentlink.protocol import ToolError as AgentToolError
 
 from .. import errors, handlers
+from .. import scanstate as S
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 WHO = "ScanRuler for FreeCAD"
@@ -32,5 +33,18 @@ def refusing(fn):
     return run
 
 
+def touching(fn, session, tool):
+    """fn, and after each call that goes through the session's scanstate
+    version moves (the dock follows), as the add-on's own runner does."""
+
+    @functools.wraps(fn)
+    def run(*a):
+        out = fn(*a)
+        S.touched(session, tool)
+        return out
+
+    return run
+
+
 def tools(group, module, session):
-    return hooks.tools_from_data(DATA, group, {k: refusing(fn) for k, fn in handlers.bound(session, module).items()}, WHO)
+    return hooks.tools_from_data(DATA, group, {k: refusing(touching(fn, session, k)) for k, fn in handlers.bound(session, module).items()}, WHO)

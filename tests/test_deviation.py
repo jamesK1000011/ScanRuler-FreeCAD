@@ -172,6 +172,14 @@ class Deviation(unittest.TestCase):
         self.assertLess(missing[0]["volume"], 1.15 * self.bump_volume)
         self.assertTrue(5 < missing[0]["centroid"][0] < 17, missing[0])
         self.assertLess(v["totals"]["excess"]["volume"], 0.2 * self.bump_volume)
+        # Kept where the Surface Deviation page's Volume error reads it.
+        from scanrulerfc import scanstate as S
+        from scanrulerfc.pages import deviation as page
+
+        d = S.state(self.session)["deviation"]
+        self.assertEqual(round(d["volumeResult"]["totals"]["missing"]["volume"], 3), round(v["totals"]["missing"]["volume"], 3))
+        vol = next(x for x in page.build(S.state(self.session))["sections"] if x["id"] == "volume")
+        self.assertEqual(vol["keys"][0]["label"], "Find volume errors again")
 
         # The files.
         for fmt in ("ply", "csv", "npy", "report"):

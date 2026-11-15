@@ -262,13 +262,27 @@ class LoadCommand(_Base):
 
 def load(path):
     """A .FCStd opens as the FreeCAD document it is; a .scanruler project, so
-    the original's users bring their work across, goes to the panel's loader."""
+    the original's users bring their work across, is read through the tools
+    (project_import: the scan, elements and sections it can), and the panel
+    is told what came across."""
     if path.lower().endswith(".fcstd"):
         import FreeCAD
 
         return FreeCAD.openDocument(path)
     if path.lower().endswith(".scanruler"):
-        return _hooks["ui"]("load-scanruler", path)
+        from .errors import ToolError
+        from .project_import import load as load_project
+
+        try:
+            got = load_project(path, _hooks["runner"])
+        except ToolError as e:
+            _say(f"ScanRuler: {e.message}")
+            return None
+        left = got["notLoaded"] + [f"{x['tool']}: {x['message']}" for x in got["errors"]]
+        _say(f"ScanRuler: {got['project']} — scan {got['scan'] or 'not opened'}, {got['elements']} elements, "
+             f"{got['sections']} sections." + (" Not loaded: " + " ".join(left) if left else ""))
+        _hooks["ui"]("load-scanruler", got)
+        return got
     raise ValueError(f"{os.path.basename(path)}: Load takes {' or '.join(W.LOAD_SUFFIXES)}.")
 
 
