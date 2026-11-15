@@ -272,6 +272,7 @@ scanrulerfc/scanstate.py
 scanrulerfc/schema.py
 scanrulerfc/section_core.py
 scanrulerfc/segment.py
+scanrulerfc/settings.py
 scanrulerfc/shadow_core.py
 scanrulerfc/shapes.py
 scanrulerfc/snapshot/__init__.py
@@ -315,6 +316,7 @@ tests/test_flat_objects.py
 tests/test_flat_sheet.py
 tests/test_font_enums.py
 tests/test_gui_commands.py
+tests/test_gui_guide.py
 tests/test_gui_pages.py
 tests/test_heightmap.py
 tests/test_integration.py

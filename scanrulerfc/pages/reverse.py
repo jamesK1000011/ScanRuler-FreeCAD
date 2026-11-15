@@ -20,7 +20,7 @@ from .. import workspaces as W
 from . import kit as K
 from .infotext_pages import INFO
 
-TITLE = "Reverse engineer"
+TITLE = "Reverse Engineer"
 WORKSPACE = "reverse"
 PAGE = "reverse"
 PENDING = "coming with the engine port"

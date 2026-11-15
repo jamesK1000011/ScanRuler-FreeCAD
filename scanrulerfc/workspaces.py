@@ -26,6 +26,8 @@
 # "moved" (the original's words name a web-only thing; the port says the
 # FreeCAD equivalent).
 
+import re
+
 from . import CREDIT  # noqa: F401 — the one credit line, kept in scanrulerfc/__init__.py
 WORKBENCH_MENU = "ScanRuler"
 WORKBENCH_TIP = "ScanRuler by Stefan Hermann (CNC Kitchen), ported to FreeCAD"
@@ -43,9 +45,48 @@ WORKSPACES = (
     {"id": "reverse", "command": "ScanRuler_WsReverse", "label": "Reverse engineer", "tip": "Build a solid STEP body over the scan", "icon": "extract", "order": 11},
 )
 DEFAULT_WORKSPACE = "elements"
-WORKSPACE_TOOLBAR = "ScanRuler workspaces"
-PROJECT_TOOLBAR = "ScanRuler project"
-VIEW_TOOLBAR = "ScanRuler view"
+WORKSPACE_TOOLBAR = "ScanRuler Workspaces"
+VIEW_TOOLBAR = "ScanRuler View"
+
+# --- FreeCAD's design guide: how a string shows -------------------------------
+# The tables keep the original's words (tests/test_workspaces.py holds them
+# to the TSX); what FreeCAD shows follows its design guide: Title Case for
+# command names, menu items and group titles, a tooltip a full sentence.
+SMALL_WORDS = frozenset("a an and as at but by for from if in into nor of on onto or per the to via vs with".split())
+
+
+def _cap_word(w):
+    """One word capitalised, words that already carry capitals (ScanRuler,
+    STEP, 2D) and numbers left as they are."""
+    if not w or any(c.isupper() for c in w[1:]) or not w[0].isalpha():
+        return w
+    return w[0].upper() + w[1:]
+
+
+def title_case(s):
+    """"Align by picking points…" -> "Align by Picking Points…": every word
+    capitalised but the small ones inside; the first and last always, and
+    each part of "Auto-align" or "Shrink/expand"."""
+    words = s.split(" ")
+    idx = [i for i, w in enumerate(words) if w.strip("…./-")]
+    out = []
+    for i, w in enumerate(words):
+        core = w.rstrip("….:")
+        edge = bool(idx) and i in (idx[0], idx[-1])
+        if core.lower() in SMALL_WORDS and not edge:
+            out.append(w)
+            continue
+        out.append(re.sub(r"[^\s/\-]+", lambda m: _cap_word(m.group(0)), w))
+    return " ".join(out)
+
+
+def sentence(s):
+    """A tooltip as a full sentence: capital first, a full stop last."""
+    s = s.strip()
+    if not s:
+        return s
+    s = s[0].upper() + s[1:]
+    return s if s[-1] in ".?!" else s.rstrip("…") + "."
 
 
 def _k(command, label, tip, icon, tool=None, run=False, args=None, tip_from="title", key=None):
@@ -60,21 +101,25 @@ def _lk(command, label, icon, tool=None, run=False, args=None):
     return _k(command, label, TIPS.get(command, label), icon, tool, run, args, "label")
 
 
-_FIT = "Fit a {} to the part of the scan you pick."
-_FLAT = "Fit a {} to the edges you pick on the flat scan."
+_FIT = "Fit {} to the part of the scan you pick."
+_FLAT = "Fit {} to the edges you pick on the flat scan."
+
+
+def _a(noun):
+    return ("an " if noun[0] in "aeiou" else "a ") + noun
 TIPS = {
     "ScanRuler_AutoAlign": "Turn the scan square to its main planes and axes automatically.",
     "ScanRuler_AlignPart": "Align the scan to datums you pick: a plane, an axis, a point.",
     "ScanRuler_MoveRotate": "Move or rotate the scan by numbers you type.",
     "ScanRuler_ScalePart": "Scale the scan to its true size from lengths you measured.",
     "ScanRuler_ElementPoint": "Place a point on the scan.",
-    "ScanRuler_ElementLine": _FIT.format("line"),
-    "ScanRuler_ElementPlane": _FIT.format("plane"),
-    "ScanRuler_ElementSphere": _FIT.format("sphere"),
-    "ScanRuler_ElementCylinder": _FIT.format("cylinder"),
-    "ScanRuler_ElementCone": _FIT.format("cone"),
-    "ScanRuler_ElementCircle": _FIT.format("circle"),
-    "ScanRuler_ElementTorus": _FIT.format("torus"),
+    "ScanRuler_ElementLine": _FIT.format(_a("line")),
+    "ScanRuler_ElementPlane": _FIT.format(_a("plane")),
+    "ScanRuler_ElementSphere": _FIT.format(_a("sphere")),
+    "ScanRuler_ElementCylinder": _FIT.format(_a("cylinder")),
+    "ScanRuler_ElementCone": _FIT.format(_a("cone")),
+    "ScanRuler_ElementCircle": _FIT.format(_a("circle")),
+    "ScanRuler_ElementTorus": _FIT.format(_a("torus")),
     "ScanRuler_NewDimension": "Measure between elements: a distance, an angle or a diameter.",
     "ScanRuler_NewTolerance": "Check a form or position tolerance on an element, such as parallelism.",
     "ScanRuler_AlignAutomatically": "Best-fit the scan onto the nominal part automatically.",
@@ -84,10 +129,10 @@ TIPS = {
     "ScanRuler_MeasureAgain": "Measure the wall thickness again with the settings now.",
     "ScanRuler_CopyReport": "Copy the measuring report as text.",
     "ScanRuler_FlatPoint": "Place a point on the flat scan.",
-    "ScanRuler_FlatLine": _FLAT.format("line"),
-    "ScanRuler_FlatCircle": _FLAT.format("circle"),
-    "ScanRuler_FlatArc": _FLAT.format("arc"),
-    "ScanRuler_FlatSpline": _FLAT.format("spline"),
+    "ScanRuler_FlatLine": _FLAT.format(_a("line")),
+    "ScanRuler_FlatCircle": _FLAT.format(_a("circle")),
+    "ScanRuler_FlatArc": _FLAT.format(_a("arc")),
+    "ScanRuler_FlatSpline": _FLAT.format(_a("spline")),
     "ScanRuler_FlatCount": "Count the shapes of one kind on the flat scan.",
     "ScanRuler_FlatText": "Add a text note to the 2D sheet.",
     "ScanRuler_FlatNewDimension": "Measure between elements on the 2D sheet.",
@@ -205,25 +250,32 @@ TOOLBARS = {
 
 
 def toolbar_name(ws, title):
-    """The QToolBar's object name: unique across workspaces ("Create element"
-    is in both Measure workspaces)."""
-    return f"ScanRuler {ws}: {title}"
+    """The QToolBar's object name and title, in Title Case: unique across
+    workspaces ("Create Element" is in both Measure workspaces)."""
+    return f"ScanRuler {title_case(workspace(ws)['label'])}: {title_case(title)}"
 
 
-# --- the "ScanRuler project" toolbar (TopBar.tsx's keys) ---------------------
+# --- the project keys (TopBar.tsx's), in the ScanRuler menu ----------------
+# The original's top bar also has undo and redo; FreeCAD's own Edit menu and
+# toolbar carry those, and its File toolbar New, Open and Save, so these stay
+# off the toolbars and say they act on the ScanRuler project.
 PROJECT = (
-    {"command": "Std_Undo", "native": True},
-    {"command": "Std_Redo", "native": True},
-    _k("ScanRuler_New", "New", "Start a new project (asks if there are unsaved changes)", "newProject"),
+    _k("ScanRuler_New", "New project", "Start a new ScanRuler project in a new FreeCAD document (asks if there are unsaved changes)",
+       "newProject", tip_from="moved"),
     # The original: "Save everything as one .scanruler file". The FreeCAD
     # document is the project here.
-    _k("ScanRuler_Save", "Save", "Save everything in the FreeCAD document (.FCStd)", "save", tip_from="moved"),
-    _k("ScanRuler_Load", "Load", "Open a project, scan or image", "load"),
+    _k("ScanRuler_Save", "Save project", "Save the ScanRuler project: its scan, elements and results go in the FreeCAD document (.FCStd)",
+       "save", tip_from="moved"),
+    _k("ScanRuler_Load", "Open project…", "Open a ScanRuler project (.scanruler) or a FreeCAD document (.FCStd) holding one",
+       "load", tip_from="moved"),
 )
-SETTINGS = _k("ScanRuler_Settings", "Settings", "Theme, mouse controls and other settings", "settings")
+OPEN_SCAN = _k("ScanRuler_OpenScan", "Open scan…", "Open a scan (STL, PLY, OBJ, OFF or 3MF) to measure", "load",
+               "scan_open", tip_from="moved")
+SETTINGS = _k("ScanRuler_Settings", "Settings…", "Open ScanRuler's settings; theme and mouse controls are FreeCAD's own preferences",
+              "settings", tip_from="moved")
 # The original's camera key: "Screenshot this tab (⌥⇧S / Alt+Shift+S)".
 SNAPSHOT = _k("ScanRuler_Snapshot", "Snapshot", "Screenshot the 3D view", "camera", "scan_snapshot_latest", tip_from="moved")
-ABOUT = _k("ScanRuler_About", "About ScanRuler", WORKBENCH_TIP, "wsMeasure", tip_from="moved")
+ABOUT = _k("ScanRuler_About", "About ScanRuler", "Show ScanRuler's version, licence and credits", "wsMeasure", tip_from="moved")
 LOAD_SUFFIXES = (".FCStd", ".scanruler")
 
 # --- the view bar (ViewBar.tsx and the plugins' keys), in bar order ----------
@@ -320,7 +372,7 @@ def all_commands():
     out = {}
     for w in WORKSPACES:
         out[w["command"]] = {"command": w["command"], "label": w["label"], "tip": w["tip"], "icon": w["icon"], "workspace": w["id"]}
-    for k in keys() + view_keys() + [p for p in PROJECT if not p.get("native")] + [SETTINGS, SNAPSHOT, ABOUT]:
+    for k in keys() + view_keys() + list(PROJECT) + [OPEN_SCAN, SETTINGS, SNAPSHOT, ABOUT]:
         out.setdefault(k["command"], k)
     return out
 

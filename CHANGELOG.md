@@ -3,6 +3,18 @@
 
 ## Unreleased
 
+- The workbench as FreeCAD's design guide asks, from the GUI pass on
+  FreeCAD 1.1.3: command names, menus and toolbar titles in Title Case,
+  every tooltip its own full sentence. A workspace switch shows its panel
+  (under Agent Link, its panel's ScanRuler tab) and keeps only its own
+  toolbars, written where FreeCAD's toolbar restore reads them. A key that
+  cannot run says why in the status bar ("Open a scan first: ScanRuler ▸
+  Open Scan…"); Open Scan… is in the ScanRuler menu. Settings… opens
+  ScanRuler's own settings dialog, About a box with the version, licence
+  and the credit to Stefan Hermann (CNC Kitchen); neither is taken over by
+  macOS's application menu. Undo, Redo, New, Save and Load are off the
+  toolbars: FreeCAD has its own, and the project's New, Save and Open are
+  in the ScanRuler menu.
 - Reverse engineer, build steps 10 and 11, ported from ScanRuler by Stefan
   Hermann (CNC Kitchen): Sheet, Loft (a smooth loft whose skin crosses
   itself is refused, naming its sections), Sweep, Thicken (the wall along

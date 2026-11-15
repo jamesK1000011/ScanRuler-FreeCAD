@@ -7,10 +7,12 @@
 #
 # The original's tab strip becomes the "ScanRuler workspaces" toolbar, its
 # per-workspace panels' key grids become toolbars of which only the active
-# workspace's show, its top bar's undo, redo, New, Save and Load become the
-# "ScanRuler project" toolbar, and its floating view bar becomes the
-# "ScanRuler view" toolbar in the bottom toolbar area: FreeCAD has no stable
-# overlay API over the 3D view across 1.x (design 2.8).
+# workspace's show, its top bar's New, Save and Load become the ScanRuler
+# menu's project items (FreeCAD's own toolbars have undo, redo, New, Open and
+# Save, so no second set stands beside them), and its floating view bar
+# becomes the "ScanRuler View" toolbar in the bottom toolbar area: FreeCAD has
+# no stable overlay API over the 3D view across 1.x (design 2.8). Names show
+# as FreeCAD's design guide asks (workspaces.title_case).
 
 from . import commands as C
 from . import workspaces as W
@@ -20,26 +22,27 @@ def toolbars():
     """(object name, title, [commands]) for every toolbar, in the order
     Initialize appends them."""
     out = [(W.WORKSPACE_TOOLBAR, W.WORKSPACE_TOOLBAR, [w["command"] for w in W.WORKSPACES])]
-    out.append((W.PROJECT_TOOLBAR, W.PROJECT_TOOLBAR, [p["command"] for p in W.PROJECT]))
     for wid, bars in W.TOOLBARS.items():
         for title, ks in bars:
-            out.append((W.toolbar_name(wid, title), title, [k["command"] for k in ks]))
+            out.append((W.toolbar_name(wid, title), W.title_case(title), [k["command"] for k in ks]))
     view = [C.group_name(g) if g["menu"] else g["command"] for g in W.VIEW_BAR] + list(W.VIEW_TAIL)
     out.append((W.VIEW_TOOLBAR, W.VIEW_TOOLBAR, view))
     return out
 
 
 def menus():
-    """(menu path, [commands]) in order: Workspace ▸, one submenu per
-    workspace, then Snapshot, Settings…, About ScanRuler."""
-    out = [([W.WORKBENCH_MENU, "Workspace"], [w["command"] for w in W.WORKSPACES])]
+    """(menu path, [commands]) in order: Open Scan… and the project's New,
+    Open and Save, Workspace ▸, one submenu per workspace, then Snapshot,
+    Settings…, About ScanRuler."""
+    out = [([W.WORKBENCH_MENU], [W.OPEN_SCAN["command"], "Separator"] + [p["command"] for p in W.PROJECT] + ["Separator"])]
+    out.append(([W.WORKBENCH_MENU, "Workspace"], [w["command"] for w in W.WORKSPACES]))
     for w in W.WORKSPACES:
         cmds = []
         for _title, ks in W.TOOLBARS[w["id"]]:
             if cmds:
                 cmds.append("Separator")
             cmds.extend(k["command"] for k in ks)
-        out.append(([W.WORKBENCH_MENU, w["label"]], cmds))
+        out.append(([W.WORKBENCH_MENU, W.title_case(w["label"])], cmds))
     out.append(([W.WORKBENCH_MENU], ["Separator", W.SNAPSHOT["command"], W.SETTINGS["command"], W.ABOUT["command"]]))
     return out
 
@@ -68,6 +71,7 @@ def make_class(Gui):
                 self.appendMenu(path, cmds)
 
         def Activated(self):
+            C.plain_menu_roles()
             _bottom_view_bar(Gui)
             _own_panel(Gui)
             C.switch_workspace(C.current_workspace())
