@@ -205,10 +205,14 @@ def coin_project(view, p):
     vv = cam.getViewVolume(a)
     if 0 < a < 1.0:
         vv.scale(1.0 / a)
-    out = coin.SbVec3f()
-    vv.projectToScreen(coin.SbVec3f(*[float(c) for c in p]), out)
+    src = coin.SbVec3f(*[float(c) for c in p])
+    try:
+        out = vv.projectToScreen(src)  # pivy returns the screen point
+    except TypeError:
+        out = coin.SbVec3f()
+        vv.projectToScreen(src, out)
     w, h = vp.getViewportSizePixels().getValue()
-    x, y = out.getValue()[:2]
+    x, y = (out.getValue() if hasattr(out, "getValue") else tuple(out))[:2]
     return float(x) * w, float(y) * h
 
 
