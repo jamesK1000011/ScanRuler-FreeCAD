@@ -54,8 +54,44 @@ def _k(command, label, tip, icon, tool=None, run=False, args=None, tip_from="tit
 
 
 def _lk(command, label, icon, tool=None, run=False, args=None):
-    """A key whose original has no title: its label is its tooltip."""
-    return _k(command, label, label, icon, tool, run, args, "label")
+    """A key whose original has no title: the label stays the original's, and
+    the tooltip says what it does (TIPS), as FreeCAD's design guide asks;
+    repeating the label told nothing (GUI pass on the Mac)."""
+    return _k(command, label, TIPS.get(command, label), icon, tool, run, args, "label")
+
+
+_FIT = "Fit a {} to the part of the scan you pick."
+_FLAT = "Fit a {} to the edges you pick on the flat scan."
+TIPS = {
+    "ScanRuler_AutoAlign": "Turn the scan square to its main planes and axes automatically.",
+    "ScanRuler_AlignPart": "Align the scan to datums you pick: a plane, an axis, a point.",
+    "ScanRuler_MoveRotate": "Move or rotate the scan by numbers you type.",
+    "ScanRuler_ScalePart": "Scale the scan to its true size from lengths you measured.",
+    "ScanRuler_ElementPoint": "Place a point on the scan.",
+    "ScanRuler_ElementLine": _FIT.format("line"),
+    "ScanRuler_ElementPlane": _FIT.format("plane"),
+    "ScanRuler_ElementSphere": _FIT.format("sphere"),
+    "ScanRuler_ElementCylinder": _FIT.format("cylinder"),
+    "ScanRuler_ElementCone": _FIT.format("cone"),
+    "ScanRuler_ElementCircle": _FIT.format("circle"),
+    "ScanRuler_ElementTorus": _FIT.format("torus"),
+    "ScanRuler_NewDimension": "Measure between elements: a distance, an angle or a diameter.",
+    "ScanRuler_NewTolerance": "Check a form or position tolerance on an element, such as parallelism.",
+    "ScanRuler_AlignAutomatically": "Best-fit the scan onto the nominal part automatically.",
+    "ScanRuler_AlignByPoints": "Align the scan to the nominal part by picking matching points on both.",
+    "ScanRuler_MarkFitSurface": "Mark the surfaces the best fit should use; the rest are left out.",
+    "ScanRuler_FindVolumeErrors": "Find where the scan has material missing or added against the nominal part.",
+    "ScanRuler_MeasureAgain": "Measure the wall thickness again with the settings now.",
+    "ScanRuler_CopyReport": "Copy the measuring report as text.",
+    "ScanRuler_FlatPoint": "Place a point on the flat scan.",
+    "ScanRuler_FlatLine": _FLAT.format("line"),
+    "ScanRuler_FlatCircle": _FLAT.format("circle"),
+    "ScanRuler_FlatArc": _FLAT.format("arc"),
+    "ScanRuler_FlatSpline": _FLAT.format("spline"),
+    "ScanRuler_FlatCount": "Count the shapes of one kind on the flat scan.",
+    "ScanRuler_FlatText": "Add a text note to the 2D sheet.",
+    "ScanRuler_FlatNewDimension": "Measure between elements on the 2D sheet.",
+}
 
 
 _KINDS = (("point", "Point", "elPoint"), ("line", "Line", "elLine"), ("plane", "Plane", "elPlane"),
