@@ -179,6 +179,32 @@ class _RectOcct:
         return {f"{a}{m}": fn(p[i] for p in c) for i, a in enumerate("xyz") for m, fn in (("min", min), ("max", max))}
 
 
+class HalfSpace(unittest.TestCase):
+    def test_the_box_stands_past_the_part_on_the_kept_side(self):
+        # cutPlane's half-space is a finite box: OCCT's infinite one has a
+        # plane face with no edges, and tracing the cut measured to them
+        # (BRepExtrema_DistShapeShape failed).
+        bounds = {"xmin": 2, "ymin": -3, "zmin": 1, "xmax": 42, "ymax": 17, "zmax": 11}
+        for origin, n in (([20, 0, 6], [-1, 0, 0]), ([20, 0, 6], [1, 0, 0]), ([0, 0, 0], K.normalize([1, 2, 3])), ([100, 100, 100], [0, 0, -1])):
+            corner, u, w, side, height = K.half_space_box(origin, n, bounds)
+            self.assertAlmostEqual(K.dot(K.sub(corner, origin), n), 0, places=9)
+            for p in ([x, y, z] for x in (2, 42) for y in (-3, 17) for z in (1, 11)):
+                d = K.sub(p, corner)
+                a, b, c = K.dot(d, u), K.dot(d, w), K.dot(d, n)
+                if c > 0:
+                    self.assertTrue(K.HALF_SPACE_MARGIN <= a <= side - K.HALF_SPACE_MARGIN and K.HALF_SPACE_MARGIN <= b <= side - K.HALF_SPACE_MARGIN and c <= height - K.HALF_SPACE_MARGIN, (origin, n, p))
+        self.assertEqual(K.half_space_box([0, 0, 0], [0, 0, 1])[3], 2 * K.HALF_SPACE_BIG)
+
+    def test_no_distance_is_taken_to_an_unbounded_face(self):
+        class Unbounded:
+            Edges = []
+
+            def isPartOfDomain(self, u, v):
+                return True
+
+        self.assertEqual(K.Occt().classifyPointOnFace(Unbounded(), 0, 0), "in")
+
+
 class TracedCut(unittest.TestCase):
     def test_the_tools_face_is_traced_too_not_the_box_twice(self):
         # A box 40 x 20 x 10 cut by a tool: four walls kept as they were, top
