@@ -10,15 +10,17 @@
 
 import math
 
+from ._js import js_hypot
+
 from ..geom2d import view_chain
 
 
 def chain_closed(c):
-    return len(c) > 2 and math.hypot(c[0][0] - c[-1][0], c[0][1] - c[-1][1]) < 1e-9
+    return len(c) > 2 and js_hypot(c[0][0] - c[-1][0], c[0][1] - c[-1][1]) < 1e-9
 
 
 def chain_length(c):
-    return sum(math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]) for i in range(1, len(c)))
+    return sum(js_hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]) for i in range(1, len(c)))
 
 
 def chain_area(c):
@@ -46,7 +48,7 @@ def join_chain_ends(chains, gap):
         return c[-1] if e & 1 else c[0]
 
     def dist(e, f):
-        return math.hypot(end(e)[0] - end(f)[0], end(e)[1] - end(f)[1])
+        return js_hypot(end(e)[0] - end(f)[0], end(e)[1] - end(f)[1])
 
     pairs = []
     for i in range(n):
@@ -79,7 +81,7 @@ def join_chain_ends(chains, gap):
     step = max(1e-3, spacings[len(spacings) >> 1] if spacings else math.inf)
 
     def bridge(out, a, b):
-        k = int(math.floor(math.hypot(b[0] - a[0], b[1] - a[1]) / step))
+        k = int(math.floor(js_hypot(b[0] - a[0], b[1] - a[1]) / step))
         for t in range(1, k):
             out.append([a[0] + ((b[0] - a[0]) * t) / k, a[1] + ((b[1] - a[1]) * t) / k])
 

@@ -11,7 +11,7 @@
 
 import math
 
-from ._js import clone, fmod
+from ._js import clone, fmod, js_hypot
 from .sketch_spline import is_closed, nearest_on_spline, spline_at, spline_curve, spline_end, spline_samples
 from ..chainsegment import unwind_angle  # sketch.ts's unwindAngle, already ported with segment.ts
 
@@ -46,7 +46,7 @@ def dot2(a, b):
 
 
 def len2(a):
-    return math.hypot(a[0], a[1])
+    return js_hypot(a[0], a[1])
 
 
 def perp2(a):
@@ -86,7 +86,7 @@ def distance_along(p, q, axis=None):
 def axis_relation_of(a, b, degrees=INFER_AXIS_DEG):
     dx = b[0] - a[0]
     dy = b[1] - a[1]
-    ln = math.hypot(dx, dy)
+    ln = js_hypot(dx, dy)
     if not (ln > 1e-9):
         return None
     limit = math.sin((degrees * math.pi) / 180)
@@ -440,7 +440,7 @@ def arc_through(p, q, r):
     ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
     uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
     c = [ux, uy]
-    radius = math.hypot(ax - ux, ay - uy)
+    radius = js_hypot(ax - ux, ay - uy)
     theta_p = math.atan2(ay - uy, ax - ux)
     theta_q = math.atan2(by - uy, bx - ux)
     theta_r = math.atan2(cy - uy, cx - ux)

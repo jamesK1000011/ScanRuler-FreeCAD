@@ -13,6 +13,8 @@
 
 import math
 
+from ._js import js_hypot
+
 import numpy as np
 
 from ..linalg import ortho_basis as _ortho_basis
@@ -113,9 +115,9 @@ def _least_spread_across(m, r):
     c = _spread(m, v)
     xx, xy, xz, yy, yz, zz = m["cov"]
     b = u[0] * (xx * v[0] + xy * v[1] + xz * v[2]) + u[1] * (xy * v[0] + yy * v[1] + yz * v[2]) + u[2] * (xz * v[0] + yz * v[1] + zz * v[2])
-    low = (a + c) / 2 - math.hypot((a - c) / 2, b)
+    low = (a + c) / 2 - js_hypot((a - c) / 2, b)
     e = [b, low - a] if abs(b) > 1e-300 else ([1, 0] if a <= c else [0, 1])
-    ln = math.hypot(e[0], e[1])
+    ln = js_hypot(e[0], e[1])
     return [(u[0] * e[0] + v[0] * e[1]) / ln, (u[1] * e[0] + v[1] * e[1]) / ln, (u[2] * e[0] + v[2] * e[1]) / ln]
 
 

@@ -6,7 +6,8 @@
 # relation can be held to. A trace is {"plane", "n": [a, b], "d"}: the
 # points p with n.p + d = 0 lie on it.
 
-import math
+
+from ._js import js_hypot
 
 DATUM_PLANES = (
     {"plane": "xy", "name": "XY plane", "normal": [0, 0, 1]},
@@ -34,7 +35,7 @@ def datum_traces(frame):
         normal = dp["normal"]
         a = _dot3(frame["basisU"], normal)
         b = _dot3(frame["basisV"], normal)
-        ln = math.hypot(a, b)
+        ln = js_hypot(a, b)
         if ln < 1e-6:
             continue
         out.append({"plane": dp["plane"], "n": [a / ln, b / ln], "d": _dot3(frame["origin"], normal) / ln})

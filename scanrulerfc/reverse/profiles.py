@@ -8,7 +8,7 @@
 
 import math
 
-from ._js import fmod, js_round, num_str, precision_number, to_fixed
+from ._js import fmod, js_hypot, js_round, num_str, precision_number, to_fixed
 from .loops import circle_through, piece_points
 from .regions import loop_geometry, match_regions, merge_regions, regions_by_pick
 from .sketch import TOUCH_MM, anchor_point, arc_point, sketch_bounds
@@ -221,7 +221,7 @@ def _profile_extent(profile):
     pts = [q for p in profile["outer"] for q in piece_points(p)]
     lo = [min(p[k] for p in pts) for k in range(3)]
     hi = [max(p[k] for p in pts) for k in range(3)]
-    return math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
+    return js_hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
 
 
 def loft_problem(sketches, profiles):
@@ -232,7 +232,7 @@ def loft_problem(sketches, profiles):
         for e in s["sketch"]["entities"]:
             if e.get("construction") or e["kind"] not in ("line", "arc"):
                 continue
-            ln = math.hypot(e["b"][0] - e["a"][0], e["b"][1] - e["a"][1]) if e["kind"] == "line" else e["r"] * abs(e["sweep"])
+            ln = js_hypot(e["b"][0] - e["a"][0], e["b"][1] - e["a"][1]) if e["kind"] == "line" else e["r"] * abs(e["sweep"])
             if ln < STATION_MIN_PIECE_MM:
                 return (f"{s['name']}'s piece {_n(e['id'])} ({'an arc' if e['kind'] == 'arc' else 'a line'}) is {_mmw(ln)} mm long — under {_n(STATION_MIN_PIECE_MM)} mm: "
                         "no piece of a section, and one the kernel can stop on (NCollection_DataMap::Find) or fold at. Take it out (reverse.sketch.edit remove) and join its neighbours, or fit that section again.")
@@ -282,7 +282,7 @@ def sweep_path(sketch, frm):
     ends = [{"piece": i, "end": end, "at": anchor_point(e, end)} for i, e in enumerate(pieces) for end in ("a", "b")]
 
     def meeting(p):
-        return [q for q in ends if q["piece"] != p["piece"] and math.hypot(q["at"][0] - p["at"][0], q["at"][1] - p["at"][1]) <= TOUCH_MM]
+        return [q for q in ends if q["piece"] != p["piece"] and js_hypot(q["at"][0] - p["at"][0], q["at"][1] - p["at"][1]) <= TOUCH_MM]
 
     if any(len(meeting(p)) > 1 for p in ends):
         return f"{name} branches — three pieces meet at a point; a sweep follows one chain."
@@ -408,7 +408,7 @@ def route_sweep_geometry(profile_sketch, regions, route):
 def far_reach(origin, d, sketch, planes):
     """How far "far" is for an extrusion limited by a plane."""
     b = sketch_bounds(sketch)
-    reach = math.hypot(b["max"][0] - b["min"][0], b["max"][1] - b["min"][1]) if b else 10
+    reach = js_hypot(b["max"][0] - b["min"][0], b["max"][1] - b["min"][1]) if b else 10
     for p in planes:
         reach = max(reach, abs(dot([p["origin"][0] - origin[0], p["origin"][1] - origin[1], p["origin"][2] - origin[2]], d)) * 2)
     return max(reach * 4, 10)
@@ -482,7 +482,7 @@ def profiles_meet_axis(profiles, origin, d, tol=1e-6):
                 ey = yj - yi
                 l2 = ex * ex + ey * ey
                 t = max(0, min(1, -(xi * ex + yi * ey) / l2)) if l2 > 0 else 0
-                if math.hypot(xi + ex * t, yi + ey * t) <= tol:
+                if js_hypot(xi + ex * t, yi + ey * t) <= tol:
                     return "on"
                 if (yi > 0) != (yj > 0) and 0 < xi - (yi * ex) / ey:
                     inside = not inside
@@ -679,11 +679,11 @@ def _cross2(a, b):
 
 
 def _dist2(a, b):
-    return math.hypot(a[0] - b[0], a[1] - b[1])
+    return js_hypot(a[0] - b[0], a[1] - b[1])
 
 
 def _unit2(a):
-    ln = math.hypot(a[0], a[1])
+    ln = js_hypot(a[0], a[1])
     return [a[0] / ln, a[1] / ln] if ln > 1e-15 else None
 
 
