@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'extract' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>extract</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6 7v10a6 2.5 0 0 0 12 0V7Z" stroke="#1877c0" fill="#d9e8f5" />
+<ellipse cx="12" cy="7" rx="6" ry="2.5" stroke="#1877c0" fill="#d9e8f5" />
+<circle cx="12" cy="2.2" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="3.4" cy="6" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="20.8" cy="9" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="3" cy="13" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="21" cy="15.5" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="7" cy="21.6" r=".95" stroke="none" fill="#6b7280" />
+<circle cx="16.5" cy="22" r=".95" stroke="none" fill="#6b7280" />
+</g>
+</svg>

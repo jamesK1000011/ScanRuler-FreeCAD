@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'sweep' key (plugins/reverse/ui/SweepFields.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>sweep</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 7.5h6.5a7.5 7.5 0 0 1 7.5 7.5v6h-5v-6a2.5 2.5 0 0 0-2.5-2.5H3Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M1 10h8.5a5 5 0 0 1 5 5v8" stroke="#1877c0" />
+</g>
+</svg>

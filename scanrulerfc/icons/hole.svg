@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'hole' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>hole</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M2.5 12h14v7h-14Z" fill="#6b7280" fill-opacity=".13" />
+<path d="m16.5 12 5-6v7l-5 6Z" fill="#6b7280" fill-opacity=".13" />
+<path d="m2.5 12 5-6h14l-5 6Z" fill="#6b7280" fill-opacity=".13" />
+<ellipse cx="12" cy="9" rx="3.5" ry="1.6" stroke="#1877c0" fill="#d9e8f5" />
+<path d="M12 1.5V9" stroke="#1877c0" stroke-dasharray="3.2 1.6 0.6 1.6" stroke-width="1.1" />
+</g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'markBrush' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>markBrush</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5.5 17.5Q9 10.5 16 8" stroke="#1877c0" opacity=".3" stroke-width="8" />
+<circle cx="16" cy="8" r="4" stroke="#1877c0" />
+<circle cx="16" cy="8" r="1.1" stroke="none" fill="#6b7280" />
+</g>
+</svg>
