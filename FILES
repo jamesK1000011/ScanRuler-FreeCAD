@@ -67,6 +67,7 @@ scanrulerfc/repeat_core.py
 scanrulerfc/reverse/__init__.py
 scanrulerfc/reverse/_js.py
 scanrulerfc/reverse/autoconstrain.py
+scanrulerfc/reverse/build.py
 scanrulerfc/reverse/buildtypes.py
 scanrulerfc/reverse/chain_outline.py
 scanrulerfc/reverse/corners.py
@@ -107,6 +108,7 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 tests/meshes.py
 tests/meshkit.py
+tests/reverse_fakekernel.py
 tests/reverse_fixtures/part_roundtrip.json
 tests/reverse_fixtures/step_keys_goldens.json
 tests/synth.py
@@ -140,6 +142,7 @@ tests/test_redteam_deviation.py
 tests/test_redteam_fits.py
 tests/test_repeat.py
 tests/test_reverse_autoconstrain.py
+tests/test_reverse_build.py
 tests/test_reverse_corners.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
