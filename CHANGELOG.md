@@ -1,6 +1,26 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # Changelog
 
+## 0.4.0 — 2026-11-15
+
+- The Reverse engineer engine, ported from ScanRuler by Stefan Hermann
+  (CNC Kitchen): the feature list, parameters and their expressions, the
+  sketch solver and regions, the patch network maths, and the build on
+  FreeCAD's Part kernel, in a `ScanRulerReverse` container in the document
+  (one undo step an edit, its bodies matched by id).
+- 21 `reverse_*` tools in their own `reverse` group, deferred in Agent Link
+  so a session that does not use them pays nothing: the feature list
+  (add, update, remove, move, suppress, rollback, clear, list, schema), the
+  build, the parameters and the bodies (names, describe, check, clearance,
+  set). Agent Link's echo lights the Create feature key of the feature's
+  kind.
+- The Reverse engineer page: the feature keys of the kinds this port
+  builds, Play and + Add run the tools; FEATURES, BODIES and PARAMETERS
+  list what the tools read. The rest still say they are coming with the
+  engine port.
+- Load opens a `.scanruler` project's Reverse engineer part in the
+  document's container; without FreeCAD it is named as not loaded.
+
 ## 0.3.0 — 2026-11-14
 
 - A ScanRuler workbench of its own, after ScanRuler by Stefan Hermann (CNC

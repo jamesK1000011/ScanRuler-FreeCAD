@@ -18,8 +18,8 @@ Combo View and the status strip (READY, element and dimension counts,
 "ScanRuler · CNC Kitchen"). Colour maps start on `jet`, as the original's
 do. Save writes the FreeCAD document; Load opens a `.FCStd` or a
 `.scanruler` project from the original (its scan, fitted elements and
-sections; reverse engineer data waits for that engine's port). The
-Reverse engineer workspace is a stub until then. It needs no other add-on.
+sections, and its Reverse engineer part, which needs FreeCAD's Part
+kernel). It needs no other add-on.
 
 It also adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:
@@ -124,6 +124,24 @@ moved on.
   of the window for the person to mark up and note; `snapshot_list`,
   `snapshot_latest` and `snapshot_wait` let the agent read them. Only the
   person takes a shot.
+- **Reverse engineer** (`reverse`, a deferred group: listed only when a
+  session asks for it): the Reverse engineer engine of ScanRuler by Stefan
+  Hermann (CNC Kitchen), ported to FreeCAD under `scanrulerfc/reverse/`.
+  The feature list lives in one `ScanRulerReverse` container in the
+  document, one undo step an edit, its bodies built on FreeCAD's Part
+  kernel. Tools: `reverse_feature_add`, `reverse_feature_update`,
+  `reverse_feature_remove`, `reverse_feature_move`,
+  `reverse_feature_suppress`, `reverse_feature_rollback`,
+  `reverse_feature_clear`, `reverse_feature_list`,
+  `reverse_feature_schema`, `reverse_build`, `reverse_build_stop`,
+  `reverse_parameter_add`, `reverse_parameter_set`,
+  `reverse_parameter_rename`, `reverse_parameter_remove`,
+  `reverse_parameter_list`, `reverse_body_names`, `reverse_body_describe`,
+  `reverse_body_check`, `reverse_body_clearance`, `reverse_body_set`. On the
+  Reverse engineer page the keys of the kinds this port builds run these
+  tools; sketch editing, Import STEP, sheet, split, loft, sweep, fit
+  surface, patch network, trim and thicken are still coming with the
+  engine port.
 - **More model formats**: glTF/GLB, Collada, VRML 2 and 3DS open as the scan
   or the reference through Agent Link's readers. FBX does not: export it as
   glTF.
