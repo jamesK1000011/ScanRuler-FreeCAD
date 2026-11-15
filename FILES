@@ -71,6 +71,7 @@ scanrulerfc/reverse/datums.py
 scanrulerfc/reverse/expression.py
 scanrulerfc/reverse/features.py
 scanrulerfc/reverse/parameters.py
+scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/regions.py
 scanrulerfc/reverse/sketch.py
 scanrulerfc/reverse/sketch_spline.py
@@ -87,6 +88,7 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 tests/meshes.py
 tests/meshkit.py
+tests/reverse_fixtures/part_roundtrip.json
 tests/synth.py
 tests/test_autoalign.py
 tests/test_catalog.py
@@ -121,6 +123,7 @@ tests/test_reverse_autoconstrain.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_parameters.py
+tests/test_reverse_part_file.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_thickness.py

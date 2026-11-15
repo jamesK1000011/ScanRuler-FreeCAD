@@ -184,9 +184,27 @@ def _refuse(name):
     raise ValueError(f"Unexpected token {name} in JSON")
 
 
+def _index_key(k):
+    """Whether a key is an array index, which a JavaScript object lists
+    first, in numeric order, whatever order it was written in."""
+    return k.isdigit() and k.isascii() and (k == "0" or k[0] != "0") and int(k) < 2 ** 32 - 1
+
+
+def js_object(pairs):
+    """A dict in the order a JavaScript object keeps its keys."""
+    d = {}
+    for k, v in pairs:
+        d[k] = v
+    if any(_index_key(k) for k in d):
+        idx = sorted((k for k in d if _index_key(k)), key=int)
+        d = {**{k: d[k] for k in idx}, **{k: v for k, v in d.items() if not _index_key(k)}}
+    return d
+
+
 def parse(text):
-    """JSON.parse: no NaN or Infinity, integers past 2^53 read as doubles."""
-    return json.loads(text, parse_int=_int, parse_constant=_refuse)
+    """JSON.parse: no NaN or Infinity, integers past 2^53 read as doubles,
+    keys in a JavaScript object's order."""
+    return json.loads(text, parse_int=_int, parse_constant=_refuse, object_pairs_hook=js_object)
 
 
 def clone(value):
