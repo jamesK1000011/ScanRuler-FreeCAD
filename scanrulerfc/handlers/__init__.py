@@ -11,7 +11,7 @@ import importlib
 from . import _bind
 
 # The families, in the order Agent Link lists them.
-MODULES = ("scan", "elements", "align", "dimensions", "sections", "meshtools", "flat", "deviation", "thickness", "noise", "thread", "wear", "catalog", "manual", "pack", "fitcomp", "cad")
+MODULES = ("scan", "elements", "align", "dimensions", "sections", "meshtools", "flat", "deviation", "thickness", "noise", "thread", "wear", "catalog", "manual", "pack", "fitcomp", "cad", "snapshot")
 
 
 def module(name):

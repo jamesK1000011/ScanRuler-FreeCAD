@@ -24,6 +24,7 @@ scanrulerfc/agentlink/fam_noise.py
 scanrulerfc/agentlink/fam_pack.py
 scanrulerfc/agentlink/fam_scan.py
 scanrulerfc/agentlink/fam_sections.py
+scanrulerfc/agentlink/fam_snapshot.py
 scanrulerfc/agentlink/fam_thickness.py
 scanrulerfc/agentlink/fam_thread.py
 scanrulerfc/agentlink/fam_wear.py
@@ -86,6 +87,7 @@ scanrulerfc/handlers/noise.py
 scanrulerfc/handlers/pack.py
 scanrulerfc/handlers/scan.py
 scanrulerfc/handlers/sections.py
+scanrulerfc/handlers/snapshot.py
 scanrulerfc/handlers/thickness.py
 scanrulerfc/handlers/thread.py
 scanrulerfc/handlers/wear.py
@@ -188,7 +190,6 @@ scanrulerfc/meshtools/grid.py
 scanrulerfc/meshtools/handlers.py
 scanrulerfc/meshtools/shell.py
 scanrulerfc/meshtools/solids.py
-scanrulerfc/meshtools/tools.json
 scanrulerfc/meshtools/trim.py
 scanrulerfc/meshtools/wrap.py
 scanrulerfc/min_zone.py

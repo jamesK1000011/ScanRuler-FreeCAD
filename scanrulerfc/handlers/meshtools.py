@@ -11,6 +11,7 @@
 # tools keep reading the scan until mesh_use_edited takes the copy into use.
 # The arrays before each change are kept, so mesh_undo takes it back.
 
+import functools
 import math
 import os
 
@@ -38,10 +39,10 @@ def r(v, nd=4):
 
 def mt_state(session):
     st = S.state(session)
-    mine = st.setdefault("meshToolsState", {"base": None, "copy": None, "edits": [], "pending": [], "reduced": None, "undo": []})
+    mine = st.setdefault("meshToolsState", {"base": None, "copy": None, "edits": [], "pending": [], "reduced": None, "undo": [], "piece": None, "wrap": None})
     if st["scan"] is not mine["base"] and not any(u["scan"] is st["scan"] for u in mine["undo"]):
         # Another scan was opened: its copy and edits went with the old one.
-        mine.update({"base": st["scan"], "copy": None, "edits": [], "pending": [], "reduced": None, "undo": []})
+        mine.update({"base": st["scan"], "copy": None, "edits": [], "pending": [], "reduced": None, "undo": [], "piece": None, "wrap": None})
     return mine
 
 
@@ -324,8 +325,16 @@ def bind(session):
             if ms["reduced"] is None:
                 raise ToolError("invalid_state", "There is no reduced mesh — mesh_reduce makes one.")
             V, F = ms["reduced"]["V"], ms["reduced"]["F"]
+        elif part == "piece":
+            if ms.get("piece") is None:
+                raise ToolError("invalid_state", "There is no trimmed piece — mesh_trim makes one.")
+            V, F = ms["piece"]["V"], ms["piece"]["F"]
+        elif part == "wrap":
+            if ms.get("wrap") is None:
+                raise ToolError("invalid_state", "There is no wrap — mesh_wrap makes one.")
+            V, F = ms["wrap"]["V"], ms["wrap"]["F"]
         else:
-            raise ToolError("invalid_input", "part: edited or reduced — the trimmed piece is not ported.")
+            raise ToolError("invalid_input", "part: edited, reduced, piece or wrap.")
         scan = S.scan_of(session)
         if a.get("to") == "document":
             if session.doc is None:
@@ -372,7 +381,16 @@ def bind(session):
         "mesh_discard_edited": mesh_discard_edited,
         "mesh_undo": mesh_undo,
         "mesh_export": mesh_export,
+        # Densify, Boolean, Trim to scan, Shell and Wrap (scanrulerfc/meshtools),
+        # on the same Mesh Tools state; imported here, as they import this module.
+        **_added(session),
     }
+
+
+def _added(session):
+    from ..meshtools import handlers as ADDED
+
+    return {n: functools.partial(ADDED.HANDLERS[n], session) for n in ADDED.NAMES}
 
 
 def point_mesh_distances(P, V, F, sample=4000):
@@ -437,5 +455,6 @@ def _point_triangles(p, T):
     return np.min([np.linalg.norm(c - p, axis=1) for c in cands], axis=0)
 
 
-NAMES = ("mesh_parts", "mesh_inspect", "mesh_remove_islands", "mesh_delete_marked", "mesh_flip_normals", "mesh_cut", "mesh_cut_preview", "mesh_mirror", "mesh_fill_holes", "mesh_smooth", "mesh_offset", "mesh_reduce", "mesh_apply_reduced", "mesh_discard", "mesh_use_edited", "mesh_discard_edited", "mesh_undo", "mesh_export")
+NAMES = ("mesh_parts", "mesh_inspect", "mesh_remove_islands", "mesh_delete_marked", "mesh_flip_normals", "mesh_cut", "mesh_cut_preview", "mesh_mirror", "mesh_fill_holes", "mesh_smooth", "mesh_offset", "mesh_reduce", "mesh_apply_reduced", "mesh_discard", "mesh_use_edited", "mesh_discard_edited", "mesh_undo", "mesh_export",
+         "mesh_densify", "mesh_boolean", "mesh_trim", "mesh_shell", "mesh_wrap", "mesh_apply_wrap")
 HANDLERS = _bind.table(bind, NAMES)

@@ -439,9 +439,14 @@ class Handlers(unittest.TestCase):
     def test_the_tool_data_names_every_handler(self):
         import json
 
-        with open(os.path.join(HERE, "..", "scanrulerfc", "meshtools", "tools.json"), encoding="utf-8") as f:
+        from scanrulerfc.handlers import meshtools as family
+
+        with open(os.path.join(HERE, "..", "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
             doc = json.load(f)
-        self.assertEqual(sorted(doc["entries"]), sorted(H.NAMES))
+        # In the add-on's one tool data, in the meshtools family.
+        for n in H.NAMES:
+            self.assertEqual(doc["entries"][n]["group"], "meshtools", n)
+            self.assertIn(n, family.NAMES)
         try:
             from agentlink import tooldata
         except ImportError:
