@@ -7,6 +7,8 @@ ScanRuler's measuring of 3D scans, ported to FreeCAD from **ScanRuler by
 CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
 Licensed AGPL-3.0-only, the same as ScanRuler.
 
+<!-- screenshot: FreeCAD with the ScanRuler workbench, a scan coloured by its deviation map, the ScanRuler panel beside the model tree -->
+
 Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of Agent Link for FreeCAD installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
 
 It is a **ScanRuler workbench** of its own, laid out as the original: the
@@ -40,6 +42,35 @@ last tool it ran.
 The tool names are ScanRuler's own (`scan_open`, `element_fit`,
 `deviation_align` …), so ScanRuler's guides read the same here.
 Everything is in millimetres.
+
+## What you need
+
+- FreeCAD 1.0 or newer (1.1 recommended), on macOS, Linux or Windows.
+- numpy, which comes with FreeCAD. scipy, when FreeCAD has it, speeds up a
+  few steps (symmetry, mesh grids, flatbed parts); they run without it.
+- Nothing else: no other add-on, no account, no network. Agent Link for
+  FreeCAD is optional; with it, an agent can use the tools below.
+
+## Install
+
+Pick one, not two.
+
+- **Addon Manager (custom repository, until it is listed).** In FreeCAD:
+  **Edit ▸ Preferences ▸ Addon Manager**, under *Custom repositories* add
+  `https://github.com/jamesK1000011/ScanRuler-FreeCAD`, branch `main`. Then
+  **Tools ▸ Addon manager**, find **ScanRuler for FreeCAD**, Install, and
+  restart FreeCAD.
+- **With Agent Link's Claude Desktop extension.** It installs this add-on
+  for you into FreeCAD's `Mod` folder as `ScanRulerFC`, at the commit its
+  tests passed with.
+- **By hand.** Put this folder in FreeCAD's `Mod` folder (find it with
+  `FreeCAD.getUserAppDataDir()` in FreeCAD's Python console) and restart
+  FreeCAD.
+
+Then pick **ScanRuler** from the workbench list and use **ScanRuler ▸ Open
+Scan…**.
+
+<!-- screenshot: the ScanRuler workspaces toolbar and the 3D Measure page -->
 
 ## What is ported
 
@@ -168,3 +199,44 @@ The tests that need FreeCAD skip without it; the ones that need Agent Link
 skip without it, and the rest run alone. CI (`.github/workflows/ci.yml`)
 runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
 out beside it.
+
+## Uninstall
+
+- **Addon Manager**: Tools ▸ Addon manager ▸ ScanRuler for FreeCAD ▸
+  Uninstall, then restart FreeCAD.
+- **By hand, or installed by the Agent Link extension**: delete the folder
+  from FreeCAD's `Mod` folder (`ScanRulerFC` when the extension put it
+  there), and restart FreeCAD.
+- **Your files** are yours to keep or delete: what the tools write goes
+  beside the open document, or to `~/ScanRuler` when it has not been saved
+  (exports, `scanners.json`, reports).
+
+## Privacy
+
+ScanRuler for FreeCAD has no telemetry and makes no network connection. Your
+scans, projects and reports stay on your computer, where you save them.
+Snapshots are taken only when you press the camera key. Library packs
+(`pack_write`) are scrubbed of personal details (paths, names, printer
+addresses and serials) before they are written. With Agent Link, what the
+agent reads goes to the AI provider your MCP client uses, under that
+provider's terms.
+
+## Credits and licence
+
+- **ScanRuler by Stefan Hermann (CNC Kitchen)**,
+  https://github.com/CNCKitchen/ScanRuler: the measuring, fitting,
+  alignment, deviation, wall thickness, sections, mesh tools, 2D measuring,
+  reverse engineering and plugins ported here, and the window's layout,
+  panels, key labels, tooltips, colour maps and icons the workbench follows.
+  Each ported file names the ScanRuler source it comes from. See
+  `NOTICE.md`.
+- Fonts: Barlow, Barlow Semi Condensed and B612 Mono, SIL Open Font License 1.1
+  (`scanrulerfc/fonts/`).
+
+AGPL-3.0-only (`LICENSE`), as ScanRuler is. The full source of this port is
+this repository; a changed copy you give to others, or let others use over a
+network, must offer its source under the same licence. Every file's licence
+is stated in its SPDX header or in `REUSE.toml`; the licence texts are in
+`LICENSES/` (the privacy check under `.github/privacy/` is Agent Link's,
+LGPL-2.1-or-later). CNC Kitchen's commercial licences for ScanRuler do not
+cover this port. Please report problems here, not to ScanRuler.
