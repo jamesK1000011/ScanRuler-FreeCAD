@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'offsetSurface' key (plugins/mesh-tools/ui/meshIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>offsetSurface</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 20v-8a4 4 0 0 1 4-4h8v12Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M4 20v-8a8 8 0 0 1 8-8h8" stroke="#1877c0" stroke-dasharray="2 2.4" />
+<path d="m9.2 9.2-2.6-2.6m0 0v2.3m0-2.3h2.3" stroke="#1877c0" />
+</g>
+</svg>

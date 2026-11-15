@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'shellSolid' key (plugins/mesh-tools/ui/meshIcons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>shellSolid</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path fill-rule="evenodd" d="M3.5 4.5h17v15h-17ZM7.5 8.5v7h9v-7Z" stroke="#1877c0" fill="#d9e8f5" />
+<path d="M3.5 12h4m9 0h4" stroke-width="1.1" />
+</g>
+</svg>

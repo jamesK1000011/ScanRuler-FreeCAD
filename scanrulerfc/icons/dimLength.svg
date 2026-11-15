@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'dimLength' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>dimLength</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5 18.5h14" />
+<path d="M5 15V6M19 15V6" stroke="#1877c0" stroke-width="1.1" />
+<path d="M5 8.5h14M7.2 6.3 5 8.5l2.2 2.2M16.8 6.3 19 8.5l-2.2 2.2" stroke="#1877c0" />
+</g>
+</svg>

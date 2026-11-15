@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'compare' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>compare</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 17c5-8.5 13-8.5 18 0" />
+<path d="M6.3 9.6v3.4M10.06 8.6v2.2M13.94 13.4v-2.2M17.7 9.2v3.5" stroke="#1877c0" />
+<circle cx="6.3" cy="9.6" r="1.05" stroke="none" fill="#6b7280" />
+<circle cx="10.06" cy="8.6" r="1.05" stroke="none" fill="#6b7280" />
+<circle cx="13.94" cy="13.5" r="1.05" stroke="none" fill="#6b7280" />
+<circle cx="17.7" cy="9.2" r="1.05" stroke="none" fill="#6b7280" />
+</g>
+</svg>

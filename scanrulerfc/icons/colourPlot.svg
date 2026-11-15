@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'colourPlot' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>colourPlot</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 13c0-5 3-9.5 8.5-9.5S21 7 20.5 12 17 20.5 11.5 20.5 4 18 4 13Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M8 13.5C8 10.5 10 8 13 8s4.5 2 4.5 4.5S15.5 17 12.5 17 8 16 8 13.5Z" stroke="#1877c0" fill="#d9e8f5" />
+<circle cx="13.5" cy="12" r="1.7" stroke="none" fill="#1877c0" />
+</g>
+</svg>

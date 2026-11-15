@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'chamfer' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>chamfer</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="m4 12 8-8h8v16H4Z" stroke="none" fill="#6b7280" fill-opacity=".13" />
+<path d="M12 4h8v16H4v-8" />
+<path d="M4 12V4h8" stroke-width="1.1" opacity=".5" stroke-dasharray="2 2.4" />
+<path d="m4 12 8-8" stroke="#1877c0" />
+</g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only. Drawn from ScanRuler's 'split' key (src/ui/icons.tsx),
+     ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>split</title>
+<g transform="scale(2.6666667)" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 7h7c-1.5 4 1.5 7 0 11H3Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M14 7h7v11h-7c1.5-4-1.5-7 0-11Z" fill="#6b7280" fill-opacity=".13" />
+<path d="M12 3c-1.5 5.5 1.5 12.5 0 18" stroke="#1877c0" />
+</g>
+</svg>
