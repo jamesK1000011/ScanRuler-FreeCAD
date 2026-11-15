@@ -67,11 +67,18 @@ class Dispatch(unittest.TestCase):
         self.assertEqual({k for k, v in DISPATCH.items() if v == "later"}, set(LATER))
         self.assertTrue(all(n > 6 for n in LATER.values()))
 
-    def test_a_later_kind_fails_in_its_place_and_the_build_goes_on(self):
+    def test_a_sheet_step_that_fails_does_so_in_its_place_and_the_build_goes_on(self):
         b = Builder(FakeKernel())
-        out = b.build([{"kind": "loft", "id": 1, "name": "Loft 1"}, extrude(2, rect(0, 0, 10, 10), 0, 10)])
+        out = b.build([{"kind": "thicken", "id": 1, "name": "Thicken 1", "sheet": 9, "thickness": 1, "side": "out", "op": "new"}, extrude(2, rect(0, 0, 10, 10), 0, 10)])
         self.assertEqual([r["status"] for r in out["results"]], ["failed", "ok"])
-        self.assertIn("build step 10", out["results"][0]["message"])
+        self.assertEqual(out["results"][0]["message"], "The sheet this thickens is gone, or failed to build.")
+        out = b.build([extrude(1, rect(0, 0, 10, 10), 0, 10), {"kind": "thicken", "id": 2, "name": "Thicken 2", "sheet": 1, "thickness": 1, "side": "out", "op": "new"}])
+        self.assertTrue(out["results"][1]["message"].startswith("Extrude 1 is a solid, not a sheet — a thicken takes a sheet"), out["results"][1])
+
+    def test_the_scan_steps_say_the_scan_is_not_here(self):
+        out = Builder(FakeKernel()).build([{"kind": "trim", "id": 1, "name": "Trim 1", "bodies": [], "primitives": [{"kind": "plane"}], "tolerance": 0.2, "overlap": 0.8},
+                                           {"kind": "surface", "id": 2, "name": "Surface 2", "region": [0] * 30, "fit": {}, "shape": "freeform"}])
+        self.assertEqual([r["message"] for r in out["results"]], ["The scan is not here to trim against.", "The scan is not here to fit a surface through."])
 
 
 class Retries(unittest.TestCase):
@@ -213,6 +220,62 @@ class Pure(unittest.TestCase):
         # Three edges round one face: it is the reference of each; flipped, the other.
         self.assertEqual(reference_faces([(1, 2), (1, 3), (4, 1)], False), [1, 1, 1])
         self.assertEqual(reference_faces([(1, 2), (1, 3), (4, 1)], True), [2, 3, 4])
+
+
+def sheet_step(i, x):
+    return {"kind": "sheet", "id": i, "name": f"Sheet {i}", "sketchId": 99, "pieces": [{"kind": "line", "a": [x, -50, 0], "b": [x, 50, 0]}], "dir": [0, 0, 1], "from": -50, "to": 50}
+
+
+def split_step(i, body, tools, keep, **more):
+    return {"kind": "split", "id": i, "name": f"Split {i}", "body": body, "tools": tools, "keep": keep, "tolerance": 0.2, "overlap": 0.8, **more}
+
+
+class Sheets(unittest.TestCase):
+    """Build steps 10 and 11 on the stand-in kernel: the Builder's own
+    decisions (which body is a surface, which fragment is kept, whose
+    maker a face keeps); the geometry is held to FreeCAD by the fixtures."""
+
+    def test_a_sheet_is_a_surface_body(self):
+        out = Builder(FakeKernel()).build([sheet_step(1, 3)])
+        self.assertEqual(out["results"], [{"id": 1, "status": "ok"}])
+        self.assertEqual([(b["id"], b["surface"], b["closed"]) for b in out["bodies"]], [(1, True, False)])
+
+    def test_split_keeps_the_largest_or_the_smallest(self):
+        for keep, volume in (("largest", 700), ("smallest", 300)):
+            with self.subTest(keep):
+                out = Builder(FakeKernel()).build([extrude(1, rect(0, 0, 10, 10), 0, 10), sheet_step(2, 3), split_step(3, 1, [2], keep)])
+                self.assertEqual([r["status"] for r in out["results"]], ["ok", "ok", "ok"], out["results"])
+                self.assertEqual({b["id"]: round(b["volume"]) for b in out["bodies"] if not b["surface"]}, {1: volume})
+
+    def test_split_refusals(self):
+        out = Builder(FakeKernel()).build([extrude(1, rect(0, 0, 10, 10), 0, 10), sheet_step(2, 30), split_step(3, 1, [2], "largest"),
+                                           split_step(4, 1, [2], "largest", within=1), sheet_step(5, 4), split_step(6, 5, [2], "largest"),
+                                           split_step(7, 1, [5], "scan")])
+        said = {r["id"]: r.get("message") for r in out["results"]}
+        self.assertEqual(said[3], "The sheet does not cut the body into parts — it has to cross the body from side to side.")
+        self.assertTrue(said[4].startswith("A split within its sheets' regions is not built"), said[4])
+        self.assertTrue(said[6].startswith("Splitting a sheet is not built"), said[6])
+        self.assertTrue(said[7].startswith("The scan is not here to keep the fragments on it"), said[7])
+
+    def test_thicken_places_its_solid_and_the_skin_keeps_the_sheets_maker(self):
+        b = Builder(FakeKernel())
+        out = b.build([sheet_step(1, 3), {"kind": "thicken", "id": 2, "name": "Thicken 2", "sheet": 1, "thickness": 2, "side": "out", "op": "new"}])
+        r = out["results"][1]
+        self.assertEqual(r["status"], "ok", r)
+        self.assertEqual(r["note"], "The wall along the sheet's edge is 2 mm at its thinnest, measured at 48 points.")
+        body = b.bodies[2]
+        self.assertEqual(sorted(set(body["origins"].values())), [1, 2])
+        self.assertEqual(round(b.volume_of(body["shape"])), 200)
+
+
+class Words(unittest.TestCase):
+    def test_wall_said(self):
+        from scanrulerfc.reverse.build_sheets import thicken_way, wall_said
+
+        self.assertEqual(wall_said({"least": 1.99, "at": [0, 0, 0], "points": 48}, 2), {"note": "The wall along the sheet's edge is 1.99 mm at its thinnest, measured at 48 points."})
+        self.assertEqual(wall_said({"least": 1.2, "at": [1.234, 0, -5], "points": 40}, 2)["warning"],
+                         "The wall along the sheet's edge comes to 1.2 mm at (1.23, 0, -5), under the 2 mm asked (measured at 40 points): the kernel cut the wall short there, or the far skin comes back near it.")
+        self.assertEqual([thicken_way(s) for s in ("out", "in", "both")], ["along its normal", "against its normal", "both ways"])
 
 
 if __name__ == "__main__":

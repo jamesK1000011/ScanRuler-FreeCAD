@@ -175,6 +175,54 @@ s = rect(1, 0, 0, 10, 10)
 fx("parameters drive the extrude", [s, extrude(2, s, dist(0, 8), exprs={"extent.to": "h * 2"})], [body(2, 1200, "10·10·(h·2), h 6")],
    parameters=[{"id": 1, "name": "h", "kind": "length", "expression": "6"}])
 
+
+# ---- build steps 10 and 11: sheets, splits, lofts, sweeps, thickens
+def line_sketch(i, a, b):
+    return sketch(i, lambda s: add_entity(s, {"kind": "line", "a": a, "b": b}))
+
+
+def sheet_of(i, sk, frm, to):
+    return {"id": i, "kind": "sheet", "name": f"Sheet {i}", "sketchId": sk["id"], "from": frm, "to": to, "visible": True}
+
+
+def split_of(i, body_id, tools, keep):
+    return {"id": i, "kind": "split", "name": f"Split {i}", "body": body_id, "tools": tools, "keep": keep, "tolerance": 0.3, "overlap": 0.5, "visible": True}
+
+
+def on_z(i, draw, z):
+    return sketch(i, draw, plane={"kind": "world", "axis": "z", "offset": z}, frame={**XY, "origin": [0, 0, z]})
+
+
+def surface(fid, area, formula, **more):
+    return {"id": fid, "surface": True, "area": area, "formula": formula, **more}
+
+
+cut_at_3 = line_sketch(3, [3, -5], [3, 15])
+fx("a sheet across a box, split, the largest kept", [*cube(), cut_at_3, sheet_of(4, cut_at_3, -5, 15), split_of(5, 2, [4], "largest")],
+   [body(2, 700, "10·10·7, the side past x = 3", box=[[3, 0, 0], [10, 10, 10]]), surface(4, 400, "the sheet: 20·20")])
+fx("a sheet across a box, split, the smallest kept", [*cube(), cut_at_3, sheet_of(4, cut_at_3, -5, 15), split_of(5, 2, [4], "smallest")],
+   [body(2, 300, "10·10·3, the side short of x = 3", box=[[0, 0, 0], [3, 10, 10]]), surface(4, 400, "the sheet: 20·20")])
+cut_at_6 = line_sketch(5, [6, -5], [6, 15])
+fx("split between two sheets", [*cube(), cut_at_3, sheet_of(4, cut_at_3, -5, 15), cut_at_6, sheet_of(6, cut_at_6, -5, 15), split_of(7, 2, [4, 6], "between")],
+   [body(2, 300, "10·10·3, the wall between x = 3 and x = 6", box=[[3, 0, 0], [6, 10, 10]]), surface(4, 400, "20·20"), surface(6, 400, "20·20")])
+wall = line_sketch(1, [3, 0], [3, 10])
+for side in ("out", "in", "both"):
+    fx(f"thicken a sheet, {side}", [wall, sheet_of(2, wall, 0, 10), {"id": 3, "kind": "thicken", "name": "Thicken 3", "sheet": 2, "thickness": 2, "side": side, "op": "new", "visible": True}],
+       [surface(2, 100, "10·10"), body(3, 200, "10·10·2", faces=6)])
+fx("loft, ruled, a circle to a smaller one", [circle(1, 0, 0, 5), on_z(2, lambda s: add_entity(s, {"kind": "circle", "c": [0, 0], "r": 3}), 10),
+                                             {"id": 3, "kind": "loft", "name": "Loft 3", "sketches": [1, 2], "ruled": True, "op": "new", "visible": True}],
+   [body(3, math.pi * 10 / 3 * (25 + 9 + 15), "frustum π·h/3·(R² + r² + Rr), R 5, r 3, h 10", rel=1e-5)])
+fx("loft, smooth, through three equal circles", [circle(1, 0, 0, 5), on_z(2, lambda s: add_entity(s, {"kind": "circle", "c": [0, 0], "r": 5}), 10),
+                                                on_z(3, lambda s: add_entity(s, {"kind": "circle", "c": [0, 0], "r": 5}), 20),
+                                                {"id": 4, "kind": "loft", "name": "Loft 4", "sketches": [1, 2, 3], "ruled": False, "op": "new", "visible": True}],
+   [body(4, math.pi * 25 * 20, "a cylinder π·5²·20 — no fold to refuse", rel=1e-4)])
+fx("sweep a circle along a straight route", [circle(1, 0, 0, 2), {"id": 2, "kind": "sweep", "name": "Sweep 2", "profile": 1, "path": None,
+                                                                 "route": {"points": [[0, 0, 0], [0, 0, 20]], "bendRadius": 5}, "op": "new", "visible": True}],
+   [body(2, math.pi * 4 * 20, "π·2²·20", rel=1e-5)])
+fx("sweep a circle round a bend", [circle(1, 0, 0, 2), {"id": 2, "kind": "sweep", "name": "Sweep 2", "profile": 1, "path": None,
+                                                       "route": {"points": [[0, 0, 0], [0, 0, 20], [20, 0, 20]], "bendRadius": 5}, "op": "new", "visible": True}],
+   [body(2, math.pi * 4 * (30 + 2.5 * math.pi), "Pappus: π·2²·(15 + 15 straight + ¼·2π·5 round the bend)", rel=1e-4)])
+
 if __name__ == "__main__":
     out = os.path.join(ROOT, "tests", "reverse_fixtures", "kernel_builds.json")
     with open(out, "w", encoding="utf-8") as f:

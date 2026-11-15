@@ -5,7 +5,8 @@
 # by tests/tools/make_reverse_kernel_fixtures.py): each is a valid record
 # list that resolves to the build steps meant, here; on FreeCAD each builds
 # to the volumes worked out by hand, within the design's bars (1e-6 on
-# analytic solids, looser where a fixture says), with the statuses meant.
+# analytic solids, looser where a fixture says), with the statuses meant; a
+# sheet (a surface body) to its area.
 import json
 import math
 import os
@@ -69,7 +70,7 @@ class Fixtures(unittest.TestCase):
         for fx in FIXTURES:
             for b in fx["bodies"]:
                 self.assertTrue(b["formula"], fx["name"])
-                self.assertTrue(b.get("volume") is not None or b.get("between"), fx["name"])
+                self.assertTrue(b.get("volume") is not None or b.get("between") or (b.get("surface") and b.get("area")), fx["name"])
 
 
 @unittest.skipUnless(HAVE_FC, NEEDS)
@@ -89,6 +90,11 @@ class Builds(unittest.TestCase):
                 self.assertEqual(sorted(bodies), sorted(b["id"] for b in fx["bodies"]), fx["name"])
                 for want in fx["bodies"]:
                     got = bodies[want["id"]]
+                    if want.get("surface"):
+                        # A sheet: a surface body, held to its area.
+                        self.assertTrue(got["surface"] and not got["closed"], want)
+                        self.assertAlmostEqual(got["area"], want["area"], delta=want.get("rel", REL) * want["area"], msg=want["formula"])
+                        continue
                     self.assertTrue(got["closed"], want)
                     if want.get("between"):
                         lo, hi = want["between"]
