@@ -215,6 +215,32 @@ class Boolean(unittest.TestCase):
             BO.boolean_mesh(V, F, [(*cylinder(3, -5, 5), None)], "subtract")
 
 
+class NearSurfaceGrid(unittest.TestCase):
+    def test_large_triangles_and_a_small_reach_stay_bounded(self):
+        # trim's on-body check: a box of 2.5 mm triangles searched within
+        # 1e-3 once filed each triangle under millions of cells (12e9 in all).
+        V, F = box_mesh(20, 20, 20, 8)
+        near = G.NearSurface(V, F, 1e-3)
+        self.assertLessEqual(len(near.tris), max(8 * len(F), G.FILE_TARGET))
+        c = V[F].mean(axis=1)
+        found, d, _, face = near.nearest(np.vstack([c, c + [0, 0, 0.5]]))
+        self.assertTrue(found[: len(F)].all())
+        np.testing.assert_array_equal(face[: len(F)], np.arange(len(F)))
+        self.assertLess(d[: len(F)].max(), 1e-9)
+        far = np.abs(c[:, 2]) < 9.99  # the side walls' points, moved up along them, stay on them
+        self.assertFalse(found[len(F):][~far].any())
+
+    def test_too_many_entries_refuses_without_allocating(self):
+        V, F = box_mesh(20, 20, 20, 8)
+        old = G.MAX_FILED
+        G.MAX_FILED = 100
+        try:
+            with self.assertRaisesRegex(M.MeshError, "too large to search near its surface"):
+                G.NearSurface(V, F, 1e-3)
+        finally:
+            G.MAX_FILED = old
+
+
 class Shell(unittest.TestCase):
     def test_wall_to_start_and_what_the_mesh_calls_for(self):
         self.assertEqual(SH.default_wall_thickness(250), 2)

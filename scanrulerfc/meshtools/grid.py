@@ -391,6 +391,12 @@ def signed_volume(V, F):
 
 # ---- nearest triangles within a reach ----------------------------------------------------
 
+# Grid entries (a triangle filed under a cell) a NearSurface aims to stay
+# under, and the most it will allocate — about 1.6 GB of index arrays — before
+# refusing.
+FILE_TARGET = 1 << 22
+MAX_FILED = 1 << 25
+
 def _ragged(lo, hi):
     """Every integer box cell between lo and hi (inclusive, per row): the
     row each comes from and its (i, j, k)."""
@@ -426,12 +432,29 @@ class NearSurface:
         self.reach = float(reach)
         T = np.stack([self.A, self.B, self.C], axis=1)
         bmin, bmax = T.min(axis=1) - reach, T.max(axis=1) + reach
-        self.g = g = max(reach, 1e-9)
-        self.o = bmin.min(axis=0)
-        span = bmax.max(axis=0) - self.o
+        self.o = bmin.min(axis=0) if len(F) else np.zeros(3)
+        span = bmax.max(axis=0) - self.o if len(F) else np.zeros(3)
+        # A triangle is filed under every cell its grown box covers, so any
+        # cell size finds all within reach; the reach is only the finest.
+        # Large triangles and a small reach would file one triangle under
+        # millions of cells, so the cell grows — as ScanRuler's tile grid is
+        # held to its tile — until the filing is bounded by the triangles'
+        # count (at a cell the size of the whole box, eight a triangle).
+        g = max(reach, 1e-9)
+        budget = max(8 * len(F), FILE_TARGET)
+        while True:
+            lo = np.floor((bmin - self.o) / g).astype(np.int64)
+            hi = np.floor((bmax - self.o) / g).astype(np.int64)
+            w = np.maximum(hi - lo + 1, 0).astype(float)
+            filed = float((w[:, 0] * w[:, 1] * w[:, 2]).sum())
+            cells = float(np.prod(np.ceil(span / g) + 1))
+            if filed <= budget and cells < 2.0 ** 62:
+                break
+            g *= 2
+        if filed > MAX_FILED:
+            raise M.MeshError(f"The mesh is too large to search near its surface here — {len(F):,} triangles would need {filed:,.0f} grid entries, over the {MAX_FILED:,} this allows. Decimate it first.")
+        self.g = g
         self.n = np.maximum(1, np.ceil(span / g).astype(np.int64) + 1)
-        lo = np.floor((bmin - self.o) / g).astype(np.int64)
-        hi = np.floor((bmax - self.o) / g).astype(np.int64)
         row, i, j, k = _ragged(lo, hi)
         key = i + self.n[0] * (j + self.n[1] * k)
         order = np.argsort(key, kind="stable")
