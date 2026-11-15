@@ -13,7 +13,7 @@ from scanrulerfc import catalog_core as C  # noqa: E402
 try:
     from agentlink.protocol import ToolError  # noqa: F401
 
-    from scanrulerfc import fam_catalog
+    from scanrulerfc.agentlink import fam_catalog
 
     HAVE = True
 except ImportError:

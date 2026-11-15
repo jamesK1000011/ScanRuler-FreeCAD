@@ -11,15 +11,15 @@ import math
 import os
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import dev_rigid as R
-from . import on_reference
-from . import scanstate as S
-from .dev_align import AlignError, align_from_pairs, align_local, auto_align, quality_warnings
-from .dev_field import field_percentiles
-from .dev_hotspots import FEATURE_DEPTH, FEATURE_MIN_AREA, FEATURE_MIN_SPACINGS, hotspots
-from .dev_map import (
+from .. import dev_rigid as R
+from .. import meshio
+from .. import errors, on_reference
+from .. import scanstate as S
+from ..dev_align import AlignError, align_from_pairs, align_local, auto_align, quality_warnings
+from ..dev_field import field_percentiles
+from ..dev_hotspots import FEATURE_DEPTH, hotspots
+from ..dev_map import (
     DEFAULT_FACING_DEG,
     DEFAULT_MAP_FACING_DEG,
     compute_deviation,
@@ -37,13 +37,10 @@ from .dev_map import (
     suggest_range,
     vertex_normals,
 )
-from .dev_surface import NominalSurface, signed_volume, weld
-from .dev_volume import KINDS, MAX_REGIONS, VOLUME_REGIONS, volume_deviation, volume_out
-
-GROUP = "deviation"
-INFO = "The scan against a reference part (ScanRuler, ported): open the reference, best-fit the scan onto it, map, read patches and volumes, export."
-# A long job: Agent Link queues and times it (hooks.md, HEAVY).
-HEAVY = {"deviation_align"}
+from ..dev_surface import NominalSurface, signed_volume, weld
+from ..dev_volume import KINDS, VOLUME_REGIONS, volume_deviation, volume_out
+from ..errors import ToolError
+from . import _bind
 
 KEY = "deviation"
 CAD = (".step", ".stp", ".iges", ".igs", ".brep", ".brp")
@@ -150,12 +147,7 @@ def read_reference(session, a):
             if units != "mm":
                 note = "A STEP, IGES or BREP file carries its own units: units is for mesh files."
         elif ext in MESH:
-            import Mesh
-
-            m = Mesh.Mesh(path)
-            pts, tris = m.Topology
-            V = S.points_array(pts) * S.UNITS[units]
-            F = np.array(tris, dtype=np.int64)
+            V, F = meshio.read(path, S.UNITS[units])
             kind = "mesh"
         elif S.more_formats() and ext.lstrip(".") in S.more_formats().FORMATS:
             V, F, _info = S.more_formats().read(path, units if "units" in a else None)
@@ -188,7 +180,7 @@ def require_reference(session):
 def reference_reading(session):
     """The map read on the reference (on_reference), worked out once per
     alignment and settings: {centres, normals, pieces, area, values, spacing}."""
-    from agentlink.protocol import ToolError
+    from ..errors import ToolError
 
     d = dstate(session)
     ref = d["reference"]
@@ -328,7 +320,7 @@ def bake(scan, m, st=None):
     element measured on it, when the measuring tools' state is there, so
     elements fitted before a best fit follow the scan."""
     if st is not None and hasattr(scan, "set_pose"):
-        from . import model
+        from .. import model
 
         model.transform_all(st, (m.r, m.t))
         return
@@ -353,13 +345,15 @@ def find_element(session, ref):
 # ---- the tools ----
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def open_reference(a):
         S.scan_of(session)
         d = dstate(session)
         try:
             ref = read_reference(session, a)
-        except ToolError:
+        except errors.REFUSED:  # its own refusal, or the host's (a body not found)
             raise
         except Exception as e:
             raise ToolError("failed", f"The reference could not be read: {e}")
@@ -645,90 +639,17 @@ def tools(session):
             out["scanOpen"] = f"The scan is open: {v['scanOpenColumns']} columns of cells read through its holes by the winding number, unsure where it does not say. ScanRuler closes such holes with the reference first; this port does not."
         return out
 
-    reading = {
-        "range": {"type": "number", "exclusiveMinimum": 0, "description": "Colour scale, ± mm."},
-        "maxDistance": {"type": "number", "exclusiveMinimum": 0, "description": "Search distance, mm."},
-        "tolerance": {"type": "number", "exclusiveMinimum": 0, "description": "Tolerance, ± mm."},
+    return {
+        "deviation_open_reference": open_reference,
+        "deviation_align": align,
+        "deviation_measure": measure,
+        "deviation_set_target": set_target,
+        "deviation_settings": settings,
+        "deviation_hotspots": hot,
+        "deviation_volume": volume,
+        "deviation_export": export,
     }
-    facing = {"oneOf": [{"type": "number", "minimum": 1, "maximum": 90}, {"type": "null"}], "description": "Facing limit, degrees, or null."}
-    patch_words = f"depth, the median |deviation| over the patch; volume, mm³ past the tolerance (the ranking key); kind, \"feature\" when the patch is at least {FEATURE_MIN_AREA} mm² and {FEATURE_MIN_SPACINGS} point spacings² across and its depth at least {FEATURE_DEPTH}× the tolerance — material missing or misplaced, to model or to name — else \"texture\""
-    return [
-        Tool(
-            "deviation_open_reference",
-            "Open the nominal part the scan is compared with — path to a STEP, IGES or BREP from CAD (tessellated finely) or an STL, PLY, OBJ, OFF or 3MF mesh (units for those: mm by default), or body, a solid in the FreeCAD document by name or label — in place of the one there is; any alignment and map against the old one go. Returns the deviation state.",
-            obj({"path": {"type": "string"}, "body": {"type": "string"}, "units": {"type": "string", "enum": list(S.UNITS)}}),
-            open_reference,
-        ),
-        Tool(
-            "deviation_align",
-            "Rigid best fit (no scale) of the scan onto the reference, then the deviation map under it. mode auto (the default) finds the pose on its own; points starts from three or more pairs of corresponding points (scan and reference, mm) then refines; local refines the fit in hand on a marked surface only (vertices), within searchDistance mm. The scan's vertices are moved onto the reference. Refuses (invalid_input) when the scan and the reference differ in size by more than 2× — a unit mix-up (×10, ×25.4, ×1000, named when near one) that would read as a near-perfect match on a patch of the big part; allowSizeMismatch: true fits anyway, for a scan that truly is a small piece of the reference. Refuses a scan with non-finite vertices. Returns the alignment (RMS, points matched, matchedShare — the share of sampled scan points that drove the pose —, converged, transform), the map's statistics (withinTolerancePct over every scan point, measured or not; withinToleranceOfMeasuredPct; measuredPct) and warnings: read them — a matchedShare under 50 %, a fit that did not converge, or under 80 % of the points measured each mean the map is not to be trusted as it stands. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing). The auto search distance is 2 % of the reference's diagonal. Moving the part afterwards (align_clear, align_datum, align_auto, align_symmetry, scan_scale) drops this alignment and its map.",
-            obj(
-                {
-                    "mode": {"type": "string", "enum": ["auto", "points", "local"]},
-                    "pairs": {"type": "array", "minItems": 3, "items": obj({"scan": vec3("On the scan, mm."), "reference": vec3("The same point on the reference, mm.")}, ["scan", "reference"])},
-                    "vertices": {"type": "array", "minItems": 3, "items": {"type": "integer", "minimum": 0}},
-                    "searchDistance": {"type": "number", "exclusiveMinimum": 0},
-                    "allowSizeMismatch": {"type": "boolean", "description": "Fit even when the scan and the reference differ in size by more than 2× — only for a scan that truly is a small piece of a larger reference, never to get past a unit mix-up."},
-                }
-            ),
-            align,
-        ),
-        Tool(
-            "deviation_measure",
-            "Measure the deviation map again under the alignment in hand — after a change of facing limit, say. deviation_align measures it already. Refuses (invalid_state) when there is no alignment, including when the part was moved since it was made (align_clear, align_datum, align_auto, align_symmetry, scan_scale drop it): run deviation_align again. Returns the map's statistics (min, max, mean, RMS, sigma, percentiles; withinTolerancePct over every scan point, withinToleranceOfMeasuredPct, measuredPct, points matched) and warnings when under 80 % of the points have a reading. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing).",
-            obj({}),
-            measure,
-        ),
-        Tool(
-            "deviation_set_target",
-            "Map how far the scan strays from one of its own fitted elements — a plane, cylinder, sphere or torus — instead of from a reference part; null goes back to the reference. side is the material side, read off the scan when the element is chosen (outward: the element's outer side; inward: a bore or shell) — give it to override. facingDeg limits which surface counts to what faces the element within that many degrees (60 by default), null for any. Returns the map's statistics.",
-            obj(
-                {
-                    "element": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "minLength": 1}, {"type": "null"}], "description": "The element (id or name), or null."},
-                    "side": {"type": "string", "enum": ["outward", "inward"]},
-                    "facingDeg": facing,
-                },
-                ["element"],
-            ),
-            set_target,
-        ),
-        Tool(
-            "deviation_settings",
-            "The deviation map's reading: range (colour scale, ± mm), maxDistance (search distance, mm: readings past it count as unmeasured), bands, tolerance (± mm the statistics count within), facingDeg (the map is measured again), colormap (jet). Returns the deviation state.",
-            obj({**reading, "bands": {"oneOf": [{"type": "integer", "minimum": 2, "maximum": 256}, {"type": "null"}]}, "facingDeg": facing, "colormap": {"type": "string", "enum": ["jet"]}}),
-            settings,
-        ),
-        Tool(
-            "deviation_hotspots",
-            f"The deviation map read as patches: the vertices past the tolerance gathered into connected regions, the largest and farthest first. Needs a map (deviation_align or deviation_set_target). Returns each patch's centroid, box, area, count, mean, extreme, depth, volume, kind, side, the extreme's point and vertex, a few vertices; features, found, over and unmeasured. {patch_words}. Trap: read far every time — the vertices past the search distance: far.inside is scan deep inside the reference (a hole, pocket or slot the model lacks), far.outside scan standing off it. Sign: a patch's mean and extreme are positive (side outside) where the scan stands outside the reference — excess material — and negative (side inside) where material is missing. on: reference reads the map on the reference instead (coveredPct, withinTolerancePct over the reference's area, mostExcess, mostMissing, unscanned), signed the same way. Changes nothing.",
-            obj(
-                {
-                    "tolerance": {"type": "number", "exclusiveMinimum": 0},
-                    "patches": {"type": "integer", "minimum": 1, "maximum": 50},
-                    "grain": {"type": "number", "exclusiveMinimum": 0},
-                    "on": {"type": "string", "enum": ["scan", "reference"]},
-                }
-            ),
-            hot,
-        ),
-        Tool(
-            "deviation_volume",
-            "The scan and the reference part compared as solids, on a grid of small cells: each cell inside one and not the other is an error, touching cells a region. excess is material the reference has and the part has not, missing the other way round, unsure where the scan does not say (never an error). Needs deviation_align. Returns totals (mm³ and % of the reference) and the regions largest first, each with kind, volume, maxDepth, thickness, shape (layer or lump), centroid, deepest, box, evidence and confidence. Trap: nothing thinner than smallestSeen (two cells) is seen. Changes nothing.",
-            obj(
-                {
-                    "tolerance": {"type": "number", "exclusiveMinimum": 0},
-                    "cell": {"type": "number", "exclusiveMinimum": 0},
-                    "regions": {"type": "integer", "minimum": 1, "maximum": MAX_REGIONS},
-                    "within": obj({"min": vec3("Lowest corner, mm."), "max": vec3("Highest corner, mm.")}, ["min", "max"]),
-                    "kinds": {"type": "array", "items": {"type": "string", "enum": list(KINDS)}},
-                }
-            ),
-            volume,
-        ),
-        Tool(
-            "deviation_export",
-            "The deviation map as a file — side scan (the default) or reference (the map read on the reference, a reading per small piece of it; ply, csv or npy): format ply (the default: binary, a vertex per scan vertex with x, y, z, deviation, measured and the map's jet colour), csv (x,y,z,d), npy (N × 4 float32) or report (ScanRuler's plain-text report, also in the answer). path, else in the session's folder. Returns the file with readings, measured, measuredPct, withinTolerance, withinTolerancePct (over every reading, measured or not), withinToleranceOfMeasuredPct, tolerance and searchDistance. Sign, both sides: positive where the scan stands outside the reference (excess material), negative inside it (material missing). Trap: the distance is NaN where there is no reading, and a reading past the search distance is kept as it is. Changes nothing.",
-            obj({"side": {"type": "string", "enum": ["scan", "reference"]}, "format": {"type": "string", "enum": ["ply", "csv", "npy", "report"]}, "path": {"type": "string"}}),
-            export,
-        ),
-    ]
+
+
+NAMES = ("deviation_open_reference", "deviation_align", "deviation_measure", "deviation_set_target", "deviation_settings", "deviation_hotspots", "deviation_volume", "deviation_export")
+HANDLERS = _bind.table(bind, NAMES)

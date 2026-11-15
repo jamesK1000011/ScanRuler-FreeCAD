@@ -1,0 +1,5299 @@
+{
+ "dataVersion": "1.0.0",
+ "licence": "AGPL-3.0-only",
+ "about": "ScanRuler for FreeCAD's tools for agents (through Agent Link, in its tool-data format): name, what it does, its arguments as JSON Schema, its group, whether it changes the document. The handlers are scanrulerfc/handlers; ported from ScanRuler by Stefan Hermann (CNC Kitchen).",
+ "entries": {
+  "scan_open": {
+   "group": "scan",
+   "description": "Open a 3D scan (STL, PLY, OBJ, OFF, 3MF; glTF/GLB, Collada, VRML, 3DS in the units their format says) to measure, in place of the one open: units mm (default), cm, m or in — or object: a mesh in the document (one Agent Link's meshobj tools cleaned, say), in millimetres. A scan with elements or dimensions on it is kept unless discard: true. Returns the scan's summary and warnings: a scan under 1 mm or over 5 m across is most likely in other units than read (open it again with units); over 2 million triangles, mesh_reduce first; vertices that are not numbers (NaN or infinite) are dropped with their triangles.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "discard": {
+      "type": "boolean"
+     },
+     "object": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "units": {
+      "enum": [
+       "mm",
+       "cm",
+       "m",
+       "in"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_nearest": {
+   "group": "scan",
+   "description": "Where a place lands on the scan: the vertex (a point snaps to the nearest), its coordinates and outward normal, a triangle it is a corner of, and how far it lies from the point asked about. Use it to check a point lies on the surface before fitting there. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "description": "The place on the scan.",
+      "oneOf": [
+       {
+        "additionalProperties": false,
+        "properties": {
+         "vertex": {
+          "description": "A scan vertex.",
+          "minimum": 0,
+          "type": "integer"
+         }
+        },
+        "required": [
+         "vertex"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "point": {
+          "description": "A point, mm; the nearest vertex is taken.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "point"
+        ],
+        "type": "object"
+       }
+      ]
+     }
+    },
+    "required": [
+     "at"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_query": {
+   "group": "scan",
+   "description": "The scan's vertices inside a box, or within a radius of a point (near), with their outward normals — the points on a face; normal keeps only those facing a direction. Returns matched, the vertex numbers, points and normals (mm, current frame), the box round them, centroid and mean normal; fields: count, ids or all (the default) says how much. Trap: at most limit come back (1000 by default, 20000 at most), every k-th spread evenly, step saying k — mark: true marks every matching vertex, not the thinned list, for element_fit_marked { marked: true }. Changes nothing on the part.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "box": {
+      "additionalProperties": false,
+      "description": "A box in the current frame.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "fields": {
+      "description": "count: the numbers alone (the default with mark); ids: with the vertices; all: with points and normals (the default).",
+      "enum": [
+       "count",
+       "ids",
+       "all"
+      ]
+     },
+     "limit": {
+      "description": "How many vertices at most; 1000 by default, 20000 at most.",
+      "maximum": 20000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "mark": {
+      "description": "Leave every matching vertex marked, for element_fit_marked { marked: true }.",
+      "type": "boolean"
+     },
+     "near": {
+      "additionalProperties": false,
+      "description": "A ball about a point, in place of box.",
+      "properties": {
+       "at": {
+        "description": "The centre, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "radius": {
+        "description": "mm.",
+        "exclusiveMinimum": 0,
+        "type": "number"
+       }
+      },
+      "required": [
+       "at",
+       "radius"
+      ],
+      "type": "object"
+     },
+     "normal": {
+      "additionalProperties": false,
+      "description": "Only the vertices whose outward normal faces this way.",
+      "properties": {
+       "dir": {
+        "description": "A direction, any length.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "withinDeg": {
+        "description": "Degrees; 30 by default.",
+        "exclusiveMinimum": 0,
+        "maximum": 180,
+        "type": "number"
+       }
+      },
+      "required": [
+       "dir"
+      ],
+      "type": "object"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_segment": {
+   "group": "scan",
+   "description": "The scan's planar regions, found all at once: grown from the flattest places outward within maxDeg (15°) and maxRms (0.05 mm), those smaller than minArea given back. Returns found, considered, claimed and the regions, largest first, at most limit (20): id, normal, point, sigma, area (mm²), box, vertices, neighbours { id, deg }. mark: a region's id, or several, leaves their points marked for element_fit_marked { marked: true }. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "box": {
+      "additionalProperties": false,
+      "description": "A box in the current frame.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "kind": {
+      "description": "What to find; plane, the default and for now the only one.",
+      "enum": [
+       "plane"
+      ]
+     },
+     "limit": {
+      "description": "How many regions are listed; 20 by default.",
+      "maximum": 200,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "list": {
+      "description": "With mark: the list of regions too.",
+      "type": "boolean"
+     },
+     "mark": {
+      "description": "Leave this region's points marked, or several regions'.",
+      "oneOf": [
+       {
+        "description": "A region's id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Several regions' ids.",
+        "items": {
+         "minimum": 1,
+         "type": "integer"
+        },
+        "minItems": 1,
+        "type": "array"
+       }
+      ]
+     },
+     "maxDeg": {
+      "description": "Degrees; 15 by default.",
+      "exclusiveMinimum": 0,
+      "maximum": 60,
+      "type": "number"
+     },
+     "maxRms": {
+      "description": "mm; 0.05 by default.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "minArea": {
+      "description": "mm²; by default a square 2 % of the scan's diagonal on a side.",
+      "minimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_fit_surface": {
+   "group": "scan",
+   "description": "A patch of the scan measured as a surface — a sloped side, a twisted ruled face, a dome, a saddle — from vertices or a box (normal keeps those facing a way). Returns the patch's frame (origin, normal, basisU, basisV) and each model as a height over (u, v): plane (a + b·u + c·v), bilinear (+ d·u·v) and quadric (+ d·u² + e·u·v + f·v², with curvature { k1, k2, r1, r2, axis1, axis2, shape }), each with coefficients, rms and worst; model: best (the default) fits every one and names the simplest whose rms is within a tenth of the lowest. Trap: 7 points at least, at most limit (20000) spread evenly. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "box": {
+      "additionalProperties": false,
+      "description": "A box in the current frame.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "limit": {
+      "description": "How many points at most; 20000 by default.",
+      "maximum": 20000,
+      "minimum": 7,
+      "type": "integer"
+     },
+     "model": {
+      "description": "Which surface; best (the default) fits each and names the simplest that holds.",
+      "enum": [
+       "plane",
+       "bilinear",
+       "quadric",
+       "best"
+      ]
+     },
+     "normal": {
+      "additionalProperties": false,
+      "description": "Only the vertices whose outward normal faces this way.",
+      "properties": {
+       "dir": {
+        "description": "A direction, any length.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "withinDeg": {
+        "description": "Degrees; 30 by default.",
+        "exclusiveMinimum": 0,
+        "maximum": 180,
+        "type": "number"
+       }
+      },
+      "required": [
+       "dir"
+      ],
+      "type": "object"
+     },
+     "vertices": {
+      "description": "The scan vertices of the patch.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 7,
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_qa": {
+   "group": "scan",
+   "description": "One call before modelling, to know what the scan will and will not give. Returns rims (the open edges of its holes: count, total length, the longest few with rim number, centre, size and circle where one fits), noise (the median scatter of small plane fits, mm; 0 on a CAD tessellation, with measured: the bends between facets), sheet where most of the area has a second skin facing back within reach (gauge { p5, p50, p95 }, twoSkins: that share), apart on such a part with flat walls (what stands over reach off every main wall — tabs bent in, ribs, bosses), tessellation where the mesh is an STL exported from CAD (cad, sparse, densifyTo), thickness through the part along axis — given, the alignment's z, or the way most of it faces — (p5, p50, p95; the main faces' tiltDeg, run and faces { topDeg, bottomDeg }) and notes, what looks wrong, plainly. Traps: a scanned skin with no rims, or only pinholes, is a wrap bridging the holes it did not see through; on a sheet or a thin shell, thickness reads the box across the part — the wall is sheet.gauge. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "axis": {
+      "description": "The thickness axis.",
+      "oneOf": [
+       {
+        "description": "A world axis.",
+        "enum": [
+         "x",
+         "y",
+         "z"
+        ]
+       },
+       {
+        "description": "A direction, any length.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_draft": {
+   "group": "scan",
+   "description": "The scan's walls that run near a pull direction — the sides a mould opens along — gathered into patches, each with draftDeg, the angle it leans off the pull: positive where the wall faces partly along the pull, negative where it faces back (a back draft, an undercut); with sigmaDeg, spreadDeg, centroid, box, area (mm²), count, facing, turnDeg and round for a boss's or hole's round side. Needs pull; box, nearDeg (10), patches (12), minArea (1 mm²) and split (a plane no patch reaches across: \"symmetry\", a plane element, \"XY\", \"YZ\", \"XZ\" or { point, normal }) narrow it. Trap: read it early on a moulded or cast part, along each direction the tools open — walls that lean half a degree to a few explain fits that miss by the lean. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "box": {
+      "additionalProperties": false,
+      "description": "A box in the current frame.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "minArea": {
+      "description": "mm²; 1 by default.",
+      "minimum": 0,
+      "type": "number"
+     },
+     "nearDeg": {
+      "description": "Degrees off square to the pull a wall may lean and count; 10 by default.",
+      "exclusiveMinimum": 0,
+      "maximum": 45,
+      "type": "number"
+     },
+     "patches": {
+      "description": "How many patches, the largest first; 12 by default.",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pull": {
+      "description": "The pull direction, any length.",
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+     },
+     "split": {
+      "description": "A plane no patch reaches across.",
+      "oneOf": [
+       {
+        "type": [
+         "string",
+         "integer"
+        ]
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "normal": {
+          "description": "Its normal.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "point": {
+          "description": "A point on the plane.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "point",
+         "normal"
+        ],
+        "type": "object"
+       }
+      ]
+     }
+    },
+    "required": [
+     "pull"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_pattern": {
+   "group": "scan",
+   "description": "Rotational repeats about an axis — a fan's blades, a flange's holes, a wheel's spokes, a gear's teeth — counted from the scan: it is cut square to the axis at each height in at (six spread over the part by default), and each cut (between radius.min and radius.max) is turned against itself. Needs axis: a cylinder, cone, line or circle element, \"X\", \"Y\", \"Z\", or { origin, dir }. Returns per height count, pitchDeg, phaseDeg (from zeroDir), betweenDeg, score (0 to 1; under 0.5 count is 1 and tried says the best), rms, worst, instances (angleDeg, radius, offDeg, rms, worst, share — a copy out of place or worn reads off) and rings (round outlines about the axis: radius, off, towardDeg, rms). Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "description": "Heights to cut at.",
+      "items": {
+       "description": "Height along the axis, mm.",
+       "type": "number"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "axis": {
+      "description": "The axis the pattern turns about.",
+      "oneOf": [
+       {
+        "type": [
+         "string",
+         "integer"
+        ]
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "dir": {
+          "description": "Its direction.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "origin": {
+          "description": "A point on the axis.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "origin",
+         "dir"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "count": {
+      "description": "The most copies looked for; 60 by default.",
+      "maximum": 128,
+      "minimum": 2,
+      "type": "integer"
+     },
+     "instances": {
+      "description": "Each copy's figures; true by default.",
+      "type": "boolean"
+     },
+     "radius": {
+      "additionalProperties": false,
+      "description": "Only the outline between these radii.",
+      "properties": {
+       "max": {
+        "description": "mm.",
+        "exclusiveMinimum": 0,
+        "type": "number"
+       },
+       "min": {
+        "description": "mm.",
+        "minimum": 0,
+        "type": "number"
+       }
+      },
+      "required": [],
+      "type": "object"
+     }
+    },
+    "required": [
+     "axis"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_heightmap": {
+   "group": "scan",
+   "description": "Where the scan is first met looking along an axis (axis, -z by default: the top surface from above) or square onto a plane (plane: an element, \"XY\", \"YZ\", \"XZ\", or { origin, normal, u? }), over a grid of cells: pocket floors, ledges, a step's height, a face's tilt, a pad's tiers, an icon on a key in one call. of: height (the default), deviation (the deviation map's reading where each ray lands) or relief (the height less the surface round it, for icons, grooves and lettering; smooth, mm, three cells by default). Returns cell, origin [u0, v0], cols, rows, grid (rows from the low v up, null where nothing; grid[r][c] stands at u0 + (c + ½)·cell, v0 + (r + ½)·cell), min, max, hit, valued; with plane also its frame (a cell's point is origin + u·U + v·V + height·normal). levels: true gathers the values into levels in place of the grid, largest first — of a height, the sloped cells (past slopeDeg, 10°) left out first, each level of 5 % or more with its plane { origin, normal } (normal toward the viewer), which align_datum levels on; a gentle warp that ran levels together is taken out first and said (warp { rise, bow, note }); ramps says where the slopes between tiers lie when they are many. picture: true writes the map coloured as a PNG. Trap: with plane, box is [u, v, height] in the plane's frame (or { world: { min, max } }); scanLies says where the scan lies when few cells meet it. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "axis": {
+      "description": "The way looked: -z (the default) from above.",
+      "enum": [
+       "+x",
+       "-x",
+       "+y",
+       "-y",
+       "+z",
+       "-z"
+      ]
+     },
+     "box": {
+      "description": "The part looked at: min and max (with plane [u, v, height]), or world: { min, max }.",
+      "properties": {
+       "max": {
+        "description": "Highest corner.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "world": {
+        "additionalProperties": false,
+        "description": "A box in the current frame.",
+        "properties": {
+         "max": {
+          "description": "Highest corner, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "min": {
+          "description": "Lowest corner, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "min",
+         "max"
+        ],
+        "type": "object"
+       }
+      },
+      "type": "object"
+     },
+     "cell": {
+      "description": "mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "flip": {
+      "description": "With plane: look from its other side.",
+      "type": "boolean"
+     },
+     "gap": {
+      "description": "levels: the least gap between two levels, mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "grid": {
+      "description": "The grid of numbers; the default without levels. false gives the picture alone.",
+      "type": "boolean"
+     },
+     "levels": {
+      "description": "The values gathered into levels.",
+      "type": "boolean"
+     },
+     "of": {
+      "description": "height (the default), deviation or relief.",
+      "enum": [
+       "height",
+       "deviation",
+       "relief"
+      ]
+     },
+     "path": {
+      "type": "string"
+     },
+     "picture": {
+      "description": "Write the map coloured as a PNG.",
+      "type": "boolean"
+     },
+     "plane": {
+      "description": "Look square onto this plane instead of along an axis.",
+      "oneOf": [
+       {
+        "description": "A plane element, or \"XY\", \"YZ\", \"XZ\".",
+        "oneOf": [
+         {
+          "description": "Its id.",
+          "minimum": 1,
+          "type": "integer"
+         },
+         {
+          "description": "Its name.",
+          "minLength": 1,
+          "type": "string"
+         }
+        ]
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "normal": {
+          "description": "Its normal: the side looked from.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "origin": {
+          "description": "A point on the plane, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "u": {
+          "description": "A direction for u, flattened into the plane; a sketch's by default.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "origin",
+         "normal"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "slopeDeg": {
+      "description": "levels of a height: cells steeper than this are left out, degrees; 90 keeps every one.",
+      "exclusiveMinimum": 0,
+      "maximum": 90,
+      "type": "number"
+     },
+     "smooth": {
+      "description": "relief: the smoothing sigma, mm; three cells by default.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_outline": {
+   "group": "scan",
+   "description": "The scan's outline seen along an axis, or square onto a plane, read as a sketch would draw it: a flange's plan, a bezel's opening, a gasket's shape — each loop as the fewest lines and arcs that follow it within tolerance (mm, 0.2 by default), a round loop as one circle. axis, plane, flip and box as scan_heightmap takes them, u, v as it lays them. Returns loops, the largest first (4 by default): hole, area (mm²), box, points ([u, v] corners), rounds { at, radius, center }, arcs { from, radius, center, mid } (from points[from] through mid to the next point) or circle { center, radius, rms }, and worst (mm the trace strays from what is drawn, worstAt when past the tolerance). Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "axis": {
+      "description": "The way looked: -z (the default) from above.",
+      "enum": [
+       "+x",
+       "-x",
+       "+y",
+       "-y",
+       "+z",
+       "-z"
+      ]
+     },
+     "box": {
+      "description": "Only the scan inside it: min and max (with plane [u, v, height]), or world: { min, max }.",
+      "properties": {
+       "max": {
+        "description": "Highest corner.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "world": {
+        "additionalProperties": false,
+        "description": "A box in the current frame.",
+        "properties": {
+         "max": {
+          "description": "Highest corner, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "min": {
+          "description": "Lowest corner, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "min",
+         "max"
+        ],
+        "type": "object"
+       }
+      },
+      "type": "object"
+     },
+     "flip": {
+      "description": "With plane: look from its other side.",
+      "type": "boolean"
+     },
+     "loops": {
+      "description": "How many loops, the largest first; 4 by default.",
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "plane": {
+      "description": "Look square onto this plane instead of along an axis.",
+      "oneOf": [
+       {
+        "description": "A plane element, or \"XY\", \"YZ\", \"XZ\".",
+        "oneOf": [
+         {
+          "description": "Its id.",
+          "minimum": 1,
+          "type": "integer"
+         },
+         {
+          "description": "Its name.",
+          "minLength": 1,
+          "type": "string"
+         }
+        ]
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "normal": {
+          "description": "Its normal: the side looked from.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "origin": {
+          "description": "A point on the plane, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         },
+         "u": {
+          "description": "A direction for u, flattened into the plane.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "origin",
+         "normal"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "tolerance": {
+      "description": "How closely the sketch follows the outline, mm; 0.2 by default.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_cloud": {
+   "group": "scan",
+   "description": "The scan as a point cloud: every vertex with its outward normal, in the pose it is measured in now, as binary PLY (the default) or XYZ text (x y z nx ny nz a line). path, or with your files. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "format": {
+      "description": "ply or xyz.",
+      "enum": [
+       "ply",
+       "xyz"
+      ]
+     },
+     "path": {
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "scan_info": {
+   "group": "scan",
+   "description": "The scan open: file, units, vertices, triangles, box, centre, area; and how many elements and dimensions are on it. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
+   "date": "2026-11-14"
+  },
+  "element_fit": {
+   "group": "elements",
+   "description": "Fit an element on the scan: a plane, sphere, cylinder, cone or torus grows its surface from the place (or places) in at and is best-fitted to it (RANSAC/LMedS estimate, region growing, Gaussian best fit with a sigma cut-off); a point is the place itself; a circle goes through three or more places — with exactly three it runs through each, so its sigma and formError are null (nothing to read), and under six a warning says its form is not to be judged. A place is { vertex } or { point: [x, y, z] } (mm, current frame; the nearest vertex is taken). Trap: a seed near an edge can land on the wrong surface — say what is sought with side, radius, axis or within, and surfaces that do not match are passed over. Returns the element with its fit (sigma = RMS, formError = peak-to-peak, residualMin/Max, usedPoints of regionSize; coverage for round ones), the seeds used (inRegion, offMm, deg) and the region grown (area, box); a warning when seeds lie on two surfaces.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "assumed": {
+      "description": "The designed diameter, mm: kept beside the fit, reported as measured.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "at": {
+      "description": "Where on the scan.",
+      "oneOf": [
+       {
+        "description": "One place.",
+        "oneOf": [
+         {
+          "additionalProperties": false,
+          "properties": {
+           "vertex": {
+            "description": "A scan vertex.",
+            "minimum": 0,
+            "type": "integer"
+           }
+          },
+          "required": [
+           "vertex"
+          ],
+          "type": "object"
+         },
+         {
+          "additionalProperties": false,
+          "properties": {
+           "point": {
+            "description": "A point, mm; the nearest vertex is taken.",
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           }
+          },
+          "required": [
+           "point"
+          ],
+          "type": "object"
+         }
+        ]
+       },
+       {
+        "description": "Several places.",
+        "items": {
+         "description": "A place.",
+         "oneOf": [
+          {
+           "additionalProperties": false,
+           "properties": {
+            "vertex": {
+             "description": "A scan vertex.",
+             "minimum": 0,
+             "type": "integer"
+            }
+           },
+           "required": [
+            "vertex"
+           ],
+           "type": "object"
+          },
+          {
+           "additionalProperties": false,
+           "properties": {
+            "point": {
+             "description": "A point, mm; the nearest vertex is taken.",
+             "items": {
+              "type": "number"
+             },
+             "maxItems": 3,
+             "minItems": 3,
+             "type": "array"
+            }
+           },
+           "required": [
+            "point"
+           ],
+           "type": "object"
+          }
+         ]
+        },
+        "minItems": 1,
+        "type": "array"
+       }
+      ]
+     },
+     "axis": {
+      "description": "Cylinder, cone: the axis direction, roughly (within 20°).",
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+     },
+     "kind": {
+      "description": "What to fit.",
+      "enum": [
+       "plane",
+       "sphere",
+       "cylinder",
+       "cone",
+       "torus",
+       "point",
+       "circle"
+      ]
+     },
+     "knownDiameter": {
+      "description": "Sphere: a known diameter held, mm (a gauge ball); the centre alone is fitted.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "mark": {
+      "description": "Leave the grown region marked for element_fit_marked.",
+      "type": "boolean"
+     },
+     "name": {
+      "description": "A name; else numbered by kind — \"Sphere 2\".",
+      "minLength": 1,
+      "type": "string"
+     },
+     "radius": {
+      "additionalProperties": false,
+      "description": "Sphere, cylinder, cone: the radius range sought.",
+      "properties": {
+       "max": {
+        "description": "mm.",
+        "exclusiveMinimum": 0,
+        "type": "number"
+       },
+       "min": {
+        "description": "mm.",
+        "exclusiveMinimum": 0,
+        "type": "number"
+       }
+      },
+      "required": [],
+      "type": "object"
+     },
+     "side": {
+      "description": "Sphere, cylinder, cone: inside (concave, a bore) or outside (convex, a shaft).",
+      "enum": [
+       "inside",
+       "outside"
+      ]
+     },
+     "sigma": {
+      "description": "Outlier cut-off, sigma: 3 (the default), 2, 1, or 0 for all points.",
+      "enum": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "within": {
+      "additionalProperties": false,
+      "description": "The surface stays inside this box.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     }
+    },
+    "required": [
+     "kind"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_fit_marked": {
+   "group": "elements",
+   "description": "Fit a plane, sphere, cylinder, cone or torus to exactly the scan vertices given, with no search for the surface — vertices, or marked: true for the points the last element_fit { mark: true }, scan_segment { mark } or scan_query { mark: true } left marked, or box (with normal: only those facing a way) for every vertex inside it. Returns the element, and with box how many points it took.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "assumed": {
+      "description": "The designed diameter, mm: kept beside the fit, reported as measured.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "box": {
+      "additionalProperties": false,
+      "description": "A box in the current frame.",
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "kind": {
+      "description": "What to fit.",
+      "enum": [
+       "plane",
+       "sphere",
+       "cylinder",
+       "cone",
+       "torus"
+      ]
+     },
+     "knownDiameter": {
+      "description": "Sphere: a known diameter held, mm (a gauge ball); the centre alone is fitted.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "marked": {
+      "description": "The points left marked, in place of vertices.",
+      "type": "boolean"
+     },
+     "name": {
+      "description": "A name; else numbered by kind — \"Sphere 2\".",
+      "minLength": 1,
+      "type": "string"
+     },
+     "normal": {
+      "additionalProperties": false,
+      "description": "Only the vertices whose outward normal faces this way.",
+      "properties": {
+       "dir": {
+        "description": "A direction, any length.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "withinDeg": {
+        "description": "Degrees; 30 by default.",
+        "exclusiveMinimum": 0,
+        "maximum": 180,
+        "type": "number"
+       }
+      },
+      "required": [
+       "dir"
+      ],
+      "type": "object"
+     },
+     "sigma": {
+      "description": "Outlier cut-off, sigma: 3 (the default), 2, 1, or 0 for all points.",
+      "enum": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "vertices": {
+      "description": "The scan vertices of the surface.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 3,
+      "type": "array"
+     }
+    },
+    "required": [
+     "kind"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_construct": {
+   "group": "elements",
+   "description": "Construct an element from others and typed-in numbers — point: point-coords, point-centroid, point-midpoint, point-line-plane, point-center, point-three-planes, point-line-line, point-project; line: line-two-points, line-axis, line-plane-plane, line-plane-point, line-project, line-coords; plane: plane-three-points, plane-offset, plane-midplane, plane-offset-point, plane-line-point, plane-angle, plane-line-plane, plane-two-lines, plane-tangent-sphere, plane-tangent-cylinder, plane-coords, plane-symmetry; circle: circle-plane-cylinder, circle-plane-sphere, circle-coords. refs fill the slots in order, by id or name (\"XY\", \"YZ\", \"XZ\" become plane elements, listed under made); params are the numbers in order or by key. point-centroid measures the scan (vertices confines it); plane-symmetry finds the scan's mirror plane (seed starts the search, vertices confines it) and answers symmetry { rms, matched, sampled }. Returns the element.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "assumed": {
+      "description": "The designed diameter, mm: kept beside the fit, reported as measured.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "kind": {
+      "description": "What to construct.",
+      "enum": [
+       "point",
+       "line",
+       "plane",
+       "sphere",
+       "cylinder",
+       "cone",
+       "circle",
+       "torus"
+      ]
+     },
+     "method": {
+      "description": "The creation method — see the description.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "name": {
+      "description": "A name; else numbered by kind — \"Sphere 2\".",
+      "minLength": 1,
+      "type": "string"
+     },
+     "params": {
+      "description": "The method’s typed-in numbers, mm.",
+      "oneOf": [
+       {
+        "description": "The numbers in the method’s order.",
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       },
+       {
+        "additionalProperties": true,
+        "description": "The numbers by key (x, y, z; offset; angle; gap; nx, ny, nz, px, py, pz; dx, dy, dz, length; d, cx, cy, cz).",
+        "type": "object"
+       }
+      ]
+     },
+     "refs": {
+      "description": "The method’s source elements, slot by slot.",
+      "items": {
+       "description": "A source element; in a plane’s slot also \"XY\", \"YZ\", \"XZ\".",
+       "oneOf": [
+        {
+         "description": "Its id.",
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "description": "Its name.",
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "type": "array"
+     },
+     "seed": {
+      "description": "plane-symmetry: the plane the search starts from.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name.",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "vertices": {
+      "description": "point-centroid, plane-symmetry: only these scan vertices.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 3,
+      "type": "array"
+     }
+    },
+    "required": [
+     "kind",
+     "method"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_rename": {
+   "group": "elements",
+   "description": "Give an element another name; dimensions and constructions on it keep pointing at it.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "element": {
+      "description": "The element.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name.",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "name": {
+      "description": "Its new name.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "element",
+     "name"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_unlink": {
+   "group": "elements",
+   "description": "Freeze a constructed point, line, plane or circle where it stands: its sources give way to coordinates of its own (point-coords, line-coords, plane-coords, circle-coords), so it no longer moves when they do and stays if they are deleted. Refused for an element not built from others. Returns the element.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "element": {
+      "description": "The constructed element.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name.",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "element"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_remove": {
+   "group": "elements",
+   "description": "Delete an element — and with it every construction built on it and every dimension on any of them, and the deviation map against it when it was the deviation target (deviationTargetCleared: the map falls back to the reference part's). Returns what went.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "element": {
+      "description": "The element.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name.",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "element"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_set_visible": {
+   "group": "elements",
+   "description": "Show or hide one element, or all of them with all: true. A hidden element still measures; the flag is kept for the report and the views.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "all": {
+      "description": "Every element.",
+      "type": "boolean"
+     },
+     "element": {
+      "description": "The element.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name.",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "visible": {
+      "description": "Shown (true) or hidden (false).",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "visible"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "element_list": {
+   "group": "elements",
+   "description": "The elements on the scan, each with its fit and how it came about. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/elements.py",
+   "date": "2026-11-14"
+  },
+  "align_datum": {
+   "group": "align",
+   "description": "A 3-2-1 alignment: primary levels the part — a plane (or 3 points, or plane { origin, normal }) whose outward normal becomes primaryAxis (default z-); secondary turns it — a line or axis (or 2 points) laid along secondaryAxis (default x+), or a plane; origin is the zero point — a point, sphere or circle (or 1 point). Elements by id or name, or points in mm used as given. Trap: a plane as secondary puts its outward NORMAL on secondaryAxis. Each datum zeroes the coordinates it owns, the origin only those left open; an origin alone moves without turning. On a first alignment the coordinates nothing sets are centred on the scan's box (keepFree: true leaves them). Returns the transform applied, how many elements moved, centred, origin { set, at, note } and parallelFace when a face parallel to the levelling plane holds more of the scan.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "keepFree": {
+      "description": "First alignment: leave the coordinates nothing sets where they are instead of centring.",
+      "type": "boolean"
+     },
+     "origin": {
+      "description": "The zero point: an element, or a point on the scan.",
+      "oneOf": [
+       {
+        "additionalProperties": false,
+        "properties": {
+         "element": {
+          "description": "An element for the zero point.",
+          "oneOf": [
+           {
+            "description": "Its id.",
+            "minimum": 1,
+            "type": "integer"
+           },
+           {
+            "description": "Its name.",
+            "minLength": 1,
+            "type": "string"
+           }
+          ]
+         }
+        },
+        "required": [
+         "element"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "point": {
+          "description": "A point for the zero point, mm.",
+          "items": {
+           "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "point"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "primary": {
+      "description": "Levelling: an element, 3 points on the scan, or a plane { origin, normal }.",
+      "oneOf": [
+       {
+        "additionalProperties": false,
+        "properties": {
+         "element": {
+          "description": "An element for levelling.",
+          "oneOf": [
+           {
+            "description": "Its id.",
+            "minimum": 1,
+            "type": "integer"
+           },
+           {
+            "description": "Its name.",
+            "minLength": 1,
+            "type": "string"
+           }
+          ]
+         }
+        },
+        "required": [
+         "element"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "points": {
+          "description": "3 points, mm — they span the face.",
+          "items": {
+           "description": "A point, mm.",
+           "items": {
+            "type": "number"
+           },
+           "maxItems": 3,
+           "minItems": 3,
+           "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+         }
+        },
+        "required": [
+         "points"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "plane": {
+          "additionalProperties": false,
+          "properties": {
+           "normal": {
+            "description": "Its outward normal.",
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           },
+           "origin": {
+            "description": "A point on the plane, mm.",
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           }
+          },
+          "required": [
+           "origin",
+           "normal"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "plane"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "primaryAxis": {
+      "description": "The axis the primary's outward normal becomes; default z-.",
+      "enum": [
+       "x+",
+       "x-",
+       "y+",
+       "y-",
+       "z+",
+       "z-"
+      ]
+     },
+     "secondary": {
+      "description": "Rotation: an element, or 2 points on the scan.",
+      "oneOf": [
+       {
+        "additionalProperties": false,
+        "properties": {
+         "element": {
+          "description": "An element for rotation.",
+          "oneOf": [
+           {
+            "description": "Its id.",
+            "minimum": 1,
+            "type": "integer"
+           },
+           {
+            "description": "Its name.",
+            "minLength": 1,
+            "type": "string"
+           }
+          ]
+         }
+        },
+        "required": [
+         "element"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "points": {
+          "description": "2 points, mm — they run along the edge.",
+          "items": {
+           "description": "A point, mm.",
+           "items": {
+            "type": "number"
+           },
+           "maxItems": 3,
+           "minItems": 3,
+           "type": "array"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+         }
+        },
+        "required": [
+         "points"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "secondaryAxis": {
+      "description": "The axis the secondary runs along (a plane: its normal); default x+.",
+      "enum": [
+       "x+",
+       "x-",
+       "y+",
+       "y-",
+       "z+",
+       "z-"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/align.py",
+   "date": "2026-11-14"
+  },
+  "align_auto": {
+   "group": "align",
+   "description": "Read a coordinate system off the scan and apply it (ScanRuler's Auto-align): the directions most faces are square to and the axis round walls run along, the part standing on its base (its largest flat face, the side an open scan is open on, or an end of its main axis), its long side along X, zero under the middle on the base (on the axis for a turned part). level: settled (default) lays all faces on the axes at once, by area; largest squares the largest flat face exactly. Returns note (what it was read from), method planes|axis|principal, base, square (the largest face's tilt, and per axis the faces' tilts), largestInside when that face looks into the part, the transform and how many elements moved. Trap: a drafted wall reads as its draft, not an alignment error.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "level": {
+      "description": "settled (the default): all faces at once, by area. largest: the largest flat face exactly, the rest settled about its normal.",
+      "enum": [
+       "settled",
+       "largest"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/align.py",
+   "date": "2026-11-14"
+  },
+  "align_symmetry": {
+   "group": "align",
+   "description": "Settle the part's pose on its mirror plane and apply it: the mirror plane a measured symmetry plane (element_construct plane-symmetry, the newest) or one searched for on the scan; the axis of the current frame nearest its normal is turned onto it and the zero point put on it. Refuses when the scan has no symmetry plane (mirror RMS over 0.5 mm). Returns the note on what it settled on, the transform and how many elements moved.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/align.py",
+   "date": "2026-11-14"
+  },
+  "align_clear": {
+   "group": "align",
+   "description": "Put the part back in the coordinates the scanner delivered it in, with everything measured on it. Returns how many elements moved with it.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/align.py",
+   "date": "2026-11-14"
+  },
+  "scan_scale": {
+   "group": "align",
+   "description": "Scale the scan to its true size — a photogrammetry scan has no size of its own. Give references: lengths measured on the scan with their true lengths from the real part — a length dimension (distance or diameter), an element's diameter (sphere, cylinder, circle), or two points — or a factor outright. Several references are averaged by length; each one's own factor and how far it is off the average (offPct) come back, so a bad one shows. The scale is about the frame's zero point. Elements and dimensions scale with it. dryRun: true returns the factor and the size it would give without scaling. Returns factor, the references, size before and after, and the scan.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "dryRun": {
+      "description": "Work out the factor and the size it gives, and scale nothing.",
+      "type": "boolean"
+     },
+     "factor": {
+      "description": "Scale by this factor outright — 25.4 for a file in inches read as mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "references": {
+      "description": "Lengths to scale from — one or more.",
+      "items": {
+       "description": "A length known two ways: measured on the scan, and true.",
+       "oneOf": [
+        {
+         "additionalProperties": false,
+         "properties": {
+          "dimension": {
+           "description": "A length dimension already measured.",
+           "oneOf": [
+            {
+             "minimum": 1,
+             "type": "integer"
+            },
+            {
+             "minLength": 1,
+             "type": "string"
+            }
+           ]
+          },
+          "true": {
+           "description": "Its length on the real part, mm.",
+           "type": "number"
+          }
+         },
+         "required": [
+          "dimension",
+          "true"
+         ],
+         "type": "object"
+        },
+        {
+         "additionalProperties": false,
+         "properties": {
+          "element": {
+           "description": "A sphere, cylinder or circle; its diameter is the length.",
+           "oneOf": [
+            {
+             "description": "Its id.",
+             "minimum": 1,
+             "type": "integer"
+            },
+            {
+             "description": "Its name.",
+             "minLength": 1,
+             "type": "string"
+            }
+           ]
+          },
+          "true": {
+           "description": "Its diameter on the real part, mm.",
+           "type": "number"
+          }
+         },
+         "required": [
+          "element",
+          "true"
+         ],
+         "type": "object"
+        },
+        {
+         "additionalProperties": false,
+         "properties": {
+          "points": {
+           "description": "The two ends of the length.",
+           "items": {
+            "description": "A point on the scan, mm.",
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           },
+           "maxItems": 2,
+           "minItems": 2,
+           "type": "array"
+          },
+          "true": {
+           "description": "The distance between them on the real part, mm.",
+           "type": "number"
+          }
+         },
+         "required": [
+          "points",
+          "true"
+         ],
+         "type": "object"
+        }
+       ]
+      },
+      "minItems": 1,
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/align.py",
+   "date": "2026-11-14"
+  },
+  "dimension_add": {
+   "group": "dimensions",
+   "description": "Measure between elements, or a size or tolerance of one. refs are the elements by id or name, in slot order. Without type, the type follows the elements as clicking them does — two planes their distance, a plane and an axis theirs, two spheres their centre distance; with type, one of dist-point-point, dist-point-axis, dist-point-plane, dist-axis-axis, dist-axis-plane, dist-plane-plane, angle-axis-axis, angle-axis-plane, angle-plane-plane, size-diameter, form-flatness, form-cylindricity, form-circularity, form-sphericity, orient-parallelism, orient-perpendicularity, orient-angularity, loc-coaxiality. anchor, for two spheres: center (default), gap or span; limit holds the value to a ceiling or a nominal ± band; basic is an angularity's basic angle. Returns the dimension with its value (mm or degrees), the formatted value and the verdict. These are GD&T-like, read off fitted elements of a noisy scan — not certified.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "anchor": {
+      "description": "Two spheres: centre to centre (the default), the gap between them, or the span across them.",
+      "enum": [
+       "center",
+       "gap",
+       "span"
+      ]
+     },
+     "basic": {
+      "description": "An angularity's basic angle, degrees.",
+      "type": "number"
+     },
+     "limit": {
+      "description": "What the value is checked against, for a pass or fail verdict.",
+      "oneOf": [
+       {
+        "additionalProperties": false,
+        "properties": {
+         "kind": {
+          "description": "A ceiling.",
+          "enum": [
+           "max"
+          ]
+         },
+         "max": {
+          "description": "The most the value may be, mm or degrees.",
+          "type": "number"
+         }
+        },
+        "required": [
+         "kind",
+         "max"
+        ],
+        "type": "object"
+       },
+       {
+        "additionalProperties": false,
+        "properties": {
+         "kind": {
+          "description": "A nominal with an allowance either side.",
+          "enum": [
+           "band"
+          ]
+         },
+         "minus": {
+          "description": "Allowed below it (positive).",
+          "minimum": 0,
+          "type": "number"
+         },
+         "nominal": {
+          "description": "The nominal value, mm or degrees.",
+          "type": "number"
+         },
+         "plus": {
+          "description": "Allowed above it.",
+          "minimum": 0,
+          "type": "number"
+         }
+        },
+        "required": [
+         "kind",
+         "nominal",
+         "plus",
+         "minus"
+        ],
+        "type": "object"
+       }
+      ]
+     },
+     "name": {
+      "description": "A name; otherwise numbered — \"Distance 2\".",
+      "minLength": 1,
+      "type": "string"
+     },
+     "refs": {
+      "description": "The elements, in slot order.",
+      "items": {
+       "description": "An element.",
+       "oneOf": [
+        {
+         "description": "Its id.",
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "description": "Its name.",
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "maxItems": 3,
+      "minItems": 1,
+      "type": "array"
+     },
+     "type": {
+      "description": "The dimension type — see the description.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "refs"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "dimension_set_limit": {
+   "group": "dimensions",
+   "description": "Hold a dimension to a limit — a ceiling, or a nominal ± band — or take it off with null. Returns the dimension with its verdict.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "dimension": {
+      "description": "The dimension.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name — \"Distance 1\".",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "limit": {
+      "description": "The limit, or null for none.",
+      "oneOf": [
+       {
+        "description": "What the value is checked against, for a pass or fail verdict.",
+        "oneOf": [
+         {
+          "additionalProperties": false,
+          "properties": {
+           "kind": {
+            "description": "A ceiling.",
+            "enum": [
+             "max"
+            ]
+           },
+           "max": {
+            "description": "The most the value may be, mm or degrees.",
+            "type": "number"
+           }
+          },
+          "required": [
+           "kind",
+           "max"
+          ],
+          "type": "object"
+         },
+         {
+          "additionalProperties": false,
+          "properties": {
+           "kind": {
+            "description": "A nominal with an allowance either side.",
+            "enum": [
+             "band"
+            ]
+           },
+           "minus": {
+            "description": "Allowed below it (positive).",
+            "minimum": 0,
+            "type": "number"
+           },
+           "nominal": {
+            "description": "The nominal value, mm or degrees.",
+            "type": "number"
+           },
+           "plus": {
+            "description": "Allowed above it.",
+            "minimum": 0,
+            "type": "number"
+           }
+          },
+          "required": [
+           "kind",
+           "nominal",
+           "plus",
+           "minus"
+          ],
+          "type": "object"
+         }
+        ]
+       },
+       {
+        "description": "None.",
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "dimension",
+     "limit"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "dimension_set_basic": {
+   "group": "dimensions",
+   "description": "The basic angle an angularity tolerance is read against, in degrees, or null to take it off.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "basic": {
+      "description": "The basic angle.",
+      "oneOf": [
+       {
+        "description": "Degrees.",
+        "type": "number"
+       },
+       {
+        "description": "None.",
+        "type": "null"
+       }
+      ]
+     },
+     "dimension": {
+      "description": "The dimension.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name — \"Distance 1\".",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "dimension",
+     "basic"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "dimension_remove": {
+   "group": "dimensions",
+   "description": "Delete a dimension or tolerance.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "dimension": {
+      "description": "The dimension.",
+      "oneOf": [
+       {
+        "description": "Its id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "Its name — \"Distance 1\".",
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "dimension"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "report_get": {
+   "group": "dimensions",
+   "description": "The measurement report. format \"json\" (the default): what the numbers rest on (units, scale, alignment, fit method, outlier cut-offs), every element with its fit, every dimension with value, unit, limit and verdict, and the tally of checks. format \"text\": the plain-text summary ScanRuler's Copy report gives for the measure workspace. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "format": {
+      "description": "json (the default) or text.",
+      "enum": [
+       "json",
+       "text"
+      ]
+     },
+     "workspace": {
+      "description": "For text: measure, the only one here.",
+      "enum": [
+       "measure"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "export_csv": {
+   "group": "dimensions",
+   "description": "Write the elements and dimensions as a CSV table (one row each: value, unit, limit, deviation, verdict, sigma, form error, position) to path (default: the session's output folder). Returns the path and the row count.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "description": "Where to write the .csv file.",
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/dimensions.py",
+   "date": "2026-11-14"
+  },
+  "section_cut": {
+   "group": "sections",
+   "description": "Cut the scan with a plane and keep the cut as a section, put on the 2D sheet. across: an element with a direction (plane, cylinder, cone, line, circle) by id or name; \"XY\", \"YZ\" or \"XZ\" through the part's centre; { axis, angleDeg }, a plane through an axis turned angleDeg about it — a half section of a turned part; or { origin, normal }. offset slides the plane along its normal, mm (a coordinate plane: the coordinate itself). kind \"shadow\": not a cut but the whole scan seen along the plane's normal, its outer boundary — holes filled, never inside the part, play mm more round it (negative: a press fit) to tolerance mm (0.1) — the outline for a foam cutout, a bin insert or a holder; then section_to_sketch. Returns the section: its plane and chain count.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "across": {
+      "oneOf": [
+       {
+        "description": "An element's id.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "description": "An element's name, or \"XY\", \"YZ\", \"XZ\".",
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "description": "{ axis, angleDeg }: a plane through an axis (\"X\", \"Y\", \"Z\" or an element); or { origin, normal }: a plane given outright.",
+        "type": "object"
+       }
+      ]
+     },
+     "kind": {
+      "enum": [
+       "cut",
+       "shadow"
+      ],
+      "type": "string"
+     },
+     "name": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "offset": {
+      "type": "number"
+     },
+     "play": {
+      "type": "number"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [
+     "across"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14"
+  },
+  "section_get": {
+   "group": "sections",
+   "description": "A section's cut as polylines: each chain's points in order — [u, v] mm on the sheet, or with space \"world\" or \"both\" [x, y, z] — with the plane (origin, normal, basisU, basisV) and per chain closed, length, points, bounds. At most limit points over all chains (4000 by default, 50000 at most); past it every k-th point is kept and step says k. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "chains": {
+      "description": "Which chains, whatever the filters say.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "limit": {
+      "maximum": 50000,
+      "minimum": 2,
+      "type": "integer"
+     },
+     "section": {
+      "description": "The section, by id or name.",
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "space": {
+      "enum": [
+       "sheet",
+       "world",
+       "both"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "section"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14"
+  },
+  "section_list": {
+   "group": "sections",
+   "description": "The sections kept: id, name, plane, chains. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14"
+  },
+  "section_remove": {
+   "group": "sections",
+   "description": "Take a section away.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "section": {
+      "description": "The section, by id or name.",
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "section"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14"
+  },
+  "section_fit": {
+   "group": "sections",
+   "description": "A section's chains cut into the lines and arcs they are, without making a sketch: per chain its pieces in order — a line by its ends, length, angleDeg (from +u) and leanDeg, an arc by centre, radius, start and sweep (radians CCW from +u) — each with its residual and in world [x, y, z]. [u, v] are the section's sheet, from the part's centre; a sketch on the section counts from the world origin's foot: its [u, v] is the sheet's plus sketch.add. Without chains the longest are fitted (maxChains 12); arcs: n fits each chain as n arcs; brief: true gives each piece short. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "arcs": {
+      "description": "Each chain as this many arcs end to end.",
+      "maximum": 8,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "brief": {
+      "type": "boolean"
+     },
+     "chains": {
+      "description": "Which chains, whatever the filters say.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "closedOnly": {
+      "type": "boolean"
+     },
+     "detail": {
+      "description": "0 to 1; 0.5 by default.",
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+     },
+     "maxChains": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "maxLength": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "minLength": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "section": {
+      "description": "The section, by id or name.",
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "tolerance": {
+      "description": "mm",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [
+     "section"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14",
+   "heavy": true
+  },
+  "section_to_sketch": {
+   "group": "sections",
+   "description": "The profile road's last step: a section's chains fitted into lines and arcs (as section_fit) and written as a FreeCAD Sketcher sketch in a PartDesign body (body by label, or a new one), lying on the section's plane — its frame the sketch rule's (zero at the world origin's foot, x along the coordinate axis next round). Neighbouring pieces meet at their carriers' crossing, joined coincident; closed chains only unless closedOnly: false or chains. Then pd_pad { body, sketch, length }.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "arcs": {
+      "description": "Each chain as this many arcs end to end.",
+      "maximum": 8,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "body": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "chains": {
+      "description": "Which chains, whatever the filters say.",
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "closedOnly": {
+      "type": "boolean"
+     },
+     "detail": {
+      "description": "0 to 1; 0.5 by default.",
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+     },
+     "maxChains": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "maxLength": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "minLength": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "name": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "section": {
+      "description": "The section, by id or name.",
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "tolerance": {
+      "description": "mm",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [
+     "section"
+    ],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/sections.py",
+   "date": "2026-11-14"
+  },
+  "mesh_parts": {
+   "group": "meshtools",
+   "description": "The scan, the edited copy and its edits, the reduced mesh, and the step mesh_undo would take back. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_inspect": {
+   "group": "meshtools",
+   "description": "What the tools would find on the mesh worked on — the edited copy, or the scan while there is none: vertices, triangles, bounds; open edges and edges more than two triangles share; the volume it encloses when closed, mm³; its pieces and the islands smaller than pieceSize across (the middle of each); its rims and the holes smaller than holeSize across (the middle of each, for mesh_fill_holes { at }). Sizes default to a hundredth and a twentieth of the part. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "holeSize": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "pieceSize": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_remove_islands": {
+   "group": "meshtools",
+   "description": "Delete every connected piece smaller across than size (its bounding box) — specks, a patch of turntable; every larger piece stays. size defaults to a hundredth of the part. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "size": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_delete_marked": {
+   "group": "meshtools",
+   "description": "Delete the surface a region holds (a triangle goes when all three corners are in it); the hole it leaves stays open. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "region": {
+      "oneOf": [
+       {
+        "enum": [
+         "marked"
+        ],
+        "type": "string"
+       },
+       {
+        "description": "Exactly one of box { min, max }, sphere { center, radius } or vertices [..], narrowed with facing [x, y, z] and angleDeg (30 to start).",
+        "type": "object"
+       }
+      ]
+     }
+    },
+    "required": [
+     "region"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_flip_normals": {
+   "group": "meshtools",
+   "description": "Turn triangles over — every one, or with region those with all three corners in it. A closed mesh flipped whole encloses a negative volume. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "region": {
+      "oneOf": [
+       {
+        "enum": [
+         "marked"
+        ],
+        "type": "string"
+       },
+       {
+        "description": "Exactly one of box { min, max }, sphere { center, radius } or vertices [..], narrowed with facing [x, y, z] and angleDeg (30 to start).",
+        "type": "object"
+       }
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_cut": {
+   "group": "meshtools",
+   "description": "Cut the mesh with a plane and take one side off; cap (on to start) closes the part flat wherever the plane goes all the way round, bridging short gaps of a hole right at the cut. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "cap": {
+      "type": "boolean"
+     },
+     "keep": {
+      "description": "plus: the side the plane's direction points to (above XY, +X of YZ, +Y of XZ, along an element's direction); minus the other.",
+      "enum": [
+       "plus",
+       "minus"
+      ],
+      "type": "string"
+     },
+     "offset": {
+      "description": "mm: a coordinate plane's coordinate, or along an element's direction.",
+      "type": "number"
+     },
+     "plane": {
+      "description": "A coordinate plane — \"XY\", \"YZ\" or \"XZ\" — or an element with a direction, by id or name.",
+      "oneOf": [
+       {
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "minimum": 1,
+        "type": "integer"
+       }
+      ]
+     }
+    },
+    "required": [
+     "plane",
+     "offset",
+     "keep"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_cut_preview": {
+   "group": "meshtools",
+   "description": "What mesh_cut at this plane would do, without cutting: whether it cuts, faces it would close, gaps bridged, stretches left open. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "keep": {
+      "description": "plus: the side the plane's direction points to (above XY, +X of YZ, +Y of XZ, along an element's direction); minus the other.",
+      "enum": [
+       "plus",
+       "minus"
+      ],
+      "type": "string"
+     },
+     "offset": {
+      "type": "number"
+     },
+     "plane": {
+      "description": "A coordinate plane — \"XY\", \"YZ\" or \"XZ\" — or an element with a direction, by id or name.",
+      "oneOf": [
+       {
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "minimum": 1,
+        "type": "integer"
+       }
+      ]
+     }
+    },
+    "required": [
+     "plane",
+     "offset"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_mirror": {
+   "group": "meshtools",
+   "description": "Reflect the mesh across a plane. mode whole (to start) reflects all of it; symmetric keeps the side keep names (plus to start) and reflects it onto the other, which it replaces — joined along the plane, a closed part stays closed. offset left out: through the middle of the part. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "keep": {
+      "description": "plus: the side the plane's direction points to (above XY, +X of YZ, +Y of XZ, along an element's direction); minus the other.",
+      "enum": [
+       "plus",
+       "minus"
+      ],
+      "type": "string"
+     },
+     "mode": {
+      "enum": [
+       "whole",
+       "symmetric"
+      ],
+      "type": "string"
+     },
+     "offset": {
+      "type": "number"
+     },
+     "plane": {
+      "description": "A coordinate plane — \"XY\", \"YZ\" or \"XZ\" — or an element with a direction, by id or name.",
+      "oneOf": [
+       {
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "minimum": 1,
+        "type": "integer"
+       }
+      ]
+     }
+    },
+    "required": [
+     "plane"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_fill_holes": {
+   "group": "meshtools",
+   "description": "Close the holes smaller across than size (a twentieth of the part to start) — or, with at, only the one whose middle is nearest that point. Each patch is triangulated to bend least (Liepa), refined to the density round it and faired: curved continues the surface's bending, flat lays the tightest patch. The scan's own vertices do not move. Edits the copy; the answer's mesh says whether it is now closed.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+     },
+     "patch": {
+      "enum": [
+       "curved",
+       "flat"
+      ],
+      "type": "string"
+     },
+     "size": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_smooth": {
+   "group": "meshtools",
+   "description": "Smooth a scan's scatter out: each point moved along its normal onto a quadric fitted to the scan round it over a patch size across — bumps smaller than size go, the shape larger stays. No point moves further than limit. keepEdges (on) fits each side of an edge sharper than 30° alone and leaves the edge as scanned. With region only that surface moves, fading to its edge. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "keepEdges": {
+      "type": "boolean"
+     },
+     "limit": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "region": {
+      "oneOf": [
+       {
+        "enum": [
+         "marked"
+        ],
+        "type": "string"
+       },
+       {
+        "description": "Exactly one of box { min, max }, sphere { center, radius } or vertices [..], narrowed with facing [x, y, z] and angleDeg (30 to start).",
+        "type": "object"
+       }
+      ]
+     },
+     "size": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_offset": {
+   "group": "meshtools",
+   "description": "Move the surface along its normal by distance: expand (the part grows) or shrink — not a scale; faces end the distance from where they were and edges stay sharp. Edits the copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "direction": {
+      "enum": [
+       "expand",
+       "shrink"
+      ],
+      "type": "string"
+     },
+     "distance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "region": {
+      "oneOf": [
+       {
+        "enum": [
+         "marked"
+        ],
+        "type": "string"
+       },
+       {
+        "description": "Exactly one of box { min, max }, sphere { center, radius } or vertices [..], narrowed with facing [x, y, z] and angleDeg (30 to start).",
+        "type": "object"
+       }
+      ]
+     }
+    },
+    "required": [
+     "direction",
+     "distance"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_reduce": {
+   "group": "meshtools",
+   "description": "Reduce the mesh worked on to a light one for CAD within tolerance of it, never more than maxTriangles (50,000) — FreeCAD's quadric decimation, measured both ways (p999, max, rms; held when both 99.9 % lie within). A preview beside the scan: mesh_export { part: \"reduced\" } writes it, mesh_apply_reduced makes it the edited copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "maxTriangles": {
+      "minimum": 4,
+      "type": "integer"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_apply_reduced": {
+   "group": "meshtools",
+   "description": "Make the reduced mesh the edited copy.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_discard": {
+   "group": "meshtools",
+   "description": "Throw the reduced mesh away (what: \"reduced\"); nothing is applied.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "what": {
+      "enum": [
+       "reduced",
+       "wrap"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "what"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_use_edited": {
+   "group": "meshtools",
+   "description": "Take the edited copy into use: it becomes the scan every tool measures, the sections cut again on it. mesh_undo goes back to the scan before.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_discard_edited": {
+   "group": "meshtools",
+   "description": "Throw the edited copy and its edits away: the tools work on the scan in use again. mesh_undo brings them back.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_undo": {
+   "group": "meshtools",
+   "description": "Take the last mesh edit back (an edit, use_edited, discard_edited or apply_reduced) — the arrays before it are kept.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "mesh_export": {
+   "group": "meshtools",
+   "description": "Write the edited copy or the reduced mesh as a binary STL in millimetres (or format 3mf) to path (the session's folder by default), or to: \"document\" as a mesh object in the document. Returns the file or the object.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "format": {
+      "enum": [
+       "stl",
+       "3mf"
+      ],
+      "type": "string"
+     },
+     "part": {
+      "enum": [
+       "edited",
+       "reduced",
+       "piece"
+      ],
+      "type": "string"
+     },
+     "path": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "to": {
+      "enum": [
+       "file",
+       "document"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "part"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/meshtools.py",
+   "date": "2026-11-14"
+  },
+  "flat_objects": {
+   "group": "flat",
+   "description": "The separate parts on the flatbed image, parted from the background by a grey level (Otsu's unless threshold is given; dark: whether the parts are darker, read from the border by default) and numbered in reading order — what flat_profile takes by number. Returns each with area, holes, box, centroid, equivalentDiameter, feret (largest and smallest caliper widths and their directions), axisAngleDeg and, with outline: true, its outline. minArea drops specks (sheet units²). Changes nothing on the sheet.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "dark": {
+      "type": "boolean"
+     },
+     "limit": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "minArea": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "minHoleArea": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "outline": {
+      "type": "boolean"
+     },
+     "threshold": {
+      "maximum": 255,
+      "minimum": 0,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_profile": {
+   "group": "flat",
+   "description": "An outline read against a centre (kind radial, the default: a part seen from above — a knurl's or a gear's teeth round it) or along an axis (axial: a part lying on its side, each side apart), and its peaks counted by prominence. The outline: object (a number from flat_objects) or chains (edge chains by number). about: a 2D circle, arc or point (radial) or line (axial); else the object's own centroid or long axis. Returns per side peaks, pitch (degrees radial, sheet units axial), max, min, peakMean, valleyMean, depth; detail: full lists the peaks. samples and prominence override the defaults. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "about": {
+      "type": [
+       "integer",
+       "string"
+      ]
+     },
+     "chains": {
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "detail": {
+      "enum": [
+       "brief",
+       "full"
+      ],
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "radial",
+       "axial"
+      ],
+      "type": "string"
+     },
+     "object": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "prominence": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "samples": {
+      "maximum": 4096,
+      "minimum": 3,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_open_image": {
+   "group": "flat",
+   "description": "Open a flatbed scan of a part — PNG (or JPEG where Qt's image reader loads) at the highest optical resolution — on the 2D sheet, in place of what was there, and find its edges. The scale the file declares (pHYs, JFIF) is taken until it is calibrated. Returns the 2D state, image.decoder saying how it was read.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_calibrate": {
+   "group": "flat",
+   "description": "Set the image's scale against a known length: distance takes two places a known distance apart, diameter three or more on a circle of known diameter; mm is that length; places in the sheet's units as they are now. The edges are found again (their chain numbers change).",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "mm": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "mode": {
+      "enum": [
+       "distance",
+       "diameter"
+      ],
+      "type": "string"
+     },
+     "points": {
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 2,
+       "minItems": 2,
+       "type": "array"
+      },
+      "minItems": 2,
+      "type": "array"
+     }
+    },
+    "required": [
+     "mode",
+     "points",
+     "mm"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_detect_edges": {
+   "group": "flat",
+   "description": "Find the image's edges again at a sensitivity from 0 (only the strongest) to 1 (every faint one): subpixel Canny chains, gaps bridged, chains under a millimetre and texture dropped. Returns how many chains.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "sensitivity": {
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_curvature": {
+   "group": "flat",
+   "description": "How an edge bends, as ScanRuler's curvature comb draws it: along detected edges or a section's cut (chains, by number as flat_edges lists them) or a fitted arc or circle (element), told as stretches in order — straight, arc (radius from its middle reading, least and most; on a section convex, a round, or concave, a fillet's hollow) or the transition between; from/to are the arc length along it. A chain is read smoothed over window (2 by default), which leaves one window off each end of an open chain and turns a sudden change into a ramp about a window long, the change in its middle — a fillet's tangent point is the middle of the transition before it; a transition much longer than the window is a blend that is no arc. straightBelow (1/unit) is straight; tolerance how far an arc's readings may stray (0.1); step adds readings that far apart. comb: true also draws the comb into the document (on the section's plane on the part), scale and spacing to size it.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "chains": {
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "type": "array"
+     },
+     "comb": {
+      "type": "boolean"
+     },
+     "element": {
+      "type": [
+       "integer",
+       "string"
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "scale": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "spacing": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "step": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "straightBelow": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "maximum": 1,
+      "type": "number"
+     },
+     "window": {
+      "maximum": 20,
+      "minimum": 0.2,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_edges": {
+   "group": "flat",
+   "description": "The sheet's edge chains, longest first: chain number, points, length and bounds in the sheet's units, closed. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "limit": {
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_fit": {
+   "group": "flat",
+   "description": "Make a 2D element — kind point, line, circle or arc, by a method of that kind: point: flat-point-pick (pick), flat-point-midpoint (construct), flat-point-intersect (construct), flat-point-center (construct), line: flat-line-pick (pick), flat-line-seed (seed), flat-line-edge (edge), circle: flat-circle-pick (pick), flat-circle-seed (seed), flat-circle-edge (edge), flat-circle-centers (construct), arc: flat-arc-pick (pick), flat-arc-edge (edge). A pick method takes points (snapped to the nearest edge within reach unless snap: false; picks says where each landed); an edge method chains (whole) and/or box (sheet units), strays voted out; a construct method refs, other 2D elements. Seed methods are not ported.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "box": {
+      "additionalProperties": false,
+      "properties": {
+       "max": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+       },
+       "min": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "chains": {
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "kind": {
+      "enum": [
+       "point",
+       "line",
+       "circle",
+       "arc"
+      ],
+      "type": "string"
+     },
+     "method": {
+      "type": "string"
+     },
+     "name": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "points": {
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "maxItems": 2,
+       "minItems": 2,
+       "type": "array"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "reach": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "refs": {
+      "items": {
+       "oneOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "type": "array"
+     },
+     "snap": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "kind"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_dimension_add": {
+   "group": "flat",
+   "description": "Measure between two 2D elements: flat-dist-point-point, flat-dist-point-line, flat-dist-line-line (near-parallel only), flat-angle-line-line. Points, circles and arcs count as their centre, lines as lines. Without type, the first that takes the two in the order given. Returns the dimensions and the report.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "refs": {
+      "items": {
+       "oneOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     },
+     "type": {
+      "enum": [
+       "flat-dist-point-point",
+       "flat-dist-point-line",
+       "flat-dist-line-line",
+       "flat-angle-line-line"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "refs"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_note_add": {
+   "group": "flat",
+   "description": "Write a text note on the 2D sheet: one line; at is its lower-left corner, sheet units. Listed in the report and written into the SVG and DXF exports. Returns the note with its id.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     },
+     "text": {
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "text",
+     "at"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_edit": {
+   "group": "flat",
+   "description": "Change one thing on the 2D sheet: an element or a dimension (by id or name) takes a new name; a note (by id) new text or a new place (at); any of them visible: false to leave it out of the exports. Returns the 2D state.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     },
+     "dimension": {
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "element": {
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       }
+      ]
+     },
+     "name": {
+      "type": "string"
+     },
+     "note": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "text": {
+      "type": "string"
+     },
+     "visible": {
+      "type": "boolean"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_remove": {
+   "group": "flat",
+   "description": "Remove elements, dimensions and notes from the 2D sheet, each by id or name (a note by id). An element built on a removed one stays and says it has lost its source (lostSource), a dimension on one turns invalid (invalidDimensions). Returns what is left.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "dimensions": {
+      "items": {
+       "oneOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "type": "array"
+     },
+     "elements": {
+      "items": {
+       "oneOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "minLength": 1,
+         "type": "string"
+        }
+       ]
+      },
+      "type": "array"
+     },
+     "notes": {
+      "items": {
+       "minimum": 1,
+       "type": "integer"
+      },
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_set_alignment": {
+   "group": "flat",
+   "description": "Put the part's zero point at origin and its X axis through xAxis (sheet places): the report and the exports then read in that frame. clear: true takes it off. Returns the 2D state.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "clear": {
+      "type": "boolean"
+     },
+     "origin": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     },
+     "xAxis": {
+      "items": {
+       "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_render": {
+   "group": "flat",
+   "description": "A picture of the 2D sheet as a PNG (path, or sheet.png with your files), in its own units — +X right, +Y up — with the image, the edge chains (teal), the elements in their colours and a grid; show picks the layers (image, edges, elements, grid); frame { min, max } zooms in; size the long side in pixels (1200). map says where it lies. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "frame": {
+      "additionalProperties": false,
+      "properties": {
+       "max": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+       },
+       "min": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     },
+     "path": {
+      "type": "string"
+     },
+     "show": {
+      "items": {
+       "enum": [
+        "image",
+        "edges",
+        "elements",
+        "grid"
+       ],
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "size": {
+      "maximum": 4000,
+      "minimum": 200,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_report": {
+   "group": "flat",
+   "description": "The 2D report as ScanRuler's Copy button gives it: the image or section, the scale it rests on, every element and dimension. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "flat_export": {
+   "group": "flat",
+   "description": "Write the sheet at true scale: dxf (AutoCAD 2000, millimetres declared, y up; edges as LWPOLYLINE thinned to 0.01 mm, fits as LINE/CIRCLE/ARC/POINT, labels as TEXT) or svg (one unit per millimetre, y down). To path, the session's folder by default.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "format": {
+      "enum": [
+       "dxf",
+       "svg"
+      ],
+      "type": "string"
+     },
+     "path": {
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "format"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/flat.py",
+   "date": "2026-11-14"
+  },
+  "deviation_open_reference": {
+   "group": "deviation",
+   "description": "Open the nominal part the scan is compared with — path to a STEP, IGES or BREP from CAD (tessellated finely) or an STL, PLY, OBJ, OFF or 3MF mesh (units for those: mm by default), or body, a solid in the FreeCAD document by name or label — in place of the one there is; any alignment and map against the old one go. Returns the deviation state.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "body": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "units": {
+      "enum": [
+       "mm",
+       "cm",
+       "m",
+       "in"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_align": {
+   "group": "deviation",
+   "description": "Rigid best fit (no scale) of the scan onto the reference, then the deviation map under it. mode auto (the default) finds the pose on its own; points starts from three or more pairs of corresponding points (scan and reference, mm) then refines; local refines the fit in hand on a marked surface only (vertices), within searchDistance mm. The scan's vertices are moved onto the reference. Refuses (invalid_input) when the scan and the reference differ in size by more than 2× — a unit mix-up (×10, ×25.4, ×1000, named when near one) that would read as a near-perfect match on a patch of the big part; allowSizeMismatch: true fits anyway, for a scan that truly is a small piece of the reference. Refuses a scan with non-finite vertices. Returns the alignment (RMS, points matched, matchedShare — the share of sampled scan points that drove the pose —, converged, transform), the map's statistics (withinTolerancePct over every scan point, measured or not; withinToleranceOfMeasuredPct; measuredPct) and warnings: read them — a matchedShare under 50 %, a fit that did not converge, or under 80 % of the points measured each mean the map is not to be trusted as it stands. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing). The auto search distance is 2 % of the reference's diagonal. Moving the part afterwards (align_clear, align_datum, align_auto, align_symmetry, scan_scale) drops this alignment and its map.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "allowSizeMismatch": {
+      "description": "Fit even when the scan and the reference differ in size by more than 2× — only for a scan that truly is a small piece of a larger reference, never to get past a unit mix-up.",
+      "type": "boolean"
+     },
+     "mode": {
+      "enum": [
+       "auto",
+       "points",
+       "local"
+      ],
+      "type": "string"
+     },
+     "pairs": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "reference": {
+         "description": "The same point on the reference, mm.",
+         "items": {
+          "type": "number"
+         },
+         "maxItems": 3,
+         "minItems": 3,
+         "type": "array"
+        },
+        "scan": {
+         "description": "On the scan, mm.",
+         "items": {
+          "type": "number"
+         },
+         "maxItems": 3,
+         "minItems": 3,
+         "type": "array"
+        }
+       },
+       "required": [
+        "scan",
+        "reference"
+       ],
+       "type": "object"
+      },
+      "minItems": 3,
+      "type": "array"
+     },
+     "searchDistance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "vertices": {
+      "items": {
+       "minimum": 0,
+       "type": "integer"
+      },
+      "minItems": 3,
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14",
+   "heavy": true
+  },
+  "deviation_measure": {
+   "group": "deviation",
+   "description": "Measure the deviation map again under the alignment in hand — after a change of facing limit, say. deviation_align measures it already. Refuses (invalid_state) when there is no alignment, including when the part was moved since it was made (align_clear, align_datum, align_auto, align_symmetry, scan_scale drop it): run deviation_align again. Returns the map's statistics (min, max, mean, RMS, sigma, percentiles; withinTolerancePct over every scan point, withinToleranceOfMeasuredPct, measuredPct, points matched) and warnings when under 80 % of the points have a reading. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing).",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_set_target": {
+   "group": "deviation",
+   "description": "Map how far the scan strays from one of its own fitted elements — a plane, cylinder, sphere or torus — instead of from a reference part; null goes back to the reference. side is the material side, read off the scan when the element is chosen (outward: the element's outer side; inward: a bore or shell) — give it to override. facingDeg limits which surface counts to what faces the element within that many degrees (60 by default), null for any. Returns the map's statistics.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "element": {
+      "description": "The element (id or name), or null.",
+      "oneOf": [
+       {
+        "minimum": 1,
+        "type": "integer"
+       },
+       {
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "facingDeg": {
+      "description": "Facing limit, degrees, or null.",
+      "oneOf": [
+       {
+        "maximum": 90,
+        "minimum": 1,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "side": {
+      "enum": [
+       "outward",
+       "inward"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "element"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_settings": {
+   "group": "deviation",
+   "description": "The deviation map's reading: range (colour scale, ± mm), maxDistance (search distance, mm: readings past it count as unmeasured), bands, tolerance (± mm the statistics count within), facingDeg (the map is measured again), colormap (jet). Returns the deviation state.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "bands": {
+      "oneOf": [
+       {
+        "maximum": 256,
+        "minimum": 2,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "colormap": {
+      "enum": [
+       "jet"
+      ],
+      "type": "string"
+     },
+     "facingDeg": {
+      "description": "Facing limit, degrees, or null.",
+      "oneOf": [
+       {
+        "maximum": 90,
+        "minimum": 1,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "maxDistance": {
+      "description": "Search distance, mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "range": {
+      "description": "Colour scale, ± mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "tolerance": {
+      "description": "Tolerance, ± mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_hotspots": {
+   "group": "deviation",
+   "description": "The deviation map read as patches: the vertices past the tolerance gathered into connected regions, the largest and farthest first. Needs a map (deviation_align or deviation_set_target). Returns each patch's centroid, box, area, count, mean, extreme, depth, volume, kind, side, the extreme's point and vertex, a few vertices; features, found, over and unmeasured. depth, the median |deviation| over the patch; volume, mm³ past the tolerance (the ranking key); kind, \"feature\" when the patch is at least 4 mm² and 25 point spacings² across and its depth at least 2× the tolerance — material missing or misplaced, to model or to name — else \"texture\". Trap: read far every time — the vertices past the search distance: far.inside is scan deep inside the reference (a hole, pocket or slot the model lacks), far.outside scan standing off it. Sign: a patch's mean and extreme are positive (side outside) where the scan stands outside the reference — excess material — and negative (side inside) where material is missing. on: reference reads the map on the reference instead (coveredPct, withinTolerancePct over the reference's area, mostExcess, mostMissing, unscanned), signed the same way. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "grain": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "on": {
+      "enum": [
+       "scan",
+       "reference"
+      ],
+      "type": "string"
+     },
+     "patches": {
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_volume": {
+   "group": "deviation",
+   "description": "The scan and the reference part compared as solids, on a grid of small cells: each cell inside one and not the other is an error, touching cells a region. excess is material the reference has and the part has not, missing the other way round, unsure where the scan does not say (never an error). Needs deviation_align. Returns totals (mm³ and % of the reference) and the regions largest first, each with kind, volume, maxDepth, thickness, shape (layer or lump), centroid, deepest, box, evidence and confidence. Trap: nothing thinner than smallestSeen (two cells) is seen. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "cell": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "kinds": {
+      "items": {
+       "enum": [
+        "excess",
+        "missing",
+        "unsure"
+       ],
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "regions": {
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "within": {
+      "additionalProperties": false,
+      "properties": {
+       "max": {
+        "description": "Highest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "min": {
+        "description": "Lowest corner, mm.",
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       }
+      },
+      "required": [
+       "min",
+       "max"
+      ],
+      "type": "object"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "deviation_export": {
+   "group": "deviation",
+   "description": "The deviation map as a file — side scan (the default) or reference (the map read on the reference, a reading per small piece of it; ply, csv or npy): format ply (the default: binary, a vertex per scan vertex with x, y, z, deviation, measured and the map's jet colour), csv (x,y,z,d), npy (N × 4 float32) or report (ScanRuler's plain-text report, also in the answer). path, else in the session's folder. Returns the file with readings, measured, measuredPct, withinTolerance, withinTolerancePct (over every reading, measured or not), withinToleranceOfMeasuredPct, tolerance and searchDistance. Sign, both sides: positive where the scan stands outside the reference (excess material), negative inside it (material missing). Trap: the distance is NaN where there is no reading, and a reading past the search distance is kept as it is. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "format": {
+      "enum": [
+       "ply",
+       "csv",
+       "npy",
+       "report"
+      ],
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "side": {
+      "enum": [
+       "scan",
+       "reference"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
+   "date": "2026-11-14"
+  },
+  "thickness_measure": {
+   "group": "thickness",
+   "description": "Measure the wall thickness at every point of the scan, with the search settings given or those in hand. Returns the statistics (min, max, mean, sigma, share under the thin-wall limit, points measured), the settings, the thin spots (points under the limit gathered into patches, thinnest first by how far under) and the plain-text report. Trap: thin readings along open rims are rays escaping, not thin walls.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "coneAngleDeg": {
+      "maximum": 89,
+      "minimum": 0,
+      "type": "number"
+     },
+     "coneRays": {
+      "maximum": 256,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "maxThickness": {
+      "description": "The thickest wall searched for, mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "method": {
+      "description": "ray: along the inward normal to the far wall (the shortest of a cone with coneRays). sphere: the largest sphere that fits at the point.",
+      "enum": [
+       "ray",
+       "sphere"
+      ],
+      "type": "string"
+     },
+     "normalDeviationDeg": {
+      "description": "How far the far wall may turn from facing back, degrees, or null for any.",
+      "oneOf": [
+       {
+        "maximum": 180,
+        "minimum": 0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/thickness.py",
+   "date": "2026-11-14"
+  },
+  "thickness_settings": {
+   "group": "thickness",
+   "description": "The search settings (method, maxThickness, coneRays, coneAngleDeg, normalDeviationDeg — they take effect at the next thickness_measure) and the reading: low and high, the ends of the colour scale, mm; bands; limit, the thin-wall limit the statistics count under, mm. Returns the thickness state.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "bands": {
+      "oneOf": [
+       {
+        "minimum": 2,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "coneAngleDeg": {
+      "maximum": 89,
+      "minimum": 0,
+      "type": "number"
+     },
+     "coneRays": {
+      "maximum": 256,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "high": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "limit": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "low": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "maxThickness": {
+      "description": "The thickest wall searched for, mm.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "method": {
+      "description": "ray: along the inward normal to the far wall (the shortest of a cone with coneRays). sphere: the largest sphere that fits at the point.",
+      "enum": [
+       "ray",
+       "sphere"
+      ],
+      "type": "string"
+     },
+     "normalDeviationDeg": {
+      "description": "How far the far wall may turn from facing back, degrees, or null for any.",
+      "oneOf": [
+       {
+        "maximum": 180,
+        "minimum": 0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/thickness.py",
+   "date": "2026-11-14"
+  },
+  "scan_noise": {
+   "group": "scan-noise",
+   "description": "This scan's noise: the median scatter of small plane fits (sigmaMm, the figure the scan-to-CAD rule — nothing finer than about three times the noise — is written against), p90 and spacingMm (median edge). Kept with the scan as the measured noise. Returns plan, the noise to plan with: the larger of the named scanner's usual noise and this scan's, with finestMm and a warning when the scan reads 1.5× its scanner or more, or no scanner is named. A CAD tessellation is refused: it has no scan noise.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/noise.py",
+   "date": "2026-11-14"
+  },
+  "scanner": {
+   "group": "scan-noise",
+   "description": "Your scanners (name, noiseMm — one standard deviation of its usual noise —, spacingMm, note), kept in scanners.json with your files across projects. action: list; add { scanner, use? }; remove { name }; use { name } or { measured: true } for none (kept with the scan, by value); export { path? }; import { path } (merged by name). Returns plan, the noise to plan with, which thread and wear tools read.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "action": {
+      "enum": [
+       "list",
+       "add",
+       "remove",
+       "use",
+       "export",
+       "import"
+      ]
+     },
+     "measured": {
+      "type": "boolean"
+     },
+     "name": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "scanner": {
+      "additionalProperties": false,
+      "properties": {
+       "name": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "noiseMm": {
+        "exclusiveMinimum": 0,
+        "maximum": 5,
+        "type": "number"
+       },
+       "note": {
+        "type": "string"
+       },
+       "spacingMm": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+       }
+      },
+      "required": [
+       "name",
+       "noiseMm"
+      ],
+      "type": "object"
+     },
+     "use": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "action"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/noise.py",
+   "date": "2026-11-14"
+  },
+  "scan_thread": {
+   "group": "scan-thread",
+   "description": "Name a scanned thread: the points about a fitted cylinder's axis read for pitch (the sectors' autocorrelation, window by window), crests and roots, the hand, then folded along the helix for a sharper pitch, starts, the flank angle and the taper, and decided against ISO metric, UNC, UNF, UNEF, NPT, G/R pipe, Tr, ACME and the 45° print form. verdict: match (high or low confidence), ambiguous (tied: the sizes this scan can't tell apart, deciding: the hand measurement that would, and what each reads) or none. The diameter tolerance goes by the wall's noise raised to the scan noise to plan with (scan_noise, scanner), so a noisy scanner ties sizes it can't resolve. pitchFloor: the least share a pitch is resolved to (0.01; raise it for a scanner whose scale you trust less). Trap: a bore is matched on its crests (the minor diameter), a boss on its own (the major).",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "axis": {
+      "additionalProperties": false,
+      "description": "{ element } — a cylinder fitted in the bore or on the boss (element_fit kind cylinder) — or { origin, direction, radius, length? }.",
+      "properties": {
+       "direction": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "element": {
+        "type": [
+         "integer",
+         "string"
+        ]
+       },
+       "length": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+       },
+       "origin": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "radius": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+       }
+      },
+      "type": "object"
+     },
+     "band": {
+      "description": "mm either side of the radius a point counts; max(0.6, 0.2·radius) by default.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "detail": {
+      "enum": [
+       "brief",
+       "full"
+      ]
+     },
+     "families": {
+      "description": "Families to try: metric, unc, unf, unef, npt, bspp, bspt, tr, acme, print45; all by default.",
+      "items": {
+       "enum": [
+        "metric",
+        "unc",
+        "unf",
+        "unef",
+        "npt",
+        "bspp",
+        "bspt",
+        "tr",
+        "acme",
+        "print45"
+       ]
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "length": {
+      "description": "mm along the axis, centred on its origin; the cylinder's length by default.",
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "pitchFloor": {
+      "maximum": 0.05,
+      "minimum": 0.002,
+      "type": "number"
+     }
+    },
+    "required": [
+     "axis"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/thread.py",
+   "date": "2026-11-14"
+  },
+  "wear_setup": {
+   "group": "wear",
+   "description": "Settings, tags and the reference for wear repair, in one call; with nothing, reads them. tolerance: what counts as worn, and the pre-warp's target, mm (0.05). blendMm: how far outside a worn region a repair fades out (1). maxMm: how far the reference may be and still be the same surface (2). mode: add (only lost material comes back, the default) or both (what stands proud is trimmed too). tag: [{ action: set|remove|clear, name, kind: worn|keep, region }] — keep is never moved (a fit face, a datum, a feature meant to differ from the other half). reference: { source: mirror, plane: x|y|z } (the part's own other half across its symmetry plane through the origin — align_symmetry first) or { source: mirror, point, normal }, or { source: deviation } (the reference part, aligned).",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "blendMm": {
+      "minimum": 0,
+      "type": "number"
+     },
+     "maxMm": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "mode": {
+      "enum": [
+       "add",
+       "both"
+      ]
+     },
+     "reference": {
+      "additionalProperties": false,
+      "properties": {
+       "normal": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "plane": {
+        "enum": [
+         "x",
+         "y",
+         "z"
+        ]
+       },
+       "point": {
+        "items": {
+         "type": "number"
+        },
+        "maxItems": 3,
+        "minItems": 3,
+        "type": "array"
+       },
+       "source": {
+        "enum": [
+         "mirror",
+         "deviation"
+        ]
+       }
+      },
+      "required": [
+       "source"
+      ],
+      "type": "object"
+     },
+     "reset": {
+      "type": "boolean"
+     },
+     "tag": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "action": {
+         "enum": [
+          "set",
+          "remove",
+          "clear"
+         ]
+        },
+        "kind": {
+         "enum": [
+          "worn",
+          "keep"
+         ]
+        },
+        "name": {
+         "type": "string"
+        },
+        "region": {
+         "additionalProperties": false,
+         "description": "{ kind: box, min, max } or { kind: sphere, center, radius }, in the frame the part is measured in now.",
+         "properties": {
+          "center": {
+           "items": {
+            "type": "number"
+           },
+           "maxItems": 3,
+           "minItems": 3,
+           "type": "array"
+          },
+          "kind": {
+           "enum": [
+            "box",
+            "sphere"
+           ]
+          },
+          "max": {
+           "items": {
+            "type": "number"
+           },
+           "maxItems": 3,
+           "minItems": 3,
+           "type": "array"
+          },
+          "min": {
+           "items": {
+            "type": "number"
+           },
+           "maxItems": 3,
+           "minItems": 3,
+           "type": "array"
+          },
+          "radius": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "kind"
+         ],
+         "type": "object"
+        }
+       },
+       "required": [],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "tolerance": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/wear.py",
+   "date": "2026-11-14"
+  },
+  "wear_diff": {
+   "group": "wear",
+   "description": "For each region tagged worn: how far the scan stands in from the reference (lost, the deepest, negative mm) and out (added), mean, RMS and points past the tolerance either way. scatter: the scan's own spread against the reference off the worn regions; scanNoise: the noise to plan with (scan_noise, scanner); floor: the least tolerance they support (twice the scatter or three times the noise, the larger); note when the tolerance is under it. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "names": {
+      "description": "Only these worn regions.",
+      "items": {
+       "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/wear.py",
+   "date": "2026-11-14"
+  },
+  "wear_rebuild": {
+   "group": "wear",
+   "description": "The scan with each worn region brought back onto the reference: every vertex there moved to it, fading out over blendMm outside the region, never inside a keep region, never where the reference is past maxMm — written as an STL (path, or <scan>-repaired.stl with your files), with the wear before and after. A dent comes back; a piece broken off does not. Changes nothing in the session.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "mode": {
+      "enum": [
+       "add",
+       "both"
+      ]
+     },
+     "names": {
+      "description": "Only these worn regions.",
+      "items": {
+       "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "path": {
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/wear.py",
+   "date": "2026-11-14"
+  },
+  "wear_prewarp": {
+   "group": "wear",
+   "description": "With the target open as the deviation reference (the CAD or a repaired part) and a scan of a print of it as the scan, aligned (deviation_align): the target moved back at every point by the error the print shows, smoothed over smooth neighbour rings (2) so scan scatter is not printed in, times gain (1) — an STL in the target's frame to print next. Each call is a run: rms is this print's error; stop says whether another is worth it (under the tolerance, under a fifth better than the last, or three runs). fresh: start the count again.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "fresh": {
+      "type": "boolean"
+     },
+     "gain": {
+      "maximum": 1.5,
+      "minimum": 0.2,
+      "type": "number"
+     },
+     "path": {
+      "type": "string"
+     },
+     "smooth": {
+      "maximum": 10,
+      "minimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/wear.py",
+   "date": "2026-11-14"
+  },
+  "catalog_part": {
+   "group": "catalog",
+   "description": "Standard parts offline (socket and button head screws, hex nuts, washers, deep-groove bearings; nominal dimensions, mm). designation: a part's sizes by name (\"M5 socket head\", \"608\", \"M8 washer\", \"M4\" for every M4 part, \"ISO 4762\"). dims (with kind optional): the sizes measured — d, dk, k, s for screws; d, s, m for nuts; d1, d2, h for washers; d, D, B for bearings — matched each as a share of its nominal; named when one fits within 5% and clearly better than the next. Nothing: the kinds and their dimensions.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "designation": {
+      "type": "string"
+     },
+     "dims": {
+      "additionalProperties": {
+       "exclusiveMinimum": 0,
+       "type": "number"
+      },
+      "type": "object"
+     },
+     "kind": {
+      "enum": [
+       "socket-head-screw",
+       "button-head-screw",
+       "hex-nut",
+       "washer",
+       "bearing"
+      ]
+     },
+     "limit": {
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/catalog.py",
+   "date": "2026-11-14"
+  },
+  "catalog_links": {
+   "group": "catalog",
+   "description": "Search pages for a part's CAD on the catalogues and model libraries (traceparts, mcmaster, misumi, printables, thangs, grabcad), each with what its terms allow for a downloaded model. For the person to open; changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "query": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "sources": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/catalog.py",
+   "date": "2026-11-14"
+  },
+  "catalog_provenance": {
+   "group": "catalog",
+   "description": "Where each file brought into the project came from, kept in provenance.json with your files: action list (the default) or record { file, source, page, licence, shareable }.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "action": {
+      "enum": [
+       "list",
+       "record"
+      ]
+     },
+     "record": {
+      "additionalProperties": false,
+      "properties": {
+       "file": {
+        "type": "string"
+       },
+       "licence": {
+        "type": "string"
+       },
+       "page": {
+        "type": "string"
+       },
+       "shareable": {
+        "type": "boolean"
+       },
+       "source": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "file",
+       "source"
+      ],
+      "type": "object"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/catalog.py",
+   "date": "2026-11-14"
+  },
+  "manual_plan": {
+   "group": "manual",
+   "description": "The assembly manual's plan, as data kept with the project: settings (title, explode — how far new parts are drawn out along their move, a share of their travel, 1 —, view, product, version, publisher, safety, intendedUse, disposal), style (name ste100 — the default: short sentences, one instruction each, the verb first —, plain, or custom with your own Markdown rules in custom: \"maxWords: 25\", \"passive: off\", \"- avoid -> use\"; words: the project's word list), parts ({ name, body, kind part|hardware, designation, source, qty }; fromBodies: true adds every body not yet a part), steps (the whole list) or step (add or replace by id; at: a position). A step: place [{ part, move: the direction it moves in to its place, travel mm (clear of itself by default) }], sub (build a sub-assembly apart; a later step places it by that name), tools, torque, warnings [{ level danger|warning|caution|notice, text }], text, view. export: a file path to write the plan; import: one to read. With nothing, reads it.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "export": {
+      "type": "string"
+     },
+     "fromBodies": {
+      "type": "boolean"
+     },
+     "import": {
+      "type": "string"
+     },
+     "parts": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "body": {
+         "type": "string"
+        },
+        "designation": {
+         "type": "string"
+        },
+        "kind": {
+         "enum": [
+          "part",
+          "hardware"
+         ]
+        },
+        "name": {
+         "type": "string"
+        },
+        "qty": {
+         "minimum": 1,
+         "type": "integer"
+        },
+        "source": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "removeParts": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "settings": {
+      "type": "object"
+     },
+     "step": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "at": {
+         "minimum": 1,
+         "type": "integer"
+        },
+        "id": {
+         "type": "string"
+        },
+        "notes": {
+         "type": "string"
+        },
+        "place": {
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "move": {
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           },
+           "part": {
+            "type": "string"
+           },
+           "travel": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+           }
+          },
+          "required": [
+           "part"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "sub": {
+         "type": "string"
+        },
+        "text": {
+         "type": "string"
+        },
+        "tools": {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        "torque": {
+         "type": "string"
+        },
+        "view": {
+         "type": "string"
+        },
+        "warnings": {
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "level": {
+            "enum": [
+             "danger",
+             "warning",
+             "caution",
+             "notice"
+            ]
+           },
+           "text": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "level",
+           "text"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        }
+       },
+       "required": [],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "steps": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "at": {
+         "minimum": 1,
+         "type": "integer"
+        },
+        "id": {
+         "type": "string"
+        },
+        "notes": {
+         "type": "string"
+        },
+        "place": {
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "move": {
+            "items": {
+             "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+           },
+           "part": {
+            "type": "string"
+           },
+           "travel": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+           }
+          },
+          "required": [
+           "part"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        },
+        "sub": {
+         "type": "string"
+        },
+        "text": {
+         "type": "string"
+        },
+        "tools": {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        "torque": {
+         "type": "string"
+        },
+        "view": {
+         "type": "string"
+        },
+        "warnings": {
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "level": {
+            "enum": [
+             "danger",
+             "warning",
+             "caution",
+             "notice"
+            ]
+           },
+           "text": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "level",
+           "text"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        }
+       },
+       "required": [],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "style": {
+      "additionalProperties": false,
+      "properties": {
+       "custom": {
+        "type": "string"
+       },
+       "name": {
+        "enum": [
+         "ste100",
+         "plain",
+         "custom"
+        ]
+       },
+       "words": {
+        "type": "object"
+       }
+      },
+      "required": [],
+      "type": "object"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/manual.py",
+   "date": "2026-11-14"
+  },
+  "manual_check": {
+   "group": "manual",
+   "description": "Check the manual: each part swept in along its move against the parts already there (in its sub-assembly, or the main one) — blockedShortBy mm where it runs into one, overlapsInPlace where it sits in another — and each step's words linted to the style (length, passive, one instruction, the verb first, the word list). A body over 5000 faces is named as not checked. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/manual.py",
+   "date": "2026-11-14"
+  },
+  "manual_render": {
+   "group": "manual",
+   "description": "Write the manual as one HTML page with its pictures inside (path, or <title>.html with your files): the parts list, then each step's picture — parts in place grey, the step's own in colour drawn out along their moves with arrows in —, its parts, tools, torque, safety messages and words. Answers the lint findings. Print it to PDF from a browser.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "height": {
+      "maximum": 2000,
+      "minimum": 200,
+      "type": "integer"
+     },
+     "path": {
+      "type": "string"
+     },
+     "width": {
+      "maximum": 2000,
+      "minimum": 200,
+      "type": "integer"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/manual.py",
+   "date": "2026-11-14",
+   "heavy": true
+  },
+  "pack_setup": {
+   "group": "pack",
+   "description": "The library pack: title, author (the copyright holder), summary, printSettings, licence (an id — CC-BY-4.0, CC-BY-SA-4.0, CC-BY-NC-4.0, CC-BY-NC-SA-4.0, CC-BY-ND-4.0, CC-BY-NC-ND-4.0, CC0-1.0, MIT, GPL-3.0-only, ARR — or as a page wrote it), includeStep, include3mf, renders (0–6), bodies (all by default), files to add (a sliced 3MF, photos, the manual's HTML), upstream (the parts taken from others: { part, body?, title, author, url, licence, source, redistribute, modified, permission }; catalog_provenance's records by default). With nothing, reads it.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "author": {
+      "type": "string"
+     },
+     "bodies": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "files": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "include3mf": {
+      "type": "boolean"
+     },
+     "includeStep": {
+      "type": "boolean"
+     },
+     "licence": {
+      "type": "string"
+     },
+     "printSettings": {
+      "type": "string"
+     },
+     "renders": {
+      "maximum": 6,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "summary": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "upstream": {
+      "items": {
+       "type": "object"
+      },
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/pack.py",
+   "date": "2026-11-14"
+  },
+  "pack_plan": {
+   "group": "pack",
+   "description": "Whether the pack can go out under its licence: each upstream part checked (credited, with what the pack must carry for it; blocked, with why; leftOut — parts from sources whose terms don't allow passing files on, linked in the README instead), and what is missing. A guide, not legal advice. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/pack.py",
+   "date": "2026-11-14"
+  },
+  "pack_write": {
+   "group": "pack",
+   "description": "Write the pack as a zip (path, or <title>.zip with your files): models/ (STL, 3MF, STEP of each body), images/ (renders), files/, README.md with attribution, LICENSE. Every file scrubbed first — absolute paths and the user name in them, access codes, keys, tokens, printer serials and addresses, e-mails, a STEP header's author, an STL header's text, picture metadata — and each kind of change reported. Refused while pack_plan says it can't go out.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/pack.py",
+   "date": "2026-11-14"
+  },
+  "fit_scan_setup": {
+   "group": "fit-scan",
+   "description": "Settings for reading a print against its CAD: up (which way of the CAD stood up on the bed: +z the default), band (mm off the surface a point still counts, 1), footBand (first-layer height, 0.2), footAbove (2.5), slicer (the key map: bambustudio, orcaslicer, prusaslicer, or your own), current ({ key: value } — the slicer values in use, which changes are added to), inner (wall ids of pockets: they take the hole offset), ignore (feature ids left out), keymap (add your own map, kept in fit-keymaps.json with your files), removeKeymap. With nothing, reads them.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "band": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "current": {
+      "type": "object"
+     },
+     "footAbove": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "footBand": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+     },
+     "ignore": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "inner": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "keymap": {
+      "type": "object"
+     },
+     "removeKeymap": {
+      "type": "string"
+     },
+     "slicer": {
+      "type": "string"
+     },
+     "up": {
+      "enum": [
+       "+z",
+       "-z",
+       "+x",
+       "-x",
+       "+y",
+       "-y"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/fitcomp.py",
+   "date": "2026-11-14"
+  },
+  "fit_scan_features": {
+   "group": "fit-scan",
+   "description": "The features of the reference the print is read on, in the build frame: flat walls, floors and tops square to an axis (ids like +X1, -Z2) and upright holes and bosses (H1, B1) with centre and radius. Needs the reference open and the scan aligned in deviation. Changes nothing.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {},
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/fitcomp.py",
+   "date": "2026-11-14"
+  },
+  "fit_scan_measure": {
+   "group": "fit-scan",
+   "description": "Read the scanned print against its CAD (deviation reference, aligned): each feature on the scan, then one weighted least-squares fit — scale X, Y, Z; contour offset (outer walls out, mm); hole offset (holes closed, mm); elephant foot — each with its error and whether this part separates it; χ²/dof (over 4: poor, the offsets are not to be used); corrections (what is worth changing); the slicer's new values from current; scanNoise and nearNoise against the noise to plan with. calibrate: true makes a good run the printer's fit calibration (holes and shafts, diametral) that every hole Agent Link sizes takes. Kept as a run.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "calibrate": {
+      "type": "boolean"
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/fitcomp.py",
+   "date": "2026-11-14"
+  },
+  "fit_scan_export": {
+   "group": "fit-scan",
+   "description": "The last good run as what: ini (the slicer's keys, one a line, for its key map — slicer to choose another), json, or stl (the reference pre-compensated: scaled by the inverse, walls moved back by the contour offset, holes opened by the hole offset, the first layer drawn in; print it with the slicer's compensations at zero). path, or with your files. Refused for a poor run.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "slicer": {
+      "type": "string"
+     },
+     "what": {
+      "enum": [
+       "ini",
+       "json",
+       "stl"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/fitcomp.py",
+   "date": "2026-11-14"
+  },
+  "element_to_document": {
+   "group": "scan-cad",
+   "description": "The measured elements into the FreeCAD document as analytic geometry, in a group (group, \"Scan elements\" by default): a plane as a face of its extent; a cylinder, cone, sphere or torus as a solid (style: solids, the default) or its surface (style: surfaces); a line or circle as an edge, a point as a vertex — as drawn, an assumed diameter taken over the fitted. elements: names or ids, all by default. export: a .step path to write them too. In the frame the scan is measured in now: align first to model in the part's own frame.",
+   "inputSchema": {
+    "additionalProperties": false,
+    "properties": {
+     "elements": {
+      "items": {
+       "type": [
+        "string",
+        "integer"
+       ]
+      },
+      "type": "array"
+     },
+     "export": {
+      "type": "string"
+     },
+     "group": {
+      "type": "string"
+     },
+     "style": {
+      "enum": [
+       "solids",
+       "surfaces"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/cad.py",
+   "date": "2026-11-14"
+  }
+ }
+}

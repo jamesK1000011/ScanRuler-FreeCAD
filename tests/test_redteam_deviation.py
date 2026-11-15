@@ -32,13 +32,13 @@ class Sess:
 def _tools(sess):
     out = {}
     for f in ("fam_deviation", "fam_align", "fam_scan", "fam_elements"):
-        for t in importlib.import_module("scanrulerfc." + f).tools(sess):
+        for t in importlib.import_module("scanrulerfc.agentlink." + f).tools(sess):
             out[t.name] = t.fn
     return out
 
 
 def _setup(scan_V, scan_F, ref_V, ref_F):
-    from scanrulerfc import fam_deviation as FD
+    from scanrulerfc.handlers import deviation as FD
     from scanrulerfc import scanstate as S
     from scanrulerfc.dev_surface import NominalSurface, signed_volume, weld
 
@@ -79,7 +79,7 @@ class DeviationState(unittest.TestCase):
     def test_scaling_the_scan_drops_the_alignment(self):
         s, T = _setup(_turned(self.V), self.F, self.V, self.F)
         T["deviation_align"]({"mode": "auto"})
-        from scanrulerfc import fam_deviation as FD
+        from scanrulerfc.handlers import deviation as FD
         from scanrulerfc import model as M
         from scanrulerfc import scanstate as S
 
@@ -112,7 +112,7 @@ class DeviationState(unittest.TestCase):
         # The red team ran a scan in inches through deviation_align: that is
         # now refused as a unit mix-up (above), so the share is checked on
         # the figures directly — 10 % of the points read, all in tolerance.
-        from scanrulerfc import fam_deviation as FD
+        from scanrulerfc.handlers import deviation as FD
 
         s, T = _setup(self.V, self.F, self.V, self.F)
         d = FD.dstate(s)

@@ -13,12 +13,10 @@ import datetime
 import json
 import os
 
-from agentlink.protocol import Tool, ToolError
+from .. import catalog_core as C
+from ..errors import ToolError
+from . import _bind
 
-from . import catalog_core as C
-
-GROUP = "catalog"
-INFO = "Parts catalog (ScanRuler, ported): name a screw, nut, washer or bearing from measured sizes; search pages for CAD; where each file came from."
 PROVENANCE = "provenance.json"
 
 
@@ -30,7 +28,9 @@ def _part(p):
     return {"designation": p["designation"], "kind": p["kind"], "standard": p["standard"], "dims": p["dims"]}
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def catalog_part(a):
         if a.get("designation"):
             hits = C.lookup(a["designation"])
@@ -86,20 +86,12 @@ def tools(session):
         return {"files": files, "path": _prov_path(),
                 "note": "Files whose licence does not let them be shared on stay out of anything you share (shareable: false)."}
 
-    return [
-        Tool("catalog_part",
-             "Standard parts offline (socket and button head screws, hex nuts, washers, deep-groove bearings; nominal dimensions, mm). designation: a part's sizes by name (\"M5 socket head\", \"608\", \"M8 washer\", \"M4\" for every M4 part, \"ISO 4762\"). "
-             "dims (with kind optional): the sizes measured — d, dk, k, s for screws; d, s, m for nuts; d1, d2, h for washers; d, D, B for bearings — matched each as a share of its nominal; named when one fits within 5% and clearly better than the next. Nothing: the kinds and their dimensions.",
-             obj({"designation": {"type": "string"}, "dims": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}},
-                  "kind": {"enum": C.KIND_IDS}, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}),
-             catalog_part),
-        Tool("catalog_links",
-             f"Search pages for a part's CAD on the catalogues and model libraries ({', '.join(s['id'] for s in C.SOURCES)}), each with what its terms allow for a downloaded model. For the person to open; changes nothing.",
-             obj({"query": {"type": "string", "minLength": 1}, "sources": {"type": "array", "items": {"type": "string"}}}, ["query"]),
-             catalog_links),
-        Tool("catalog_provenance",
-             "Where each file brought into the project came from, kept in provenance.json with your files: action list (the default) or record { file, source, page, licence, shareable }.",
-             obj({"action": {"enum": ["list", "record"]},
-                  "record": obj({"file": {"type": "string"}, "source": {"type": "string"}, "page": {"type": "string"}, "licence": {"type": "string"}, "shareable": {"type": "boolean"}}, ["file", "source"])}),
-             catalog_provenance),
-    ]
+    return {
+        "catalog_part": catalog_part,
+        "catalog_links": catalog_links,
+        "catalog_provenance": catalog_provenance,
+    }
+
+
+NAMES = ("catalog_part", "catalog_links", "catalog_provenance")
+HANDLERS = _bind.table(bind, NAMES)

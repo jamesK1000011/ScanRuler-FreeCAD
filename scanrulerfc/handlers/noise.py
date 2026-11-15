@@ -13,13 +13,11 @@
 import json
 import os
 
-from agentlink.protocol import Tool, ToolError
+from .. import noise_core as N
+from .. import scanstate as S
+from ..errors import ToolError
+from . import _bind
 
-from . import noise_core as N
-from . import scanstate as S
-
-GROUP = "scan-noise"
-INFO = "Scanner noise (ScanRuler, ported): this scan's noise, your scanners' usual noise, and the noise to plan with."
 FILE = "scanners.json"
 
 
@@ -80,7 +78,9 @@ def planned(session):
     return {"plan": N.answer(n)} if n else {"plan": None, "note": "Nothing to plan with: scan_noise reads this scan's, scanner use names one."}
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def scan_noise(a):
         scan = S.scan_of(session)
         g = scan.graph()
@@ -148,16 +148,11 @@ def tools(session):
             return {"imported": sorted(names), "scanners": len(merged)}
         raise ToolError("invalid_input", f"action {act!r}")
 
-    scanner_schema = obj({
-        "action": {"enum": ["list", "add", "remove", "use", "export", "import"]},
-        "scanner": obj({"name": {"type": "string", "minLength": 1}, "noiseMm": {"type": "number", "exclusiveMinimum": 0, "maximum": 5}, "spacingMm": {"type": "number", "exclusiveMinimum": 0}, "note": {"type": "string"}}, ["name", "noiseMm"]),
-        "use": {"type": "boolean"}, "name": {"type": "string"}, "measured": {"type": "boolean"}, "path": {"type": "string"},
-    }, ["action"])
-    return [
-        Tool("scan_noise",
-             "This scan's noise: the median scatter of small plane fits (sigmaMm, the figure the scan-to-CAD rule — nothing finer than about three times the noise — is written against), p90 and spacingMm (median edge). Kept with the scan as the measured noise. Returns plan, the noise to plan with: the larger of the named scanner's usual noise and this scan's, with finestMm and a warning when the scan reads 1.5× its scanner or more, or no scanner is named. A CAD tessellation is refused: it has no scan noise.",
-             obj({}), scan_noise),
-        Tool("scanner",
-             "Your scanners (name, noiseMm — one standard deviation of its usual noise —, spacingMm, note), kept in scanners.json with your files across projects. action: list; add { scanner, use? }; remove { name }; use { name } or { measured: true } for none (kept with the scan, by value); export { path? }; import { path } (merged by name). Returns plan, the noise to plan with, which thread and wear tools read.",
-             scanner_schema, scanner),
-    ]
+    return {
+        "scan_noise": scan_noise,
+        "scanner": scanner,
+    }
+
+
+NAMES = ("scan_noise", "scanner")
+HANDLERS = _bind.table(bind, NAMES)

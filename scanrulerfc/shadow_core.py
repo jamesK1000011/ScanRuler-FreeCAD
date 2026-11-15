@@ -11,7 +11,7 @@
 # (counter-clockwise, outside to the right), then simplified by a cell
 # (the raster's steps and the scan's noise out, the corners kept). A loop
 # lies within a cell's diagonal plus a cell of the true silhouette;
-# fam_sections offsets it outwards by the play, the tolerance and a cell
+# handlers/sections offsets it outwards by the play, the tolerance and a cell
 # with FreeCAD's exact 2D offset, so what is kept is never inside the part. Plain numpy, no FreeCAD.
 
 import math

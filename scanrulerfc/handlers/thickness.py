@@ -8,13 +8,13 @@
 import math
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import scanstate as S
-from .dev_hotspots import hotspots
-from .dev_map import vertex_normals
-from .dev_surface import NominalSurface
-from .wall_thickness import (
+from .. import scanstate as S
+from ..dev_hotspots import hotspots
+from ..dev_map import vertex_normals
+from ..dev_surface import NominalSurface
+from ..errors import ToolError
+from ..wall_thickness import (
     DEFAULT_CONE_ANGLE_DEG,
     DEFAULT_NORMAL_DEVIATION_DEG,
     compute_thickness,
@@ -23,9 +23,8 @@ from .wall_thickness import (
     thickness_report,
     thickness_stats,
 )
+from . import _bind
 
-GROUP = "thickness"
-INFO = "Wall thickness over the whole scan (ScanRuler, ported): rays through the scan's own surface, statistics and thin spots."
 KEY = "thickness"
 THIN_SPOTS = 8
 
@@ -119,7 +118,9 @@ def thin_spots(scan, values, limit):
     return {"count": int(under.sum()), "found": r["found"], "patches": out}
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def measure(a):
         scan = S.scan_of(session)
         t = tstate(session)
@@ -169,24 +170,11 @@ def tools(session):
             out["thinSpots"] = thin_spots(t["scan"], t["values"], t["limit"])
         return out
 
-    search = {
-        "method": {"type": "string", "enum": ["ray", "sphere"], "description": "ray: along the inward normal to the far wall (the shortest of a cone with coneRays). sphere: the largest sphere that fits at the point."},
-        "maxThickness": {"type": "number", "exclusiveMinimum": 0, "description": "The thickest wall searched for, mm."},
-        "coneRays": {"type": "integer", "minimum": 0, "maximum": 256},
-        "coneAngleDeg": {"type": "number", "minimum": 0, "maximum": 89},
-        "normalDeviationDeg": {"oneOf": [{"type": "number", "minimum": 0, "maximum": 180}, {"type": "null"}], "description": "How far the far wall may turn from facing back, degrees, or null for any."},
+    return {
+        "thickness_measure": measure,
+        "thickness_settings": settings,
     }
-    return [
-        Tool(
-            "thickness_measure",
-            "Measure the wall thickness at every point of the scan, with the search settings given or those in hand. Returns the statistics (min, max, mean, sigma, share under the thin-wall limit, points measured), the settings, the thin spots (points under the limit gathered into patches, thinnest first by how far under) and the plain-text report. Trap: thin readings along open rims are rays escaping, not thin walls.",
-            obj(search),
-            measure,
-        ),
-        Tool(
-            "thickness_settings",
-            "The search settings (method, maxThickness, coneRays, coneAngleDeg, normalDeviationDeg — they take effect at the next thickness_measure) and the reading: low and high, the ends of the colour scale, mm; bands; limit, the thin-wall limit the statistics count under, mm. Returns the thickness state.",
-            obj({**search, "low": {"type": "number", "minimum": 0}, "high": {"type": "number", "exclusiveMinimum": 0}, "bands": {"oneOf": [{"type": "integer", "minimum": 2}, {"type": "null"}]}, "limit": {"type": "number", "exclusiveMinimum": 0}}),
-            settings,
-        ),
-    ]
+
+
+NAMES = ("thickness_measure", "thickness_settings")
+HANDLERS = _bind.table(bind, NAMES)

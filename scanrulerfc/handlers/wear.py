@@ -11,16 +11,14 @@
 import os
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import fam_deviation as D
-from . import fam_noise
-from . import noise_core as N
-from . import scanstate as S
-from . import wear_core as W
+from .. import noise_core as N
+from .. import scanstate as S
+from .. import wear_core as W
+from ..errors import ToolError
+from . import _bind, noise
+from . import deviation as D
 
-GROUP = "wear"
-INFO = "Wear repair (ScanRuler, ported): tag worn and kept regions, read the wear against the mirrored other half or the aligned reference, rebuild it, and pre-warp a model from a print of it."
 DEFAULTS = {"tolerance": 0.05, "blendMm": 1.0, "maxMm": 2.0, "mode": "add"}
 AXES = {"x": [1.0, 0, 0], "y": [0, 1.0, 0], "z": [0, 0, 1.0]}
 
@@ -60,7 +58,7 @@ def reference_surface(session, w, scan):
 
 
 def _noise(session):
-    n = fam_noise.plan_now(session)
+    n = noise.plan_now(session)
     return n, (N.answer(n) if n else None)
 
 
@@ -68,7 +66,9 @@ def _stem(name):
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in os.path.splitext(name or "part")[0])
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def wear_setup(a):
         w = wstate(session)
         s = w["settings"]
@@ -174,37 +174,13 @@ def tools(session):
                 "stop": verdict["stop"], "why": verdict["why"],
                 "note": "In the target's own frame, to print next. Starting the print is the person's call."}
 
-    v3 = {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}
-    region = {"type": "object", "description": "{ kind: box, min, max } or { kind: sphere, center, radius }, in the frame the part is measured in now.",
-              "properties": {"kind": {"enum": ["box", "sphere"]}, "min": v3, "max": v3, "center": v3, "radius": {"type": "number"}}, "required": ["kind"], "additionalProperties": False}
-    names = {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "Only these worn regions."}
-    return [
-        Tool("wear_setup",
-             "Settings, tags and the reference for wear repair, in one call; with nothing, reads them. tolerance: what counts as worn, and the pre-warp's target, mm (0.05). "
-             "blendMm: how far outside a worn region a repair fades out (1). maxMm: how far the reference may be and still be the same surface (2). mode: add (only lost "
-             "material comes back, the default) or both (what stands proud is trimmed too). tag: [{ action: set|remove|clear, name, kind: worn|keep, region }] — keep "
-             "is never moved (a fit face, a datum, a feature meant to differ from the other half). reference: { source: mirror, plane: x|y|z } (the part's own other half "
-             "across its symmetry plane through the origin — align_symmetry first) or { source: mirror, point, normal }, or { source: deviation } (the reference part, aligned).",
-             obj({"tolerance": {"type": "number", "exclusiveMinimum": 0}, "blendMm": {"type": "number", "minimum": 0}, "maxMm": {"type": "number", "exclusiveMinimum": 0},
-                  "mode": {"enum": ["add", "both"]}, "reset": {"type": "boolean"},
-                  "tag": {"type": "array", "items": obj({"action": {"enum": ["set", "remove", "clear"]}, "name": {"type": "string"}, "kind": {"enum": ["worn", "keep"]}, "region": region})},
-                  "reference": obj({"source": {"enum": ["mirror", "deviation"]}, "plane": {"enum": ["x", "y", "z"]}, "point": v3, "normal": v3}, ["source"])}),
-             wear_setup),
-        Tool("wear_diff",
-             "For each region tagged worn: how far the scan stands in from the reference (lost, the deepest, negative mm) and out (added), mean, RMS and points past the "
-             "tolerance either way. scatter: the scan's own spread against the reference off the worn regions; scanNoise: the noise to plan with (scan_noise, scanner); "
-             "floor: the least tolerance they support (twice the scatter or three times the noise, the larger); note when the tolerance is under it. Changes nothing.",
-             obj({"names": names}), wear_diff),
-        Tool("wear_rebuild",
-             "The scan with each worn region brought back onto the reference: every vertex there moved to it, fading out over blendMm outside the region, never inside a "
-             "keep region, never where the reference is past maxMm — written as an STL (path, or <scan>-repaired.stl with your files), with the wear before and after. "
-             "A dent comes back; a piece broken off does not. Changes nothing in the session.",
-             obj({"names": names, "mode": {"enum": ["add", "both"]}, "path": {"type": "string"}}), wear_rebuild),
-        Tool("wear_prewarp",
-             "With the target open as the deviation reference (the CAD or a repaired part) and a scan of a print of it as the scan, aligned (deviation_align): the target "
-             "moved back at every point by the error the print shows, smoothed over smooth neighbour rings (2) so scan scatter is not printed in, times gain (1) — an STL in "
-             "the target's frame to print next. Each call is a run: rms is this print's error; stop says whether another is worth it (under the tolerance, under a fifth "
-             "better than the last, or three runs). fresh: start the count again.",
-             obj({"gain": {"type": "number", "minimum": 0.2, "maximum": 1.5}, "smooth": {"type": "number", "minimum": 0, "maximum": 10}, "fresh": {"type": "boolean"}, "path": {"type": "string"}}),
-             wear_prewarp),
-    ]
+    return {
+        "wear_setup": wear_setup,
+        "wear_diff": wear_diff,
+        "wear_rebuild": wear_rebuild,
+        "wear_prewarp": wear_prewarp,
+    }
+
+
+NAMES = ("wear_setup", "wear_diff", "wear_rebuild", "wear_prewarp")
+HANDLERS = _bind.table(bind, NAMES)

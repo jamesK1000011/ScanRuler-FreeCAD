@@ -3,7 +3,9 @@
 # scan and the reference part as layers, and the scan's maps — deviation
 # from the reference (ScanRuler's colour map, ±range, grey past the max
 # distance) and wall thickness (red thin, as ScanRuler shows it). So the
-# agent sees what the numbers say, as ScanRuler's user does.
+# agent sees what the numbers say, as ScanRuler's user does. Agent Link's
+# family layer (agentlink_families) registers them; nothing here imports
+# Agent Link.
 
 import numpy as np
 
@@ -29,7 +31,7 @@ def reference_layer(session, a):
     # Drawn only when asked for: it lies on the scan once aligned.
     if "reference" not in (a.get("layers") or []):
         return []
-    from .fam_deviation import dstate
+    from .handlers.deviation import dstate
 
     ref = dstate(session)["reference"]
     if ref is None:
@@ -38,9 +40,8 @@ def reference_layer(session, a):
 
 
 def deviation_map(session, a):
-    from agentlink.protocol import ToolError
-
-    from .fam_deviation import dstate, map_values
+    from .errors import ToolError
+    from .handlers.deviation import dstate, map_values
 
     sc = _scan(session)
     if sc is None:
@@ -62,7 +63,7 @@ def deviation_map(session, a):
 
 
 def deviation_reference_map(session, a):
-    from .fam_deviation import dstate, reference_reading
+    from .handlers.deviation import dstate, reference_reading
 
     d = dstate(session)
     got = reference_reading(session)
@@ -77,9 +78,8 @@ def deviation_reference_map(session, a):
 
 
 def thickness_map(session, a):
-    from agentlink.protocol import ToolError
-
-    from .fam_thickness import tstate
+    from .errors import ToolError
+    from .handlers.thickness import tstate
 
     sc = _scan(session)
     if sc is None:
@@ -91,21 +91,3 @@ def thickness_map(session, a):
             "range": [float(t["low"]), float(t["high"])], "label": "THICKNESS",
             "note": f"The scan's wall at each vertex ({t['method']}): red thin; grey unread. Limit {t['limit']:g} mm."}
 
-
-def register():
-    try:
-        from agentlink import render
-    except ImportError:  # an Agent Link without pictures
-        return
-    # An older Agent Link may have pictures but not these hooks: register
-    # what it takes and leave the rest.
-    layer = getattr(render, "register_layer", None)
-    add_map = getattr(render, "register_map", None)
-    if layer is not None:
-        layer("scan", scan_layer, "The open scan (grey).")
-        layer("reference", reference_layer, "The deviation reference part (blue) — drawn when asked for by name, as it lies on the scan.")
-    if add_map is None:
-        return
-    add_map("deviation", deviation_map, "The scan's deviation from the reference (ScanRuler), ±range: positive (red) excess material, negative (blue) material missing.")
-    add_map("deviation-reference", deviation_reference_map, "The deviation read on the reference (ScanRuler's map on the reference), signed as the scan's map — positive (red) excess material, negative (blue) material missing — and what was not scanned (grey).")
-    add_map("thickness", thickness_map, "The scan's wall thickness (ScanRuler), red thin.")

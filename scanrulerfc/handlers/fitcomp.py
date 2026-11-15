@@ -17,18 +17,16 @@ import json
 import os
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import fam_deviation as D
-from . import fam_noise
-from . import fitcomp_core as FC
-from . import scanstate as S
-from . import wear_core as W
+from .. import fitcomp_core as FC
+from .. import scanstate as S
+from .. import wear_core as W
+from ..errors import ToolError
+from . import _bind, noise
+from . import deviation as D
 
-GROUP = "fit-scan"
-INFO = "Print fit from a scan (ScanRuler, ported): scale, contour and hole offsets and elephant foot read off a scanned print; slicer changes; a compensated model."
 POOR = 4.0
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scanrulerfc/, beside data/
 DEFAULTS = {"up": "+z", "band": 1.0, "footBand": 0.2, "footAbove": 2.5, "slicer": "bambustudio", "current": {}, "inner": [], "ignore": []}
 
 
@@ -49,7 +47,9 @@ def builtin_keymaps():
     return out
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def own_path():
         return os.path.join(session.out_dir, "fit-keymaps.json")
 
@@ -136,7 +136,7 @@ def tools(session):
             raise ToolError("failed", f"No feature had enough scan points within {s['band']} mm: is the scan aligned to the reference, and the right one? (missed: {', '.join(rd['missed'])})")
         sol = FC.solve(rd, set(s["inner"]))
         cs = FC.corrections(sol)
-        plan = fam_noise.plan_now(session)
+        plan = noise.plan_now(session)
         poor = sol["fit"] > POOR
         j = FC.judge_noise(cs, rd["noise"], plan)
         run = {"n": len(fs["runs"]) + 1, "at": datetime.datetime.now().isoformat(timespec="seconds"), "up": s["up"], "scan": scan.name,
@@ -212,31 +212,13 @@ def tools(session):
                     "note": "In the reference's own frame; print it with the slicer's compensations at zero, or the error is undone twice."}
         raise ToolError("invalid_input", "what: ini, json or stl.")
 
-    return [
-        Tool("fit_scan_setup",
-             "Settings for reading a print against its CAD: up (which way of the CAD stood up on the bed: +z the default), band (mm off the surface a point still counts, 1), "
-             "footBand (first-layer height, 0.2), footAbove (2.5), slicer (the key map: bambustudio, orcaslicer, prusaslicer, or your own), current ({ key: value } — the "
-             "slicer values in use, which changes are added to), inner (wall ids of pockets: they take the hole offset), ignore (feature ids left out), keymap (add your own "
-             "map, kept in fit-keymaps.json with your files), removeKeymap. With nothing, reads them.",
-             obj({"up": {"enum": FC.UPS}, "band": {"type": "number", "exclusiveMinimum": 0}, "footBand": {"type": "number", "exclusiveMinimum": 0},
-                  "footAbove": {"type": "number", "exclusiveMinimum": 0}, "slicer": {"type": "string"}, "current": {"type": "object"},
-                  "inner": {"type": "array", "items": {"type": "string"}}, "ignore": {"type": "array", "items": {"type": "string"}},
-                  "keymap": {"type": "object"}, "removeKeymap": {"type": "string"}}),
-             fit_scan_setup),
-        Tool("fit_scan_features",
-             "The features of the reference the print is read on, in the build frame: flat walls, floors and tops square to an axis (ids like +X1, -Z2) and upright holes and "
-             "bosses (H1, B1) with centre and radius. Needs the reference open and the scan aligned in deviation. Changes nothing.",
-             obj({}), fit_scan_features),
-        Tool("fit_scan_measure",
-             "Read the scanned print against its CAD (deviation reference, aligned): each feature on the scan, then one weighted least-squares fit — scale X, Y, Z; contour "
-             "offset (outer walls out, mm); hole offset (holes closed, mm); elephant foot — each with its error and whether this part separates it; χ²/dof (over 4: poor, "
-             "the offsets are not to be used); corrections (what is worth changing); the slicer's new values from current; scanNoise and nearNoise against the noise to plan "
-             "with. calibrate: true makes a good run the printer's fit calibration (holes and shafts, diametral) that every hole Agent Link sizes takes. Kept as a run.",
-             obj({"calibrate": {"type": "boolean"}}), fit_scan_measure),
-        Tool("fit_scan_export",
-             "The last good run as what: ini (the slicer's keys, one a line, for its key map — slicer to choose another), json, or stl (the reference pre-compensated: scaled "
-             "by the inverse, walls moved back by the contour offset, holes opened by the hole offset, the first layer drawn in; print it with the slicer's compensations at "
-             "zero). path, or with your files. Refused for a poor run.",
-             obj({"what": {"enum": ["ini", "json", "stl"]}, "slicer": {"type": "string"}, "path": {"type": "string"}}),
-             fit_scan_export),
-    ]
+    return {
+        "fit_scan_setup": fit_scan_setup,
+        "fit_scan_features": fit_scan_features,
+        "fit_scan_measure": fit_scan_measure,
+        "fit_scan_export": fit_scan_export,
+    }
+
+
+NAMES = ("fit_scan_setup", "fit_scan_features", "fit_scan_measure", "fit_scan_export")
+HANDLERS = _bind.table(bind, NAMES)

@@ -16,15 +16,12 @@ import os
 
 import numpy as np
 
-from agentlink.protocol import Tool, ToolError
-
-from . import mesh_core as M
-from . import scanstate as S
-from . import section_core as SC
-from .fam_sections import cut_section, element_cut_axis, element_named
-
-GROUP = "meshtools"
-INFO = "Mesh Tools (ScanRuler's plugin, ported): inspect, clean, cut, mirror, fill, smooth, offset, reduce and export the scan — edits on a copy until mesh_use_edited."
+from .. import mesh_core as M
+from .. import scanstate as S
+from .. import section_core as SC
+from ..errors import ToolError
+from . import _bind
+from .sections import cut_section, element_cut_axis, element_named
 
 LIST = 40
 DEFAULT_TRIANGLE_LIMIT = 50_000
@@ -125,7 +122,9 @@ def region_vertices(session, region):
     return vs
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def edit(label, job):
         V, F, _ = working(session)
         try:
@@ -354,38 +353,26 @@ def tools(session):
     def surface_distances(P, V, F):
         return point_mesh_distances(P, V, F)
 
-    region = {"oneOf": [{"type": "string", "enum": ["marked"]}, {"type": "object", "description": "Exactly one of box { min, max }, sphere { center, radius } or vertices [..], narrowed with facing [x, y, z] and angleDeg (30 to start)."}]}
-    plane = {"oneOf": [{"type": "string", "minLength": 1}, {"type": "integer", "minimum": 1}], "description": "A coordinate plane — \"XY\", \"YZ\" or \"XZ\" — or an element with a direction, by id or name."}
-    keep = {"type": "string", "enum": ["plus", "minus"], "description": "plus: the side the plane's direction points to (above XY, +X of YZ, +Y of XZ, along an element's direction); minus the other."}
-    size = {"type": "number", "exclusiveMinimum": 0}
-    return [
-        Tool("mesh_parts", "The scan, the edited copy and its edits, the reduced mesh, and the step mesh_undo would take back. Changes nothing.", obj({}), mesh_parts),
-        Tool("mesh_inspect", "What the tools would find on the mesh worked on — the edited copy, or the scan while there is none: vertices, triangles, bounds; open edges and edges more than two triangles share; the volume it encloses when closed, mm³; its pieces and the islands smaller than pieceSize across (the middle of each); its rims and the holes smaller than holeSize across (the middle of each, for mesh_fill_holes { at }). Sizes default to a hundredth and a twentieth of the part. Changes nothing.",
-             obj({"pieceSize": size, "holeSize": size}), mesh_inspect),
-        Tool("mesh_remove_islands", "Delete every connected piece smaller across than size (its bounding box) — specks, a patch of turntable; every larger piece stays. size defaults to a hundredth of the part. Edits the copy.", obj({"size": size}), mesh_remove_islands),
-        Tool("mesh_delete_marked", "Delete the surface a region holds (a triangle goes when all three corners are in it); the hole it leaves stays open. Edits the copy.", obj({"region": region}, ["region"]), mesh_delete_marked),
-        Tool("mesh_flip_normals", "Turn triangles over — every one, or with region those with all three corners in it. A closed mesh flipped whole encloses a negative volume. Edits the copy.", obj({"region": region}), mesh_flip_normals),
-        Tool("mesh_cut", "Cut the mesh with a plane and take one side off; cap (on to start) closes the part flat wherever the plane goes all the way round, bridging short gaps of a hole right at the cut. Edits the copy.",
-             obj({"plane": plane, "offset": {"type": "number", "description": "mm: a coordinate plane's coordinate, or along an element's direction."}, "keep": keep, "cap": {"type": "boolean"}}, ["plane", "offset", "keep"]), mesh_cut),
-        Tool("mesh_cut_preview", "What mesh_cut at this plane would do, without cutting: whether it cuts, faces it would close, gaps bridged, stretches left open. Changes nothing.", obj({"plane": plane, "offset": {"type": "number"}, "keep": keep}, ["plane", "offset"]), mesh_cut_preview),
-        Tool("mesh_mirror", "Reflect the mesh across a plane. mode whole (to start) reflects all of it; symmetric keeps the side keep names (plus to start) and reflects it onto the other, which it replaces — joined along the plane, a closed part stays closed. offset left out: through the middle of the part. Edits the copy.",
-             obj({"plane": plane, "offset": {"type": "number"}, "mode": {"type": "string", "enum": ["whole", "symmetric"]}, "keep": keep}, ["plane"]), mesh_mirror),
-        Tool("mesh_fill_holes", "Close the holes smaller across than size (a twentieth of the part to start) — or, with at, only the one whose middle is nearest that point. Each patch is triangulated to bend least (Liepa), refined to the density round it and faired: curved continues the surface's bending, flat lays the tightest patch. The scan's own vertices do not move. Edits the copy; the answer's mesh says whether it is now closed.",
-             obj({"size": size, "patch": {"type": "string", "enum": ["curved", "flat"]}, "at": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}}), mesh_fill_holes),
-        Tool("mesh_smooth", "Smooth a scan's scatter out: each point moved along its normal onto a quadric fitted to the scan round it over a patch size across — bumps smaller than size go, the shape larger stays. No point moves further than limit. keepEdges (on) fits each side of an edge sharper than 30° alone and leaves the edge as scanned. With region only that surface moves, fading to its edge. Edits the copy.",
-             obj({"size": size, "limit": size, "keepEdges": {"type": "boolean"}, "region": region}), mesh_smooth),
-        Tool("mesh_offset", "Move the surface along its normal by distance: expand (the part grows) or shrink — not a scale; faces end the distance from where they were and edges stay sharp. Edits the copy.",
-             obj({"direction": {"type": "string", "enum": ["expand", "shrink"]}, "distance": size, "region": region}, ["direction", "distance"]), mesh_offset),
-        Tool("mesh_reduce", "Reduce the mesh worked on to a light one for CAD within tolerance of it, never more than maxTriangles (50,000) — FreeCAD's quadric decimation, measured both ways (p999, max, rms; held when both 99.9 % lie within). A preview beside the scan: mesh_export { part: \"reduced\" } writes it, mesh_apply_reduced makes it the edited copy.",
-             obj({"tolerance": size, "maxTriangles": {"type": "integer", "minimum": 4}}), mesh_reduce),
-        Tool("mesh_apply_reduced", "Make the reduced mesh the edited copy.", obj({}), mesh_apply_reduced),
-        Tool("mesh_discard", "Throw the reduced mesh away (what: \"reduced\"); nothing is applied.", obj({"what": {"type": "string", "enum": ["reduced", "wrap"]}}, ["what"]), mesh_discard),
-        Tool("mesh_use_edited", "Take the edited copy into use: it becomes the scan every tool measures, the sections cut again on it. mesh_undo goes back to the scan before.", obj({}), mesh_use_edited),
-        Tool("mesh_discard_edited", "Throw the edited copy and its edits away: the tools work on the scan in use again. mesh_undo brings them back.", obj({}), mesh_discard_edited),
-        Tool("mesh_undo", "Take the last mesh edit back (an edit, use_edited, discard_edited or apply_reduced) — the arrays before it are kept.", obj({}), mesh_undo),
-        Tool("mesh_export", "Write the edited copy or the reduced mesh as a binary STL in millimetres (or format 3mf) to path (the session's folder by default), or to: \"document\" as a mesh object in the document. Returns the file or the object.",
-             obj({"part": {"type": "string", "enum": ["edited", "reduced", "piece"]}, "to": {"type": "string", "enum": ["file", "document"]}, "format": {"type": "string", "enum": ["stl", "3mf"]}, "path": {"type": "string", "minLength": 1}}, ["part"]), mesh_export),
-    ]
+    return {
+        "mesh_parts": mesh_parts,
+        "mesh_inspect": mesh_inspect,
+        "mesh_remove_islands": mesh_remove_islands,
+        "mesh_delete_marked": mesh_delete_marked,
+        "mesh_flip_normals": mesh_flip_normals,
+        "mesh_cut": mesh_cut,
+        "mesh_cut_preview": mesh_cut_preview,
+        "mesh_mirror": mesh_mirror,
+        "mesh_fill_holes": mesh_fill_holes,
+        "mesh_smooth": mesh_smooth,
+        "mesh_offset": mesh_offset,
+        "mesh_reduce": mesh_reduce,
+        "mesh_apply_reduced": mesh_apply_reduced,
+        "mesh_discard": mesh_discard,
+        "mesh_use_edited": mesh_use_edited,
+        "mesh_discard_edited": mesh_discard_edited,
+        "mesh_undo": mesh_undo,
+        "mesh_export": mesh_export,
+    }
 
 
 def point_mesh_distances(P, V, F, sample=4000):
@@ -448,3 +435,7 @@ def _point_triangles(p, T):
     inside = (va >= 0) & (vb >= 0) & (vc >= 0) & (den > 0)
     cands = [np.where(inside[:, None], Q, A), seg(A, B), seg(B, C), seg(C, A)]
     return np.min([np.linalg.norm(c - p, axis=1) for c in cands], axis=0)
+
+
+NAMES = ("mesh_parts", "mesh_inspect", "mesh_remove_islands", "mesh_delete_marked", "mesh_flip_normals", "mesh_cut", "mesh_cut_preview", "mesh_mirror", "mesh_fill_holes", "mesh_smooth", "mesh_offset", "mesh_reduce", "mesh_apply_reduced", "mesh_discard", "mesh_use_edited", "mesh_discard_edited", "mesh_undo", "mesh_export")
+HANDLERS = _bind.table(bind, NAMES)

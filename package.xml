@@ -7,8 +7,7 @@
   <maintainer email="jamesK1000011@users.noreply.github.com">jamesK1000011</maintainer>
   <license file="LICENSE">AGPL-3.0-only</license>
   <url type="repository" branch="main">https://github.com/jamesK1000011/ScanRuler-FreeCAD</url>
-  <freecadmin>1.0.0</freecadmin>
-  <depend>Agent Link</depend>
+  <freecadmin>1.1.0</freecadmin>
   <tag>3D scanning</tag>
   <tag>metrology</tag>
   <tag>reverse engineering</tag>

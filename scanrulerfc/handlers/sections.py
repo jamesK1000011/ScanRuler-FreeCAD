@@ -14,20 +14,14 @@ import math
 
 import numpy as np
 
-from agentlink.protocol import Tool, ToolError
-
-from . import scanstate as S
-from . import section_core as SC
-from .geom2d import FitError
-from .chainsegment import arcs_of_chain, place_segments, profile_curves, segment_chain
-
-GROUP = "sections"
-INFO = "Sections of the scan (ScanRuler, ported): cut it with a plane, read the polylines, fit lines and arcs, write the profile as a sketch."
-# A long job: Agent Link queues and times it (hooks.md, HEAVY).
-HEAVY = {"section_fit"}
+from .. import scanstate as S
+from .. import section_core as SC
+from ..chainsegment import arcs_of_chain, place_segments, profile_curves, segment_chain
+from ..errors import ToolError
+from ..geom2d import FitError
+from . import _bind
 
 GET_LIMIT = 4000
-GET_MAX = 50000
 FIT_MAX_CHAINS = 12
 R4 = 4
 
@@ -222,7 +216,7 @@ def shadow_section(scan, frame, tolerance, play):
     import FreeCAD
     import Part
 
-    from . import shadow_core as SH
+    from .. import shadow_core as SH
 
     if not tolerance > 0:
         raise ToolError("invalid_input", "tolerance: mm, over 0 (0.1 by default).")
@@ -366,7 +360,9 @@ def brief(p):
 
 # ---- the tools ---------------------------------------------------------------------------
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def section_cut(a):
         scan = S.scan_of(session)
         kind = a.get("kind", "cut")
@@ -523,31 +519,15 @@ def tools(session):
             pass
         return {"sketch": sk.Label, "body": body.Label, "section": sec["id"], "frame": {"origin": v4(f["origin"]), "xAxis": v4(f["basisU"]), "yAxis": v4(f["basisV"]), "normal": v4(f["normal"])}, "fitted": fitted, "wires": wires, "next": "pd_pad { body, sketch, length } stands it up.", **said}
 
-    section_ref = {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "minLength": 1}], "description": "The section, by id or name."}
-    across = {"oneOf": [
-        {"type": "integer", "minimum": 1, "description": "An element's id."},
-        {"type": "string", "minLength": 1, "description": "An element's name, or \"XY\", \"YZ\", \"XZ\"."},
-        {"type": "object", "description": "{ axis, angleDeg }: a plane through an axis (\"X\", \"Y\", \"Z\" or an element); or { origin, normal }: a plane given outright."},
-    ]}
-    filters = {
-        "chains": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1, "description": "Which chains, whatever the filters say."},
-        "detail": {"type": "number", "minimum": 0, "maximum": 1, "description": "0 to 1; 0.5 by default."},
-        "tolerance": {"type": "number", "exclusiveMinimum": 0, "description": "mm"},
-        "arcs": {"type": "integer", "minimum": 1, "maximum": 8, "description": "Each chain as this many arcs end to end."},
-        "minLength": {"type": "number", "minimum": 0},
-        "maxLength": {"type": "number", "exclusiveMinimum": 0},
-        "closedOnly": {"type": "boolean"},
-        "maxChains": {"type": "integer", "minimum": 1},
+    return {
+        "section_cut": section_cut,
+        "section_get": section_get,
+        "section_list": section_list,
+        "section_remove": section_remove,
+        "section_fit": section_fit,
+        "section_to_sketch": section_to_sketch,
     }
-    return [
-        Tool("section_cut", "Cut the scan with a plane and keep the cut as a section, put on the 2D sheet. across: an element with a direction (plane, cylinder, cone, line, circle) by id or name; \"XY\", \"YZ\" or \"XZ\" through the part's centre; { axis, angleDeg }, a plane through an axis turned angleDeg about it — a half section of a turned part; or { origin, normal }. offset slides the plane along its normal, mm (a coordinate plane: the coordinate itself). kind \"shadow\": not a cut but the whole scan seen along the plane's normal, its outer boundary — holes filled, never inside the part, play mm more round it (negative: a press fit) to tolerance mm (0.1) — the outline for a foam cutout, a bin insert or a holder; then section_to_sketch. Returns the section: its plane and chain count.",
-             obj({"across": across, "offset": {"type": "number"}, "name": {"type": "string", "minLength": 1}, "kind": {"type": "string", "enum": ["cut", "shadow"]}, "play": {"type": "number"}, "tolerance": {"type": "number", "exclusiveMinimum": 0}}, ["across"]), section_cut),
-        Tool("section_get", "A section's cut as polylines: each chain's points in order — [u, v] mm on the sheet, or with space \"world\" or \"both\" [x, y, z] — with the plane (origin, normal, basisU, basisV) and per chain closed, length, points, bounds. At most limit points over all chains (4000 by default, 50000 at most); past it every k-th point is kept and step says k. Changes nothing.",
-             obj({"section": section_ref, "chains": filters["chains"], "space": {"type": "string", "enum": ["sheet", "world", "both"]}, "limit": {"type": "integer", "minimum": 2, "maximum": GET_MAX}}, ["section"]), section_get),
-        Tool("section_list", "The sections kept: id, name, plane, chains. Changes nothing.", obj({}), section_list),
-        Tool("section_remove", "Take a section away.", obj({"section": section_ref}, ["section"]), section_remove),
-        Tool("section_fit", "A section's chains cut into the lines and arcs they are, without making a sketch: per chain its pieces in order — a line by its ends, length, angleDeg (from +u) and leanDeg, an arc by centre, radius, start and sweep (radians CCW from +u) — each with its residual and in world [x, y, z]. [u, v] are the section's sheet, from the part's centre; a sketch on the section counts from the world origin's foot: its [u, v] is the sheet's plus sketch.add. Without chains the longest are fitted (maxChains 12); arcs: n fits each chain as n arcs; brief: true gives each piece short. Changes nothing.",
-             obj({"section": section_ref, **filters, "brief": {"type": "boolean"}}, ["section"]), section_fit),
-        Tool("section_to_sketch", "The profile road's last step: a section's chains fitted into lines and arcs (as section_fit) and written as a FreeCAD Sketcher sketch in a PartDesign body (body by label, or a new one), lying on the section's plane — its frame the sketch rule's (zero at the world origin's foot, x along the coordinate axis next round). Neighbouring pieces meet at their carriers' crossing, joined coincident; closed chains only unless closedOnly: false or chains. Then pd_pad { body, sketch, length }.",
-             obj({"section": section_ref, **filters, "body": {"type": "string", "minLength": 1}, "name": {"type": "string", "minLength": 1}}, ["section"]), section_to_sketch, changes=True),
-    ]
+
+
+NAMES = ("section_cut", "section_get", "section_list", "section_remove", "section_fit", "section_to_sketch")
+HANDLERS = _bind.table(bind, NAMES)

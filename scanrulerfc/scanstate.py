@@ -143,7 +143,7 @@ def state(session):
 
 
 def scan_of(session):
-    from agentlink.protocol import ToolError
+    from .errors import ToolError
 
     s = state(session)["scan"]
     if s is None:
@@ -152,32 +152,25 @@ def scan_of(session):
 
 
 def more_formats():
-    """Agent Link's readers for glTF/GLB, Collada, VRML and 3DS, where this
-    Agent Link has them."""
-    try:
-        from agentlink import meshformats
+    """Agent Link's readers for glTF/GLB, Collada, VRML and 3DS, where
+    Agent Link has lent them (meshio.EXTRA)."""
+    from . import meshio
 
-        return meshformats
-    except ImportError:
-        return None
+    return meshio.extra()
 
 
 def load(path, units="mm", given=True):
     """A scan from STL, PLY, OBJ, OFF or 3MF through FreeCAD's Mesh module,
     scaled to millimetres; glTF/GLB, Collada, VRML and 3DS through Agent
     Link's readers, in the units their format says unless given."""
-    import Mesh
+    from . import meshio
 
     if units not in UNITS:
         raise ValueError(f"units: one of {', '.join(UNITS)}.")
-    mf = more_formats()
-    if mf and os.path.splitext(path)[1].lower().lstrip(".") in mf.FORMATS:
-        V, F, _info = mf.read(path, units if given else None)
+    if meshio.extra_reads(path):
+        V, F, _info = meshio.extra().read(path, units if given else None)
         return Scan(os.path.basename(path), V, F, units if given else "mm", path)
-    m = Mesh.Mesh(path)
-    pts, tris = m.Topology
-    V = points_array(pts) * UNITS[units]
-    F = np.array(tris, dtype=np.int64)
+    V, F = meshio.read(path, UNITS[units])
     if len(F) == 0:
         raise ValueError(f"{os.path.basename(path)}: no triangles read.")
     return Scan(os.path.basename(path), V, F, units, path)
