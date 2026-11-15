@@ -95,10 +95,15 @@ def make_class(Gui):
                 self.appendMenu(path, cmds)
 
         def Activated(self):
+            from . import layout
+
             C.plain_menu_roles()
             _bottom_view_bar(Gui)
-            _own_panel(Gui)
-            C.switch_workspace(C.current_workspace())
+            # Opening the panel changes nothing: the window's "*" stays as
+            # it was (layout.keep_marks).
+            with layout.keep_marks():
+                _own_panel(Gui)
+                C.switch_workspace(C.current_workspace())
 
         def Deactivated(self):
             # The status strip is ScanRuler's: hidden in other workbenches.
