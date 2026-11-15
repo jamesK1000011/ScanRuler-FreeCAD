@@ -179,6 +179,7 @@ scanrulerfc/icons/wsMeasure.svg
 scanrulerfc/icons/wsMesh.svg
 scanrulerfc/icons/wsThickness.svg
 scanrulerfc/inputs.py
+scanrulerfc/layout.py
 scanrulerfc/legend.py
 scanrulerfc/lent.py
 scanrulerfc/linalg.py
@@ -320,6 +321,7 @@ tests/test_gui_guide.py
 tests/test_gui_pages.py
 tests/test_heightmap.py
 tests/test_integration.py
+tests/test_layout.py
 tests/test_legend.py
 tests/test_manual.py
 tests/test_measure3d_page.py
