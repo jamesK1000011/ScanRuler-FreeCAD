@@ -163,7 +163,7 @@ def trim_by_planes(k, solid, planes, origin):
 
     for plane in planes:
         side = side_of(plane, origin)
-        solid = k.cut(solid, k.half_space(plane["origin"], scale(plane["normal"], -side)))
+        solid = k.cut(solid, k.half_space(plane["origin"], scale(plane["normal"], -side), solid))
     return solid
 
 
@@ -1301,7 +1301,7 @@ class Builder:
                 raise StepFailed(f"The round face this thread is cut on is gone (was: {found['lost']}).")
             return k.thread_tracked(body["shape"], found["hashes"][0], step)
         if kind == "cutPlane":
-            return k.cut_tracked(body["shape"], k.half_space(step["plane"]["origin"], scale(step["plane"]["normal"], -step["keep"])))
+            return k.cut_tracked(body["shape"], k.half_space(step["plane"]["origin"], scale(step["plane"]["normal"], -step["keep"]), body["shape"]))
         if kind == "mirror":
             idx = next((n for n, o in enumerate(self.steps_in_play) if o["id"] == step["id"]), -1)
             threads = [o for n, o in enumerate(self.steps_in_play) if o["kind"] == "thread" and o.get("body") == step["body"] and (idx < 0 or n < idx)]

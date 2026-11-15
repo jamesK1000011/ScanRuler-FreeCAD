@@ -57,7 +57,7 @@ OCCT_CALLS = {
     "transform": ("shape.transformed(FreeCAD.Matrix)", "direct"),
     "translate": ("shape.translated(vec)", "direct"),
     "copy": ("shape.copy()", "direct"),
-    "halfSpace": ("Part.Face(Part.Plane(o, n)).makeHalfSpace(o + n); a box past the part when refused", "direct"),
+    "halfSpace": ("a box past the part (Part.Face(Part.Wire(...)).extrude), not makeHalfSpace: an infinite solid fails the tracing's distToShape", "workaround"),
     "sectionPlane": ("Part.Compound(shape.slice(n, d))", "direct"),
     "section": ("a.section(b)", "direct"),
     "fuse": ("a.fuse(b)", "direct"),
@@ -378,19 +378,16 @@ class Occt:
     def copy(self, shape):
         return shape.copy()
 
-    def halfSpace(self, origin, normal):
+    def halfSpace(self, origin, normal, bounds=None):
+        """The side of the plane `normal` points to, as a box past the part
+        (bounds: its bounding box) rather than OCCT's infinite half-space:
+        an infinite solid's plane face has no edges, and the faces' tracing
+        after a cut (classifyPointOnFace, distToShape to the edges) fails on
+        it with BRepExtrema_DistShapeShape."""
         P = _part()
-        n = normalize(normal)
-        try:
-            face = P.Face(P.Plane(_v(origin), _v(n)))
-            return face.makeHalfSpace(_v(add_scaled(origin, n, 1)))
-        except Exception:  # noqa: BLE001 — no half-space here: a box far past any part
-            big = 1e5
-            u = normalize(cross(n, [1, 0, 0] if abs(n[0]) < 0.9 else [0, 1, 0]))
-            w = cross(n, u)
-            corner = add_scaled(add_scaled(origin, u, -big), w, -big)
-            box = P.Face(P.Wire([P.LineSegment(_v(a), _v(b)).toShape() for a, b in _square(corner, u, w, 2 * big)]))
-            return box.extrude(_v(scale(n, big)))
+        corner, u, w, side, height = half_space_box(origin, normalize(normal), bounds)
+        box = P.Face(P.Wire([P.LineSegment(_v(a), _v(b)).toShape() for a, b in _square(corner, u, w, side)]))
+        return box.extrude(_v(scale(normalize(normal), height)))
 
     # ---- sections and booleans
     def sectionPlane(self, shape, origin, normal):
@@ -505,6 +502,8 @@ class Occt:
     def classifyPointOnFace(self, face, u, v):
         if not face.isPartOfDomain(u, v):
             return "out"
+        if not face.Edges:  # an unbounded face: nothing to be on, and no distance to take
+            return "in"
         P = _part()
         near = P.Vertex(face.valueAt(u, v)).distToShape(P.Compound(face.Edges))[0]
         return "on" if near < 1e-7 else "in"
@@ -739,6 +738,32 @@ class Occt:
 
     def release(self, shape):
         return None
+
+
+# A half-space's box past a part: this far beyond it, in mm; without the
+# part's extent, this big.
+HALF_SPACE_MARGIN = 1.0
+HALF_SPACE_BIG = 1e5
+
+
+def half_space_box(origin, n, bounds=None):
+    """The box standing for the half of space on n's side of the plane
+    through origin: (corner, u, w, side, height), a square of `side` in the
+    plane from `corner` along u and w, raised `height` along n — past every
+    corner of `bounds` ({xmin … zmax}) on that side."""
+    u = normalize(cross(n, [1, 0, 0] if abs(n[0]) < 0.9 else [0, 1, 0]))
+    w = cross(n, u)
+    if bounds is None:
+        centre, reach = list(origin), HALF_SPACE_BIG
+    else:
+        lo = [bounds["xmin"], bounds["ymin"], bounds["zmin"]]
+        hi = [bounds["xmax"], bounds["ymax"], bounds["zmax"]]
+        mid = [(a + b) / 2 for a, b in zip(lo, hi)]
+        up = dot(sub(mid, origin), n)
+        centre = add_scaled(mid, n, -up)
+        reach = length(sub(hi, lo)) + abs(up) + HALF_SPACE_MARGIN
+    corner = add_scaled(add_scaled(centre, u, -reach), w, -reach)
+    return corner, u, w, 2 * reach, reach
 
 
 def _square(corner, u, w, size):
@@ -1250,12 +1275,14 @@ class Kernel:
 
         return run("Making the box", go)
 
-    def half_space(self, origin, normal):
+    def half_space(self, origin, normal, around=None):
+        """The side of the plane `normal` points to: a box past `around`
+        (the part to be cut) when given, a very large one otherwise."""
         def go():
             n = normalize(normal)
             if not n:
                 raise KernelError("the plane has no normal.")
-            return self.occt.halfSpace(origin, n)
+            return self.occt.halfSpace(origin, n, None if around is None else self.occt.getBoundingBox(around))
 
         return run("Building a half-space", go)
 

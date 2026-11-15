@@ -120,7 +120,7 @@ class FakeKernel:
     def cut(self, a, b):
         return self.cut_tracked(a, b)["shape"]
 
-    def half_space(self, origin, normal):
+    def half_space(self, origin, normal, around=None):
         big = 1e6
         lo, hi = [-big] * 3, [big] * 3
         for i in range(3):
