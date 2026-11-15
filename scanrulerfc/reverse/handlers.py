@@ -139,7 +139,10 @@ class DocStore:
     @property
     def builder(self):
         c = self.container()
-        return D.builder_of(c) if c else None
+        if c is None:
+            return None
+        D.restored_build(c)
+        return D.builder_of(c)
 
     def part(self):
         c = self.container()
@@ -165,8 +168,10 @@ class DocStore:
         c = self.container()
         if c is None:
             return {"results": [], "bodies": [], "steps": {}, "parameters": []}
+        D.restored_build(c)
         b = D.builder_of(c)
-        return {"results": json.loads(c.Results or "[]"), "bodies": b.briefs(), "steps": b.last_steps, "parameters": []}
+        results = json.loads(c.Results) if c.Results else (getattr(b, "restored_results", None) or [])
+        return {"results": results, "bodies": b.briefs(), "steps": b.last_steps, "parameters": []}
 
 
 # ---- references ------------------------------------------------------------------------------------

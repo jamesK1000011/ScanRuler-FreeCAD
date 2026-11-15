@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import unittest
+import unittest.mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
@@ -117,6 +118,9 @@ class FakeObject:
             self.quiet.add(name)
         self.__dict__[name] = None
 
+    def getPropertyStatus(self, name):
+        return ["Output", "NoRecompute"] if name in self.quiet else []
+
     def setPropertyStatus(self, name, status):
         if {"Output", "NoRecompute"} & set(status):
             self.quiet.add(name)
@@ -139,6 +143,10 @@ class FakeObject:
     def purgeTouched(self):
         self.__dict__["touched"] = False
 
+    @property
+    def InList(self):
+        return [o for o in self.Document.Objects if any(n is self for n in o.needs())]
+
     def needs(self):
         """What it depends on: its Group's members (FreeCAD puts a group
         after its children) and the objects its links point at."""
@@ -147,7 +155,9 @@ class FakeObject:
 
 class FakeDocument:
     """FreeCAD's recompute in small: every touched object and everything
-    depending on it, each run once, in no promised order."""
+    depending on it, each run once, in no promised order. Like FreeCAD it
+    refuses a dependency graph with a cycle, and says what is still touched
+    after a recompute."""
 
     Name, HasPendingTransaction = "Fake", True
 
@@ -162,7 +172,28 @@ class FakeDocument:
     def removeObject(self, name):
         self.Objects = [o for o in self.Objects if o.Name != name]
 
+    def cycle(self):
+        """A dependency cycle, as the names along it, or None."""
+        state = {}
+
+        def visit(o, path):
+            state[id(o)] = 1
+            for n in o.needs():
+                if state.get(id(n)) == 1:
+                    return [*path, o.Name, n.Name]
+                if id(n) not in state:
+                    found = visit(n, [*path, o.Name])
+                    if found:
+                        return found
+            state[id(o)] = 2
+            return None
+
+        return next((c for o in self.Objects if id(o) not in state for c in [visit(o, [])] if c), None)
+
     def recompute(self):
+        loop = self.cycle()
+        if loop:
+            raise AssertionError(f"The graph must be a DAG: {' -> '.join(loop)}")
         run = {id(o): o for o in self.Objects if o.touched}
         grew = True
         while grew:
@@ -175,12 +206,13 @@ class FakeDocument:
             o.purgeTouched()
             self.runs.append(o.Name)
             o.Proxy.execute(o)
+        self.still = [o.Name for o in self.Objects if o.touched]
 
 
 class OneBuildAnEdit(unittest.TestCase):
     """The edit against a stand-in for FreeCAD's recompute in which adding a
-    body touches the container through its Group, the container runs again
-    after its bodies, and the bodies' Source link points back at it."""
+    body touches the container through its Group and the container runs
+    again after its bodies."""
 
     def setUp(self):
         from unittest import mock
@@ -228,6 +260,40 @@ class OneBuildAnEdit(unittest.TestCase):
         self.assertEqual(self.c.Status, "ok")
         self.assertFalse(self.c.touched)
 
+    def test_no_cycle_and_nothing_left_touched(self):
+        # A body linking back to its container closed a cycle with the
+        # Group: FreeCAD said "The graph must be a DAG" and left the
+        # container touched after every recompute.
+        self.edit(1)
+        self.bodies["want"] = [2, 4]
+        self.edit(2)
+        self.assertIsNone(self.doc.cycle())
+        self.assertEqual(self.doc.still, [])
+        for b in D.bodies_of(self.c):
+            self.assertEqual(b.links, [])
+            self.assertIs(D.container_of(b), self.c)
+
+    def test_kept_bodies_take_the_new_build(self):
+        self.edit(1)
+        kept = D.bodies_of(self.c)[0]
+        self.doc.runs.clear()
+        self.bodies["want"] = [2, 4]
+        self.edit(2)
+        self.assertIn(kept.Name, self.doc.runs)
+
+    def test_a_reopen_writes_nothing(self):
+        # A write on restore marked the document changed ("Unsaved
+        # changes") and touched the container for another recompute.
+        self.edit(1)
+        writes = []
+        real = FakeObject.__setattr__
+        with unittest.mock.patch.object(FakeObject, "__setattr__", lambda o, n, v: (writes.append(n), real(o, n, v))):
+            self.c.Proxy.onDocumentRestored(self.c)
+            for b in D.bodies_of(self.c):
+                b.Proxy.onDocumentRestored(b)
+        self.assertEqual(writes, [])
+        self.assertFalse(self.c.touched)
+
     def test_outside_an_edit_a_recompute_builds(self):
         self.edit(1)
         self.c.touch()
@@ -239,6 +305,30 @@ class OneBuildAnEdit(unittest.TestCase):
         self.assertLessEqual({"Results", "Status"}, self.c.quiet)
         self.c.Results = "[]"
         self.assertFalse(self.c.touched)
+
+
+class Reopened(unittest.TestCase):
+    """A document just opened: the builder lives in memory, so the first
+    read builds the part there, without writing the document."""
+
+    def test_the_bodies_are_listed_and_the_results_read(self):
+        from unittest import mock
+
+        from scanrulerfc.reverse.handlers import DocStore
+
+        doc = FakeDocument()
+        c = FakeObject(doc, D.CONTAINER)
+        doc.Objects.append(c)
+        for name in ("PartJson", "Results", "StepFiles"):
+            c.addProperty("App::PropertyString", name, mode=24)
+        c.PartJson, c.Results, c.StepFiles = dumps(part(cube_features())), "", ""
+        builders = {}
+        with mock.patch.object(D, "builder_of", lambda o: builders.setdefault(o.Name, Builder(FakeKernel()))), mock.patch.object(D, "CONTEXT", {"of": None}):
+            store = DocStore(type("S", (), {"doc": doc})())
+            self.assertEqual([b["id"] for b in store.builder.briefs()], [2])
+            self.assertEqual([r["status"] for r in store.last()["results"]], ["ok"])
+            self.assertIsNone(D.restored_build(c))  # once
+        self.assertEqual(c.Results, "")
 
 
 @unittest.skipUnless(HAVE_FC, "needs FreeCAD")
