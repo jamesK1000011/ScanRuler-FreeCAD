@@ -1,0 +1,199 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Ported from ScanRuler by CNC Kitchen (Stefan Hermann):
+# plugins/mesh-tools/core/boolean.ts
+#
+# The scan and a solid made one: the solid taken out of the scan, added to
+# it, or only what the two have in common kept — a bore the scanner could not
+# see to the bottom of cut out with a cylinder fitted where it could, a boss
+# put back, a part trimmed to a box. Several solids go as one, their union.
+#
+# ScanRuler's boolean is Manifold's (Apache-2.0, in WebAssembly). Here the
+# kernel is FreeCAD's own Mesh booleans (Mesh.unite / difference /
+# intersect), imported only when a boolean runs; without FreeCAD the tool
+# refuses, saying it needs FreeCAD. Everything round the kernel is the
+# original's: both meshes must be closed, and it says so up front; the
+# result is an edit like any other — the scan's own vertices that are left
+# keep their order and come first, believed only where a position came back
+# exactly (FreeCAD keeps points in single precision, so "exactly" is to the
+# float32 the scan's own point rounds to); and a solid that does nothing
+# anyone would want — taken away but never reaching the mesh, or lying wholly
+# inside it and sealing a hollow there; added wholly inside it — is refused,
+# naming it. Manifold reads that off how much of each piece's surface is in
+# the result; here off how much of its volume the mesh holds (none: it
+# misses; all: it lies inside), the same cases.
+
+import numpy as np
+
+from .. import mesh_core as M
+
+SHARE_NONE = 1e-4
+
+
+class NeedsKernel(M.MeshError):
+    """No boolean kernel here: the tool needs FreeCAD."""
+
+
+def freecad_kernel():
+    """FreeCAD's Mesh booleans as kernel(op, (V, F), (V, F)) -> (V, F), or
+    None outside FreeCAD."""
+    try:
+        import Mesh  # noqa: F401
+    except ImportError:
+        return None
+
+    def to_mesh(V, F):
+        m = Mesh.Mesh()
+        m.addFacets([[tuple(map(float, V[i])) for i in t] for t in np.asarray(F).tolist()])
+        return m
+
+    def run(op, a, b):
+        ma, mb = to_mesh(*a), to_mesh(*b)
+        out = ma.unite(mb) if op == "add" else ma.difference(mb) if op == "subtract" else ma.intersect(mb)
+        pts, tris = out.Topology
+        V = np.array([[p.x, p.y, p.z] for p in pts], dtype=float).reshape(-1, 3)
+        return V, np.array(tris, dtype=np.int64).reshape(-1, 3)
+
+    return run
+
+
+def subject_of(names):
+    """The tools a piece of their union is made of, as a sentence's subject,
+    and whether the verb takes the plural."""
+    names = list(names)
+    if not names:
+        return "The solid", False
+    if len(names) == 1:
+        return names[0], False
+    return f"{', '.join(names[:-1])} and {names[-1]}", True
+
+
+def describe_open(c, what, fix):
+    if c["open"] == 0 and c["bad"] == 0:
+        return None
+    parts = []
+    if c["open"] > 0:
+        parts.append(f"{c['open']:,} open edge{'' if c['open'] == 1 else 's'}")
+    if c["bad"] > 0:
+        parts.append(f"{c['bad']:,} edge{'' if c['bad'] == 1 else 's'} shared by more than two triangles")
+    return f"{what} is not closed — {' and '.join(parts)}. A boolean needs a closed mesh: {fix}"
+
+
+def weld(V, F, tol=1e-6):
+    """A CAD body's mesh, face by face, made one: coincident points merged."""
+    from ..dev_surface import weld as _weld
+
+    return _weld(V, F, tol)
+
+
+def volume(V, F):
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3)
+    if len(F) == 0:
+        return 0.0
+    t = np.asarray(V, dtype=float)[F]
+    return float(np.einsum("ij,ij->i", t[:, 0], np.cross(t[:, 1], t[:, 2])).sum() / 6)
+
+
+def pieces_of(V, F):
+    """A mesh's connected pieces, each its own (V, F)."""
+    lab = M.components(F, len(V))
+    out = []
+    for r in np.unique(lab[F[:, 0]]).tolist():
+        sel = lab[F[:, 0]] == r
+        V2, F2, _ = M.compact_edit(V, F[sel], 0)
+        out.append((V2, F2))
+    return out
+
+
+def closed_tool(V, F, name):
+    """A tool welded and checked closed, or the refusal naming it."""
+    V, F = weld(np.asarray(V, dtype=float), np.asarray(F, dtype=np.int64))
+    c = M.closedness(F, len(V))
+    if len(F) == 0 or c["open"] or c["bad"] or not volume(V, F) > 0:
+        who, _ = subject_of([name] if name else [])
+        raise M.MeshError(f"{who} did not come out as a closed mesh — is it a solid body, not a surface?")
+    return V, F
+
+
+def carry_vertices(SV, nv, RV, RF):
+    """The result's vertices as the subject's where one came back at its
+    place (each subject vertex once), else new ones after them: (V, F,
+    vertex map, triangles kept whole)."""
+    key32 = np.ascontiguousarray(np.asarray(SV, dtype=np.float32)).view(np.dtype((np.void, 12))).ravel()
+    first = {}
+    for i, k in enumerate(key32.tolist()):
+        first.setdefault(k, i)
+    rkey = np.ascontiguousarray(np.asarray(RV, dtype=np.float32)).view(np.dtype((np.void, 12))).ravel()
+    index = np.empty(len(RV), dtype=np.int64)
+    taken = set()
+    fresh = []
+    for v, k in enumerate(rkey.tolist()):
+        i = first.get(k)
+        if i is not None and i < nv and i not in taken:
+            taken.add(i)
+            index[v] = i
+        else:
+            index[v] = nv + len(fresh)
+            fresh.append(RV[v])
+    allV = np.vstack([np.asarray(SV, dtype=float), np.array(fresh, dtype=float).reshape(-1, 3)])
+    F2 = index[np.asarray(RF, dtype=np.int64)]
+    kept = int((F2 < nv).all(axis=1).sum())
+    V3, F3, vmap = M.compact_edit(allV, F2, nv)
+    return V3, F3, vmap, kept
+
+
+def boolean_mesh(V, F, tools, op, kernel=None):
+    """The subject (V, F) and the tool solids [(V, F, name)] made one by op —
+    subtract, add or intersect — their union taken away, added, or kept
+    where the mesh is: (V, F, vertex map, report). kernel defaults to
+    FreeCAD's Mesh booleans."""
+    if not tools:
+        raise M.MeshError("No solid to make one with the mesh.")
+    V = np.asarray(V, dtype=float)
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3)
+    nv = len(V)
+    msg = describe_open(M.closedness(F, nv), "The mesh", "close its holes with Fill holes first.")
+    if msg:
+        raise M.MeshError(msg)
+    solids = [closed_tool(tv, tf, name) for tv, tf, name in tools]
+    names = [name for _, _, name in tools]
+    kernel = kernel or freecad_kernel()
+    if kernel is None:
+        raise NeedsKernel("A boolean needs FreeCAD's Mesh booleans, and FreeCAD is not loaded here — run it inside FreeCAD (through Agent Link).")
+
+    union = solids[0]
+    for s in solids[1:]:
+        union = kernel("add", union, s)
+    pieces = pieces_of(*union) if len(solids) > 1 else [union]
+    result = kernel(op, (V, F), union)
+    RV, RF = result
+    if len(RF) == 0:
+        raise M.MeshError("The solid and the mesh do not overlap — nothing would be left." if op == "intersect" else "Nothing would be left of the mesh.")
+    before, after = volume(V, F), volume(RV, RF)
+
+    if op != "intersect":
+        for piece in pieces:
+            vp = volume(*piece)
+            if len(pieces) == 1 and len(solids) == 1:
+                common = before - after if op == "subtract" else before + vp - after
+            else:
+                common = volume(*kernel("intersect", (V, F), piece))
+            share = common / vp if vp > 0 else 0.0
+            none, inside = share < SHARE_NONE, share > 1 - SHARE_NONE
+            if not (none or inside):
+                continue
+            if op == "add" and not inside:
+                continue
+            if len(tools) == 1:
+                who_names = [names[0]] if names[0] else []
+            else:
+                who_names = [n for n, s in zip(names, solids) if n and volume(*kernel("intersect", s, piece)) > 1e-9]
+            who, many = subject_of(who_names)
+            if op == "subtract" and inside:
+                raise M.MeshError(f"{who} {'lie' if many else 'lies'} wholly inside the mesh — taking {'them' if many else 'it'} away would seal a hollow inside the part, not open a hole. Move {'their' if many else 'its'} end out through the surface first.")
+            if op == "subtract":
+                raise M.MeshError(f"{who} {'do' if many else 'does'} not reach the mesh — there is nothing to take away.")
+            raise M.MeshError(f"{who} {'lie' if many else 'lies'} wholly inside the mesh — there is nothing to add.")
+
+    V2, F2, vmap, kept = carry_vertices(V, nv, RV, RF)
+    report = {"op": op, "removed": int(len(F) - kept), "added": int(len(RF) - kept), "volumeBefore": before, "volumeAfter": after}
+    return V2, F2, vmap, report
