@@ -134,6 +134,27 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(kit.head_row({"info": "x"}), ["stretch", "info"])
         self.assertEqual(kit.head_row({}), [])
 
+    def test_page_follows_the_theme(self):
+        """Backgrounds and text from the palette (it stayed dark in FreeCAD
+        Light); the only fixed colour is CNC Kitchen blue, on primary keys
+        and links; a disabled primary key gets the theme's dimmed text."""
+        import re
+
+        from scanrulerfc import workspaces as W
+        from scanrulerfc.pages import kit
+
+        q = kit.page_qss()
+        self.assertIn("background: palette(window)", q)
+        self.assertIn("color: palette(window-text)", q)
+        self.assertIn("palette(base)", q)
+        fixed = set(re.findall(r"#[0-9a-fA-F]{6}\b", q))
+        self.assertEqual(fixed, {W.ACCENT})
+        for line in q.splitlines():
+            if W.ACCENT in line:
+                self.assertTrue("primary" in line or " a " in line, line)
+        self.assertIn(":disabled", q)
+        self.assertIn("placeholder-text", q)
+
     def test_labels_wrap(self):
         mods = fake_pyside()
         with mock.patch.dict(sys.modules, mods):

@@ -126,6 +126,27 @@ LONG_CHECK = 28
 SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 4, 6, 4)
 
 
+PAGE = "ScanRulerPage"
+
+
+def page_qss(accent=None):
+    """The ScanRuler panel's stylesheet: backgrounds and text from the
+    window's palette, so it follows FreeCAD's theme (it stayed a dark slab
+    in FreeCAD Light and Studio Light); CNC Kitchen blue only as the accent
+    on primary keys and links. A disabled primary key reads as disabled in
+    a light and a dark theme alike."""
+    a = accent or W.ACCENT
+    return "\n".join((
+        f"#{PAGE}, #{PAGE} QStackedWidget, #{PAGE} QScrollArea, #{PAGE} QScrollArea > QWidget > QWidget"
+        " { background: palette(window); color: palette(window-text); }",
+        f"#{PAGE} QGroupBox {{ background: palette(base); border: 1px solid palette(mid); border-radius: 4px; }}",
+        f"#{PAGE} QLabel {{ background: transparent; color: palette(window-text); }}",
+        f"#{PAGE} QPushButton[primary=\"true\"] {{ background: {a}; color: white; }}",
+        f"#{PAGE} QPushButton[primary=\"true\"]:disabled {{ background: palette(button); color: palette(placeholder-text); }}",
+        f"#{PAGE} a {{ color: {a}; }}",
+    ))
+
+
 def head_row(s):
     """What the group's title row holds, in order: its title (Title Case),
     then its count and (i) key at the right, all on the one row; [] when
@@ -323,7 +344,9 @@ def widget(model, on_key=None, on_field=None, parent=None):
             b.setCheckable(k["pressed"])
             b.setChecked(k["pressed"])
             if k.get("primary"):
-                b.setStyleSheet("QPushButton{background:%s;color:white}" % W.ACCENT)
+                # The accent from the page's stylesheet (page_qss), so a
+                # disabled primary key still reads as disabled.
+                b.setProperty("primary", True)
             if on_key:
                 b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
             grid.addWidget(b, i // per, i % per)
