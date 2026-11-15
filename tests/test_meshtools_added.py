@@ -245,6 +245,70 @@ class Boolean(unittest.TestCase):
         with self.assertRaisesRegex(M.MeshError, "wholly inside"):
             BO.boolean_mesh(V, F, [(*cylinder(3, -5, 5), None)], "subtract")
 
+    def test_a_kernel_result_inside_out_is_turned_outward(self):
+        V, F = box_mesh(20, 20, 20, 4)
+        V2, F2 = BO.outward(V, F[:, ::-1])
+        self.assertAlmostEqual(BO.volume(V2, F2), 8000, 6)
+        self.assertEqual(shut(V2, F2), {"open": 0, "bad": 0})
+        # A hollow: its wall faces into the hollow, whichever way both came.
+        hollow = joined((V, F), cuboid([-3] * 3, [3] * 3))
+        for flips in ((False, True), (True, False), (True, True), (False, False)):
+            HV, HF = hollow
+            HF = HF.copy()
+            n = len(F)
+            if flips[0]:
+                HF[:n] = HF[:n, ::-1]
+            if flips[1]:
+                HF[n:] = HF[n:, ::-1]
+            OV, OF = BO.outward(HV, HF)
+            self.assertAlmostEqual(BO.volume(OV, OF[:n]), 8000, 6)
+            self.assertAlmostEqual(BO.volume(OV, OF[n:]), -216, 6)
+        # An open piece is left as it came.
+        self.assertTrue(np.array_equal(BO.outward(V, F[1:, ::-1])[1], F[1:, ::-1]))
+
+    def test_the_freecad_kernel_turns_its_result_outward(self):
+        from unittest import mock
+
+        class Pt:
+            def __init__(self, p):
+                self.x, self.y, self.z = p
+
+        class FakeMesh:
+            """FreeCAD's Mesh as the booleans use it, its difference handed
+            back inside out the way FreeCAD 1.0 to 1.1 hand it back."""
+
+            def __init__(self, tris=None):
+                self.tris = tris or []
+                self.harmonized = False
+
+            def addFacets(self, tris):
+                self.tris += [list(t) for t in tris]
+
+            def difference(self, other):
+                return FakeMesh([t[::-1] for t in self.tris])
+
+            unite = intersect = lambda self, other: FakeMesh(list(self.tris))
+
+            def harmonizeNormals(self):
+                self.harmonized = True
+
+            @property
+            def Topology(self):
+                pts, idx, tris = [], {}, []
+                for t in self.tris:
+                    tris.append(tuple(idx.setdefault(p, len(idx)) for p in t))
+                pts = [Pt(p) for p in sorted(idx, key=idx.get)]
+                return pts, tris
+
+        fake = type(sys)("Mesh")
+        fake.Mesh = FakeMesh
+        with mock.patch.dict(sys.modules, {"Mesh": fake}):
+            kernel = BO.freecad_kernel()
+            box = box_mesh(20, 20, 20, 4)
+            for op in ("subtract", "add", "intersect"):
+                RV, RF = kernel(op, box, box)
+                self.assertAlmostEqual(BO.volume(RV, RF), 8000, 3)
+
 
 class NearSurfaceGrid(unittest.TestCase):
     def test_large_triangles_and_a_small_reach_stay_bounded(self):
