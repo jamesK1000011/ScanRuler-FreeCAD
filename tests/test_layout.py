@@ -67,6 +67,27 @@ class Tab(unittest.TestCase):
         dock.register_tab(h)
         self.assertEqual(h.got, [("ScanRuler", 70, None)])
 
+    def test_own_dock_when_agent_link_places_panels(self):
+        """With Agent Link's placer (service panel_layout) the page is its
+        own "ScanRuler" dock beside Model and Tasks, not a tab of Agent
+        Link's panel."""
+        from scanrulerfc import dock
+
+        got = []
+
+        class Hooks:
+            TABS = []
+
+            def service(self, name):
+                return object() if name == "panel_layout" else None
+
+            def register_tab(self, *a, **k):
+                got.append(a)
+
+        self.assertFalse(dock.hosted_tab_wanted(Hooks()))
+        dock.register_tab(Hooks())
+        self.assertEqual(got, [])
+
 
 if __name__ == "__main__":
     unittest.main()
