@@ -266,8 +266,31 @@ class Dock:
             kind = key.split(":", 1)[1]
             if kind in reverse.READY_KINDS:
                 reverse.open_kind(kind, self.ui.get("reverse"))  # the toolbar's key opens the box, as the panel's does
+        if key == "view" and args and args[0] in ("ViewSplit", "ViewColourPlot"):
+            self.error = split_view_key(args[0], bool(args[1]) if len(args) > 1 else True, lambda: self.session_fn()[0]) or self.error
         self.refresh(force=True)
         return True
+
+
+def split_view_key(key, on, session_fn):
+    """The Split view key (and Colour plot, which recolours an open split
+    view): the split viewer opened, closed or refreshed. What went wrong, or
+    None. A key that could not open it is let up again."""
+    from . import split_view
+
+    colour_plot = lambda: C._state["view"].get("ViewColourPlot", True)  # noqa: E731
+    if key == "ViewColourPlot":
+        sv = split_view._live["split"]
+        return sv.show() if sv is not None and sv.open else None
+    why = split_view.toggle(on, session_fn, colour_plot)
+    if why and on:
+        C._state["view"]["ViewSplit"] = False
+        try:
+            for a in C._actions("ScanRuler_ViewSplit"):
+                a.setChecked(False)
+        except Exception:  # noqa: BLE001 — no window: the state is enough
+            pass
+    return why
 
 
 def make_tab(panel):

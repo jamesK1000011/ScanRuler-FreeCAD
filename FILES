@@ -288,6 +288,7 @@ scanrulerfc/snapshot/card.py
 scanrulerfc/snapshot/handlers.py
 scanrulerfc/snapshot/marks.py
 scanrulerfc/snapshot/store.py
+scanrulerfc/split_view.py
 scanrulerfc/statusbar.py
 scanrulerfc/symmetry.py
 scanrulerfc/thread_core.py
@@ -388,6 +389,7 @@ tests/test_reverse_wiring.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_snapshot.py
+tests/test_split_view.py
 tests/test_thickness.py
 tests/test_thickness_maths.py
 tests/test_thread.py
