@@ -78,10 +78,13 @@ scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
 scanrulerfc/reverse/network.py
 scanrulerfc/reverse/network_cells.py
+scanrulerfc/reverse/network_creases.py
 scanrulerfc/reverse/network_curve.py
 scanrulerfc/reverse/network_fit.py
 scanrulerfc/reverse/network_map.py
+scanrulerfc/reverse/network_seed.py
 scanrulerfc/reverse/network_spline.py
+scanrulerfc/reverse/network_split.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/profiles.py
@@ -114,6 +117,7 @@ tests/meshes.py
 tests/meshkit.py
 tests/network_meshes.py
 tests/reverse_fixtures/network_curve_goldens.json
+tests/reverse_fixtures/network_read_goldens.json
 tests/reverse_fixtures/network_spline_goldens.json
 tests/reverse_fixtures/part_roundtrip.json
 tests/reverse_fixtures/step_keys_goldens.json
@@ -152,8 +156,13 @@ tests/test_reverse_corners.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_network_cells.py
+tests/test_reverse_network_creases.py
 tests/test_reverse_network_curve.py
+tests/test_reverse_network_fit.py
+tests/test_reverse_network_read.py
+tests/test_reverse_network_seed.py
 tests/test_reverse_network_spline.py
+tests/test_reverse_network_split.py
 tests/test_reverse_parameters.py
 tests/test_reverse_part_file.py
 tests/test_reverse_regions.py
