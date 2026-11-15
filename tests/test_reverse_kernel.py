@@ -27,7 +27,7 @@ NEEDS = "needs FreeCAD"
 from scanrulerfc.reverse import kernel as K  # noqa: E402
 from scanrulerfc.reverse.kernel_thread import chamfer_radius, fill_radius, minor_diameter, thread_span, tooth_outline  # noqa: E402
 from scanrulerfc.reverse.loops import rectangle_loop  # noqa: E402
-from scanrulerfc.reverse.origins import compose_history, flat_history, history_by_order, origins_after, parse_history, same_surface  # noqa: E402
+from scanrulerfc.reverse.origins import compose_history, flat_history, history_by_order, origins_after, parse_history, same_surface, traced_history  # noqa: E402
 
 # occtTypes.ts OcctLike, every call in its order there.
 OCCT_LIKE = """makeLineEdge makeArcEdge makeCircleEdge makeBSplineEdge makeWire makeFace addHolesInFace extrude draftPrism revolve makeHelixWireHanded
@@ -142,6 +142,62 @@ class Histories(unittest.TestCase):
         self.assertIs(same_surface(cyl, [wider, same]), same)
 
 
+class _Rect:
+    """A flat rectangle o + u·du + v·dv, a stand-in face."""
+
+    def __init__(self, h, o, du, dv, u1, v1, u0=0.0, v0=0.0):
+        self.h, self.o, self.du, self.dv, self.uv = h, o, du, dv, (u0, u1, v0, v1)
+
+
+class _RectOcct:
+    """Just what traced_history reads, for flat rectangles."""
+
+    def getSubShapes(self, shape, kind):
+        return list(shape)
+
+    def hashCode(self, f, upper=None):
+        return f.h
+
+    def surfaceType(self, f):
+        return "plane"
+
+    def uvBounds(self, f):
+        return dict(zip(("uMin", "uMax", "vMin", "vMax"), f.uv))
+
+    def pointOnSurface(self, f, u, v):
+        return [f.o[i] + u * f.du[i] + v * f.dv[i] for i in range(3)]
+
+    def uvFromPoint(self, f, p):
+        d = [p[i] - f.o[i] for i in range(3)]
+        return sum(a * b for a, b in zip(d, f.du)), sum(a * b for a, b in zip(d, f.dv))
+
+    def classifyPointOnFace(self, f, u, v):
+        return "in" if f.uv[0] < u < f.uv[1] and f.uv[2] < v < f.uv[3] else "out"
+
+    def getBoundingBox(self, f):
+        c = [self.pointOnSurface(f, u, v) for u in f.uv[:2] for v in f.uv[2:]]
+        return {f"{a}{m}": fn(p[i] for p in c) for i, a in enumerate("xyz") for m, fn in (("min", min), ("max", max))}
+
+
+class TracedCut(unittest.TestCase):
+    def test_the_tools_face_is_traced_too_not_the_box_twice(self):
+        # A box 40 x 20 x 10 cut by a tool: four walls kept as they were, top
+        # and bottom remade on their planes, and a new wall on the tool's own
+        # face. The tool's face is traced like the box's — what CI counted
+        # as a seventh box face — and no kept wall is traced at all.
+        X, Y, Z = [1, 0, 0], [0, 1, 0], [0, 0, 1]
+        walls = [_Rect(1, [0, 0, 0], X, Z, 40, 10), _Rect(2, [0, 20, 0], X, Z, 40, 10), _Rect(3, [0, 0, 0], Y, Z, 20, 10), _Rect(4, [40, 0, 0], Y, Z, 20, 10)]
+        top, bottom = _Rect(5, [0, 0, 10], X, Y, 40, 20), _Rect(6, [0, 0, 0], X, Y, 40, 20)
+        side = _Rect(7, [30, -5, -1], Y, Z, 30, 12)
+        after = [*walls, _Rect(15, [0, 0, 10], X, Y, 30, 20), _Rect(16, [0, 0, 0], X, Y, 30, 20), _Rect(17, [30, 0, 0], Y, Z, 20, 10, 5, 0)]
+        box = [*walls, top, bottom]
+        history = traced_history(_RectOcct(), [box, [side]], after)
+        self.assertEqual(history, {5: [15], 6: [16], 7: [17]})
+        before, kept = {f.h for f in box}, {f.h for f in box} & {f.h for f in after}
+        self.assertEqual(len(set(history) | kept), 7)
+        self.assertEqual(len((set(history) & before) | kept), 6)
+
+
 class ThreadForm(unittest.TestCase):
     M10 = {"standard": "metric", "diameter": 10, "pitch": 1.5, "offset": 0}
 
@@ -223,7 +279,12 @@ class Operations(unittest.TestCase):
         # are traced to the faces they were.
         self.assertGreaterEqual(len(before & after), 4)
         traced = {old for old, made in r["history"].items() if made}
-        self.assertEqual(len(traced | (before & after)), 6)
+        # The bore's wall lies on the tool's side and is traced to it, as
+        # OCCT's history of the tool's face: of the box's faces, the two
+        # holed ones are traced and none more.
+        self.assertEqual(len((traced & before) | (before & after)), 6)
+        self.assertEqual(len(traced - before), 1)
+        self.assertTrue(traced - before <= set(self.k.face_hashes(tool)))
 
     def test_fuse_and_common_volume_identity(self):
         a = self.box(10, 10, 10)
