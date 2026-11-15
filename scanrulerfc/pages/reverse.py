@@ -139,6 +139,16 @@ def editor_version():
     return _editor().version
 
 
+def box_key():
+    """Which box is open (its kind, its name, the feature it edits), or
+    None: the dock scrolls a box into view when this changes to another."""
+    ed = _editor()
+    if not ed.open:
+        return None
+    r = ed.record or {}
+    return (r.get("kind"), ed.title(), getattr(ed, "editing", None))
+
+
 def open_kind(kind, ui=None, env=None):
     """A Create feature key: the kind's box opened on the part (the fields
     the panel's ui keeps for it laid over the box's defaults), drawn in the

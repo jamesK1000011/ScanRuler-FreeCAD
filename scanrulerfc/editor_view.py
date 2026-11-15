@@ -255,8 +255,35 @@ def object_at(view, x, y):
         return None
     if not info or "x" not in info:
         return None
+    parent = info.get("ParentObject")
+    parent = getattr(parent, "Name", parent)
     return {"doc": info.get("Document"), "object": info.get("Object"), "element": info.get("Component") or "",
+            "parent": parent if isinstance(parent, str) else None,
             "point": [float(info["x"]), float(info["y"]), float(info["z"])]}
+
+
+def nearest_body(distances, reach):
+    """The id of the body nearest a point, from [(body id, distance mm)],
+    within reach; None when none is. A click on the container's compound
+    (it draws the same solids as its bodies) is put on the body under it."""
+    best = min(((d, i) for i, d in distances if d is not None and d <= reach), default=None, key=lambda t: t[0])
+    return best[1] if best else None
+
+
+def qt_to_coin(qx, qy, height, dpr):
+    """Qt's logical pixels on the view's widget (y down) to Coin's viewport
+    pixels (y up), as the view's events give them."""
+    dpr = dpr or 1.0
+    return qx * dpr, height - qy * dpr
+
+
+def _report(text):
+    try:
+        import FreeCAD
+
+        FreeCAD.Console.PrintWarning(f"ScanRuler: {text}\n")
+    except ImportError:  # no FreeCAD (a test): nothing to tell
+        pass
 
 
 def redirect(view, on):
@@ -370,6 +397,13 @@ class Overlay:
         self.dpr = 1.0
         self.field = None
         self._field_tried = False
+        # The press as Qt saw it on the view's widget: the navigation can
+        # take a press before the scene graph sees it, and a click must
+        # still count (qt_pressed, qt_released).
+        self.qt_press = None
+        self.qt_click = False
+        self.release_seen = False
+        self.watch = None
         self.attach()
 
     # ---- the view
@@ -381,6 +415,40 @@ class Overlay:
         for t in (c.SoLocation2Event, c.SoMouseButtonEvent):
             cb = self.view.addEventCallbackPivy(t.getClassTypeId(), self.on_event)
             self.callbacks.append((t, cb))
+        self._watch_presses()
+
+    def _watch_presses(self):
+        """A filter on the view's widget that sees each left press and
+        release before the navigation does; nothing where Qt has no QObject
+        (a stand-in)."""
+        core = getattr(self.qt, "QtCore", None) if self.qt is not None else None
+        base = getattr(core, "QObject", None)
+        w = view_widget(self.view, self.qt) if base is not None else None
+        if w is None:
+            return
+        ov, Qt, QEvent = self, core.Qt, core.QEvent
+
+        class Watch(base):
+            def eventFilter(self, _obj, ev):  # noqa: N802
+                try:
+                    t = ev.type()
+                    if t in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease) and ev.button() == Qt.LeftButton:
+                        p = ev.position() if hasattr(ev, "position") else ev.pos()
+                        if t == QEvent.MouseButtonPress:
+                            mods = ev.modifiers()
+                            ov.qt_pressed(p.x(), p.y(), bool(mods & (Qt.ShiftModifier | Qt.ControlModifier)))
+                        else:
+                            ov.qt_released(p.x(), p.y())
+                except Exception:  # noqa: BLE001 — a filter must never stop the view's events
+                    pass
+                return False
+
+        try:
+            self.watch = Watch()
+            w.installEventFilter(self.watch)
+            self.watch_on = w
+        except Exception:  # noqa: BLE001
+            self.watch = None
 
     def detach(self):
         for t, cb in self.callbacks:
@@ -389,6 +457,12 @@ class Overlay:
             except Exception:  # noqa: BLE001 — the view may be gone already
                 pass
         self.callbacks = []
+        if self.watch is not None:
+            try:
+                self.watch_on.removeEventFilter(self.watch)
+            except Exception:  # noqa: BLE001
+                pass
+            self.watch = None
         if self.redirected:
             redirect(self.view, False)
             self.redirected = False
@@ -626,15 +700,50 @@ class Overlay:
                     # release close by is a click on the part.
                     self.pressed_at = (x, y)
             elif c.SoMouseButtonEvent.isButtonReleaseEvent(ev, c.SoMouseButtonEvent.BUTTON1):
+                self.release_seen = True
+                qt_click, self.qt_click = self.qt_click, False
                 if self.release(x, y):
                     cb.setHandled()
                 elif self.pressed_at is not None:
                     was, self.pressed_at = self.pressed_at, None
                     if math.hypot(x - was[0], y - was[1]) <= CLICK_PX * (self.dpr or 1.0) and self.click(x, y):
                         cb.setHandled()
+                elif qt_click and self.click(x, y):
+                    # The navigation took the press, Qt saw it close by.
+                    cb.setHandled()
             return
         if self.motion(x, y):
             cb.setHandled()
+
+    def qt_pressed(self, qx, qy, modified=False):
+        """A left press on the view's widget, in Qt's logical pixels."""
+        self.qt_press = None if modified else (qx, qy)
+        self.qt_click = False
+        self.release_seen = False
+
+    def qt_released(self, qx, qy):
+        """A left release on the view's widget: a click when the press was
+        close by. The scene graph's release, if it comes, takes it
+        (on_event); if the navigation swallows that too, the click is made
+        here once FreeCAD has handled the release."""
+        was, self.qt_press = self.qt_press, None
+        self.qt_click = was is not None and math.hypot(qx - was[0], qy - was[1]) <= CLICK_PX
+        if not self.qt_click or self.held is not None:
+            return
+        self.release_seen = False
+
+        def after():
+            if self.release_seen or not self.qt_click:
+                return
+            self.qt_click = False
+            try:
+                height = float(self.view.getSize()[1])
+            except Exception:  # noqa: BLE001
+                return
+            self.pressed_at = None
+            self.click(*qt_to_coin(qx, qy, height, self.dpr))
+
+        self.env.get("later", lambda fn: fn())(after)
 
     def motion(self, x, y):
         """The pointer moved: a held grip dragged, else the grip under it lit
@@ -716,19 +825,43 @@ class Overlay:
         """A click on the part, for the box: a pick on a body, an extrude's
         end. FreeCAD's selection is put back as it was after it, so a click
         for the box never selects anything."""
+        from .reverse.picks import PICKS
+
         ed = self.editor
         if not ed.wants_clicks():
             return False
+        warn = self.env.get("warn", _report)
+        kind = (ed.record or {}).get("kind")
+        picks = kind in PICKS
         hit = object_at(self.view, x, y)
         if hit is None:
+            if picks:
+                warn(f"{kind} pick: nothing under the click at ({x:.0f}, {y:.0f}).")
             return False
-        body = self.env.get("body_of", lambda d, o: None)(hit["doc"], hit["object"])
+        point = hit["point"]
+        body = None
+        if picks:
+            # The point on the edge or the face FreeCAD picked, not where
+            # the pick ray stopped (a few pixels off, millimetres zoomed out).
+            point = self.env.get("snap", lambda h: None)(hit) or point
+            body = self.env.get("body_of", lambda d, o: None)(hit["doc"], hit["object"])
+            if body is None and hit.get("parent"):
+                body = self.env.get("body_of", lambda d, o: None)(hit["doc"], hit["parent"])
+            if body is None:
+                body = self.env.get("body_at", lambda d, p: None)(hit["doc"], point)
         store = self.env.get("store", lambda: None)()
         builder = store.builder if store is not None else None
         restore = self.env.get("keep_selection", lambda: None)()
-        changed = ed.click_part(hit["point"], body, builder, self.env.get("features", lambda: [])())
+        changed = ed.click_part(point, body, builder, self.env.get("features", lambda: [])())
         if restore is not None:
             self.env.get("later", lambda fn: fn())(restore)
+        if picks and not changed:
+            if body is None:
+                warn(f"{kind} pick: {hit['object']}.{hit['element'] or '?'} is not a Reverse engineer body.")
+            elif builder is None:
+                warn(f"{kind} pick: no build to find the {PICKS[kind][:-1]} in (no Reverse engineer container).")
+            else:
+                warn(f"{kind} pick: no {PICKS[kind][:-1]} of body {body} near ({', '.join(f'{c:.2f}' for c in point)}) — clicked {hit['object']}.{hit['element'] or '?'}.")
         return changed
 
     def commit_field(self, text):
@@ -799,15 +932,56 @@ def _env():
                     pass
 
     def body_of(doc_name, obj_name):
-        """The body id of a ReverseBody clicked, or None (the scan, another object)."""
+        """The body id of a ReverseBody clicked, or None (the scan, the
+        container, another object). Known by its BodyId and its place in
+        the container's Group, not its proxy's class: a proxy FreeCAD could
+        not restore on a reopen leaves the body a body."""
         try:
             o = FreeCAD.getDocument(doc_name).getObject(obj_name)
         except Exception:  # noqa: BLE001
             return None
-        if o is None or getattr(o, "Proxy", None).__class__.__name__ != "Body" or not hasattr(o, "BodyId"):
+        if o is None or not hasattr(o, "BodyId") or hasattr(o, "PartJson"):
+            return None
+        if getattr(o, "Proxy", None).__class__.__name__ != "Body" and D.container_of(o) is None:
             return None
         v = o.BodyId
         return int(v) if float(v).is_integer() else v
+
+    def body_at(doc_name, point):
+        """The visible body nearest a point clicked on the container's own
+        compound (it draws the same solids), within a hair."""
+        try:
+            import Part
+
+            doc = FreeCAD.getDocument(doc_name)
+            c = D.find_container(doc)
+            v = Part.Vertex(FreeCAD.Vector(*point))
+            dist = []
+            for b in D.bodies_of(c) if c is not None else []:
+                try:
+                    dist.append((b.BodyId, b.Shape.distToShape(v)[0] if not b.Shape.isNull() else None))
+                except Exception:  # noqa: BLE001
+                    pass
+        except Exception:  # noqa: BLE001
+            return None
+        i = nearest_body(dist, 1e-3 + 0.01)
+        return None if i is None else (int(i) if float(i).is_integer() else i)
+
+    def snap(hit):
+        """The point on the edge or face FreeCAD picked nearest where the
+        ray stopped; None when it cannot be read."""
+        el = hit.get("element") or ""
+        if not (el.startswith("Edge") or el.startswith("Face")):
+            return None
+        try:
+            import Part
+
+            o = FreeCAD.getDocument(hit["doc"]).getObject(hit["object"])
+            sub = o.Shape.getElement(el)
+            got = sub.distToShape(Part.Vertex(FreeCAD.Vector(*hit["point"])))[1][0][0]
+            return [float(got.x), float(got.y), float(got.z)]
+        except Exception:  # noqa: BLE001
+            return None
 
     def keep_selection():
         import FreeCADGui
@@ -831,7 +1005,8 @@ def _env():
         QtCore.QTimer.singleShot(0, fn)  # after FreeCAD's own handling of the release
 
     return {"store": store, "features": lambda: part().get("features") or [], "bodies": bodies, "units": lambda: "mm", "scope": scope, "context": context,
-            "hide": hide, "body_of": body_of, "keep_selection": keep_selection, "later": later}
+            "hide": hide, "body_of": body_of, "body_at": body_at, "snap": snap, "keep_selection": keep_selection, "later": later,
+            "warn": _report}
 
 
 def session_for(doc):

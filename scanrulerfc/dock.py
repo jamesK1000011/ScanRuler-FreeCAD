@@ -65,6 +65,26 @@ def header(st, project=None, agent=None, dirty=None, checkpoint=False):
     return out
 
 
+def _nb(text):
+    """A phrase that never breaks across lines."""
+    return text.replace(" ", "&nbsp;")
+
+
+def header_html(h):
+    """The header label's rich text: the project and scan, the agent's dot
+    and word, and the save state on a line of its own, each phrase kept
+    whole, so a narrow panel (354 px) wraps between them, never inside."""
+    first = ["<b>%s</b>" % h["title"]]
+    if h["agent"]:
+        first.append("<span style='color:%s'>●</span>&nbsp;%s" % (h["agent_dot"], _nb(h["agent"])))
+    lines = [" &nbsp; ".join(first)]
+    if h["save"]:
+        lines.append(_nb(h["save"]))
+    if h.get("error"):
+        lines.append("<span style='color:%s'>⚠ %s</span>" % (statusbar.COLOURS["ERROR"], h["error"]))
+    return "<br>".join(lines)
+
+
 def workspace_of(st, current=W.DEFAULT_WORKSPACE):
     _v, last = poll(st)
     return W.workspace_for_tool(last, current) if last else current
@@ -97,6 +117,13 @@ def press(page, key_id, page_ui, run=None):
     if after is not None:
         after(key_id, got)  # a box that made its feature closes
     return got
+
+
+def box_to_show(was, now):
+    """Whether a feature box just opened (or another took its place): the
+    dock scrolls it into view, as the person sees nothing happen when it
+    opens below the fold. Not on each refresh of the same box."""
+    return now is not None and now != was
 
 
 def ui_action(key, args, ui, current):
@@ -158,6 +185,8 @@ class Dock:
         self.head = QtWidgets.QLabel()
         self.head.setWordWrap(True)
         lay.addWidget(self.head)
+        # "Unsaved changes" on a line of its own (header_html), so a narrow
+        # panel never breaks it in two.
         self.stack = QtWidgets.QStackedWidget()
         self.slots = {}
         for wid in ORDER:
@@ -232,17 +261,36 @@ class Dock:
             except Exception:
                 pass
         self.current = m["workspace"]
-        h = m["header"]
-        bits = ["<b>%s</b>" % h["title"]]
-        if h["agent"]:
-            bits.append("<span style='color:%s'>●</span> %s" % (h["agent_dot"], h["agent"]))
-        if h["save"]:
-            bits.append(h["save"])
-        self.head.setText(" &nbsp; ".join(bits))
+        self.head.setText(header_html({**m["header"], "error": self.error}))
         statusbar.feed(st, error=self.error)
         page = PAGES[self.current]
         self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key, on_field=self.field))
         self.stack.setCurrentWidget(self.slots[self.current])
+        box = reverse.box_key() if self.current == "reverse" else None
+        if box_to_show(getattr(self, "_box_shown", None), box):
+            self._bring_into_view(self.slots[self.current], reverse.EDITOR_SECTION)
+        self._box_shown = box
+
+    def _bring_into_view(self, holder, section_id):
+        """A section of the page scrolled into view, once the page is laid
+        out (on the next turn of Qt's loop)."""
+        from PySide import QtCore, QtWidgets
+
+        from .pages import kit
+
+        page = holder.widget()
+        target = page.findChild(QtWidgets.QWidget, kit.section_object_name(section_id)) if page is not None else None
+        if target is None:
+            C._say(f"ScanRuler: the {section_id} box opened but its group was not found to scroll to.", warn=True)
+            return
+
+        def bring():
+            try:
+                holder.ensureWidgetVisible(target, 0, kit.MARGIN)
+            except RuntimeError:  # the page was drawn again meanwhile: the next refresh scrolls
+                pass
+
+        QtCore.QTimer.singleShot(0, bring)
 
     def key(self, section_id, key_id):
         page_ui = self.ui.setdefault(self.current, {})
@@ -267,12 +315,25 @@ class Dock:
             if kind in reverse.READY_KINDS:
                 reverse.open_kind(kind, self.ui.get("reverse"))  # the toolbar's key opens the box, as the panel's does
         if key == "view" and args and args[0] in ("ViewSplit", "ViewColourPlot"):
-            self.error = split_view_key(args[0], bool(args[1]) if len(args) > 1 else True, lambda: self.session_fn()[0]) or self.error
+            why = split_view_key(args[0], bool(args[1]) if len(args) > 1 else True, lambda: self.session_fn()[0], self.current)
+            if args[0] == "ViewSplit":
+                self.error = why  # in the panel's header until the next press
         self.refresh(force=True)
         return True
 
 
-def split_view_key(key, on, session_fn):
+SPLIT_WORKSPACE = "deviation"
+
+
+def split_wrong_workspace(workspace):
+    """Why the Split view does not open in this workspace, or None."""
+    if workspace is None or workspace == SPLIT_WORKSPACE:
+        return None
+    return (f"it compares the scan with the reference in {W.workspace(SPLIT_WORKSPACE)['label']}: "
+            f"switch to that workspace (the panel is on {W.workspace(workspace)['label']}), open a reference, then press it again.")
+
+
+def split_view_key(key, on, session_fn, workspace=None):
     """The Split view key (and Colour plot, which recolours an open split
     view): the split viewer opened, closed or refreshed. What went wrong, or
     None. A key that could not open it is let up again."""
@@ -290,7 +351,8 @@ def split_view_key(key, on, session_fn):
         except Exception:  # noqa: BLE001 — no window: the state is enough
             pass
 
-    why = split_view.toggle(on, session_fn, colour_plot)
+    why = split_wrong_workspace(workspace) if on else None
+    why = why or split_view.toggle(on, session_fn, colour_plot)
     if why:
         C._say(f"ScanRuler: Split view: {why}")  # the Report view, where a cmd_run's caller looks
     if why and on:

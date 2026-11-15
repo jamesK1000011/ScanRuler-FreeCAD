@@ -446,6 +446,22 @@ class Dock(unittest.TestCase):
         self.assertIsNone(DK.header(fresh())["agent"])
         self.assertEqual(DK.header(fresh(), agent="refused")["agent"], "Agent: turned away")
 
+    def test_the_header_wraps_between_phrases_never_inside(self):
+        # In a 354 px dock "… ● Agent: listening Unsaved changes" broke
+        # "changes" onto a line alone: the save state has its own line, and
+        # each phrase is kept whole.
+        html = DK.header_html(DK.header(scanned(), "WindowTest", "listening", True))
+        first, second = html.split("<br>")
+        self.assertIn("Agent:&nbsp;listening", first)
+        self.assertEqual(second, "Unsaved&nbsp;changes")
+        self.assertNotIn("<br>", DK.header_html(DK.header(fresh())))
+
+    def test_a_box_just_opened_is_scrolled_to_once(self):
+        self.assertTrue(DK.box_to_show(None, ("fillet", "Fillet 1", None)))
+        self.assertFalse(DK.box_to_show(("fillet", "Fillet 1", None), ("fillet", "Fillet 1", None)))  # the same box drawn again
+        self.assertTrue(DK.box_to_show(("fillet", "Fillet 1", None), ("chamfer", "Chamfer 1", None)))
+        self.assertFalse(DK.box_to_show(("fillet", "Fillet 1", None), None))
+
     @NEED
     def test_header_strings_are_the_originals(self):
         top = T.read("src/ui/TopBar.tsx")
@@ -504,6 +520,39 @@ class StatusBar(unittest.TestCase):
         self.assertEqual(SB.model(st)["counts"], "ELEMENTS 1 of 2 · DIM 1")
         st["elements"] = [{"fit": {"kind": "plane"}}]
         self.assertEqual(SB.model(st)["counts"], "ELEMENTS 1 · DIM 1")
+
+    def test_widgets_added_in_order_on_an_empty_bar(self):
+        # FreeCAD's bar has no permanent widgets yet when ScanRuler comes
+        # in: insertPermanentWidget(0) and (1) made Qt warn "Index out of
+        # range". The widgets are added in their order instead.
+        import types
+        from unittest import mock
+
+        class Bar:
+            def __init__(self):
+                self.permanent = []
+
+            def insertPermanentWidget(self, i, w, stretch=0):  # noqa: N802
+                if i >= len(self.permanent):  # as FreeCAD 1.1's bar answered on the Mac
+                    raise AssertionError(f"QStatusBar::insertPermanentWidget: Index out of range ({i})")
+                self.permanent.insert(i, w)
+
+            def addPermanentWidget(self, w, stretch=0):  # noqa: N802
+                self.permanent.append(w)
+
+        class Label:
+            def __init__(self, text=""):
+                self.text = text
+
+            def setToolTip(self, t):  # noqa: N802
+                pass
+
+        qtw = types.SimpleNamespace(QLabel=Label)
+        pyside = types.SimpleNamespace(QtWidgets=qtw)
+        with mock.patch.dict(sys.modules, {"PySide": pyside, "PySide.QtWidgets": qtw}):
+            bar = Bar()
+            sb = SB.StatusBar(bar)
+        self.assertEqual(bar.permanent, [sb.state, sb.counts, sb.credit])
 
     @NEED
     def test_the_originals(self):

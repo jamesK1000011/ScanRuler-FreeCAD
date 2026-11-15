@@ -210,6 +210,11 @@ def reflow(width, grids, rows, down, across, fields=()):
     return g, r
 
 
+def section_object_name(section_id):
+    """The Qt object name of a section's group box."""
+    return f"ScanRulerSection_{section_id}"
+
+
 def widget(model, on_key=None, on_field=None, parent=None):
     """A QWidget drawn from any page model (every page's, 3D Measure's too):
     a group box per section titled as FreeCAD titles them, with an (i) key,
@@ -374,6 +379,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             # The title on the group's own first row, with its (i) key (a
             # group box's title cannot hold a key): no row of its own.
             group = QtWidgets.QGroupBox()
+            group.setObjectName(section_object_name(s["id"]))  # the dock finds a box just opened by it
             group.setAccessibleName(group_title(s))
             box.addWidget(group)
             box = QtWidgets.QVBoxLayout(group)

@@ -48,9 +48,10 @@ class StatusBar:
         self.counts = QtWidgets.QLabel()
         self.credit = QtWidgets.QLabel(W.STATUS_CREDIT)
         self.credit.setToolTip(W.CREDIT)
-        bar.insertPermanentWidget(0, self.state)
-        bar.insertPermanentWidget(1, self.counts)
-        bar.addPermanentWidget(self.credit)
+        # Added in their order: insertPermanentWidget(0) on a bar with no
+        # permanent widgets yet makes Qt warn "Index out of range".
+        for w in (self.state, self.counts, self.credit):
+            bar.addPermanentWidget(w)
         self._last = None
         self.on = True
 

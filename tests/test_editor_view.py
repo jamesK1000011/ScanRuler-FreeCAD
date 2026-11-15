@@ -409,5 +409,105 @@ class OverlayInAView(unittest.TestCase):
         self.assertTrue(any(type(n).__name__ == "SoPickStyle" for n in walk(self.ov.ghost_sep)))
 
 
+class BodyView(StandInView):
+    """The stand-in view with a body under every pixel at z = 10: the
+    container's compound left of x = 0 of the part, the body right of it."""
+
+    def getObjectInfo(self, pos):  # noqa: N802
+        x, y = pos
+        obj = "ScanRulerReverse" if x < 400 else "ReverseBody"
+        return {"Document": "D", "Object": obj, "Component": "Edge1", "x": x - 400.0, "y": y - 300.0, "z": 10.0}
+
+
+class FilletPicks(unittest.TestCase):
+    """A fillet's (and a chamfer's) edges clicked on the body in the view:
+    the edge under the click toggled in the box, whether the scene graph saw
+    the press, only the release, or neither."""
+
+    def setUp(self):
+        from test_reverse_picks import BACK, FRONT, Builder as PickBuilder
+
+        self.FRONT, self.BACK = FRONT, BACK
+        self.ed = Editor()
+        self.ed.open_new("fillet", {"features": [], "nextFeatureId": 2}, [{"id": 2, "surface": False, "box": None}])
+        self.view = BodyView()
+        self.coin = stand_in_coin()
+        self.warned, self.later = [], []
+        store = types.SimpleNamespace(builder=PickBuilder())
+        env = {"store": lambda: store, "features": lambda: [], "hide": lambda ids, on: None,
+               "body_of": lambda d, o: 2 if o == "ReverseBody" else None,
+               "body_at": lambda d, p: 2 if abs(p[2] - 10) < 1e-6 else None,
+               "keep_selection": lambda: None, "later": self.later.append, "warn": self.warned.append}
+        self.ov = V.Overlay(self.ed, self.view, self.coin, None, _Vec, env)
+
+    def run_later(self):
+        while self.later:
+            self.later.pop(0)()
+
+    def click(self, x, y, press=True, release=True, qt=False):
+        if qt:
+            self.ov.qt_pressed(x, 600 - y)
+        if press:
+            self.view.send(_Event("btn", x, y, press=True))
+        if qt:
+            self.ov.qt_released(x, 600 - y)
+        handled = self.view.send(_Event("btn", x, y, press=False)) if release else False
+        self.run_later()
+        return handled
+
+    def test_an_edge_clicked_is_picked_and_clicked_again_let_go(self):
+        self.assertTrue(self.ed.wants_clicks())
+        self.assertTrue(self.click(403, 300))  # (3, 0, 10): the front top edge
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+        self.assertTrue(self.click(405, 310))  # the back one
+        self.assertEqual(self.ed.record["edges"], [self.FRONT, self.BACK])
+        self.assertTrue(self.click(403, 300))
+        self.assertEqual(self.ed.record["edges"], [self.BACK])
+        self.assertEqual(self.warned, [])
+
+    def test_a_chamfer_too(self):
+        self.ed.open_new("chamfer", {"features": [], "nextFeatureId": 2}, [{"id": 2, "surface": False, "box": None}])
+        self.assertTrue(self.click(403, 300))
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+
+    def test_the_press_taken_by_the_navigation(self):
+        self.assertTrue(self.click(403, 300, press=False, qt=True))
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+        self.assertEqual(self.ov.qt_click, False)
+
+    def test_press_and_release_both_taken_by_the_navigation(self):
+        self.click(403, 300, press=False, release=False, qt=True)
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+
+    def test_one_click_seen_twice_counts_once(self):
+        self.click(403, 300, qt=True)
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+
+    def test_a_drag_seen_by_qt_is_no_click(self):
+        self.ov.qt_pressed(403, 300)
+        self.ov.qt_released(460, 340)
+        self.view.send(_Event("btn", 460, 260, press=False))
+        self.run_later()
+        self.assertEqual(self.ed.record["edges"], [])
+
+    def test_a_click_on_the_container_s_compound_finds_the_body(self):
+        self.ed.record = {**self.ed.record, "body": 2}
+        self.ov.click(398, 300)  # the container is hit at (-2, 0, 10): no edge there
+        self.assertEqual(self.ed.record["edges"], [])
+        self.assertTrue(self.warned and self.warned[-1].startswith("fillet pick: no edge of body 2"))
+        self.assertTrue(self.ov.click(398 + 5, 300))
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+
+    def test_a_miss_says_why(self):
+        self.ov.env["body_at"] = lambda d, p: None
+        self.ov.click(390, 300)
+        self.assertIn("is not a Reverse engineer body", self.warned[-1])
+
+    def test_nearest_body_and_the_qt_point(self):
+        self.assertEqual(V.nearest_body([(1, 0.5), (2, 0.0), (3, None)], 0.01), 2)
+        self.assertIsNone(V.nearest_body([(1, 0.5)], 0.01))
+        self.assertEqual(V.qt_to_coin(10, 20, 600, 2.0), (20, 560))
+
+
 if __name__ == "__main__":
     unittest.main()
