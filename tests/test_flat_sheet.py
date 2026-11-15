@@ -22,7 +22,8 @@ except ImportError:
 @unittest.skipUnless(HAVE, "Agent Link is not importable here")
 class Sheet(unittest.TestCase):
     def setUp(self):
-        from scanrulerfc import fam_flat
+        from scanrulerfc.agentlink import fam_flat
+        from scanrulerfc.handlers import flat as flat_handlers
         from scanrulerfc import flat_core as FC
         from scanrulerfc import scanstate as St
         from test_flat_objects import S, sheet
@@ -33,7 +34,7 @@ class Sheet(unittest.TestCase):
 
         s = Sess()
         St.state(s)["flatSubject"] = {"kind": "image", "name": "x.png"}
-        f = fam_flat.fl_state(s)
+        f = flat_handlers.fl_state(s)
         g = sheet()
         f.update({"image": {"name": "x.png", "fileName": "x.png", "gray": g, "width": g.shape[1], "height": g.shape[0], "decoder": "test"},
                   "pxPerMm": {"x": 1 / S, "y": 1 / S}, "calSource": "measured", "chains": FC.detect_edges(g, 0.5, min_length=24)})

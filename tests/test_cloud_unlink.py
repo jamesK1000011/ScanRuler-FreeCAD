@@ -22,7 +22,7 @@ except ImportError:
 @unittest.skipUnless(HAVE, "Agent Link is not importable here")
 class Tools(unittest.TestCase):
     def setUp(self):
-        from scanrulerfc import fam_elements, fam_scan
+        from scanrulerfc.agentlink import fam_elements, fam_scan
         from scanrulerfc import scanstate as S
 
         class Sess:

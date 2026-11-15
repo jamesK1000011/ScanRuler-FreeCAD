@@ -24,7 +24,7 @@ except ImportError:
 @unittest.skipUnless(HAVE, "Agent Link is not importable here")
 class Heightmap(unittest.TestCase):
     def test_tiers(self):
-        from scanrulerfc import fam_scan
+        from scanrulerfc.agentlink import fam_scan
         from scanrulerfc import scanstate as S
 
         a = box_mesh(40, 30, 10, n=12, center=(0, 0, 5))
@@ -53,7 +53,7 @@ class Heightmap(unittest.TestCase):
 
 
     def _tool(self, V, F, name="t.stl"):
-        from scanrulerfc import fam_scan
+        from scanrulerfc.agentlink import fam_scan
         from scanrulerfc import scanstate as S
 
         class Sess:
@@ -127,7 +127,7 @@ class Heightmap(unittest.TestCase):
         self.assertAlmostEqual(gap, 0.8, delta=0.15)
 
     def test_deviation(self):
-        from scanrulerfc import fam_deviation as FD
+        from scanrulerfc.handlers import deviation as FD
 
         V, F = self._sheet(lambda X, Y: 0 * X, n=31)
         s, tool = self._tool(V, F)

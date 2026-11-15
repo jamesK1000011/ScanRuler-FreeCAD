@@ -9,13 +9,11 @@
 import os
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import model as M
-from . import scanstate as S
-
-GROUP = "scan-cad"
-INFO = "Scan elements into the FreeCAD document (ScanRuler, ported): fitted planes, cylinders, cones, spheres, tori, lines, circles and points as Part geometry; STEP."
+from .. import model as M
+from .. import scanstate as S
+from ..errors import ToolError
+from . import _bind
 
 
 def obj(props, required=()):
@@ -72,7 +70,9 @@ def shape_of(el, style):
     raise ToolError("invalid_input", f"{el['name']}: a {k} has no CAD form here.")
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def element_to_document(a):
         import Part
 
@@ -111,13 +111,10 @@ def tools(session):
             out["file"] = {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}
         return out
 
-    return [
-        Tool("element_to_document",
-             "The measured elements into the FreeCAD document as analytic geometry, in a group (group, \"Scan elements\" by default): a plane as a face of its extent; a cylinder, "
-             "cone, sphere or torus as a solid (style: solids, the default) or its surface (style: surfaces); a line or circle as an edge, a point as a vertex — as drawn, "
-             "an assumed diameter taken over the fitted. elements: names or ids, all by default. export: a .step path to write them too. In the frame the scan is measured "
-             "in now: align first to model in the part's own frame.",
-             obj({"elements": {"type": "array", "items": {"type": ["string", "integer"]}}, "style": {"enum": ["solids", "surfaces"]}, "group": {"type": "string"},
-                  "export": {"type": "string"}}),
-             element_to_document, changes=True),
-    ]
+    return {
+        "element_to_document": element_to_document,
+    }
+
+
+NAMES = ("element_to_document",)
+HANDLERS = _bind.table(bind, NAMES)

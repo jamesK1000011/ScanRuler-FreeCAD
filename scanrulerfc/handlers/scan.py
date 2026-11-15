@@ -6,24 +6,23 @@
 
 import os
 
-from agentlink.protocol import Tool, ToolError
+from .. import lent
+from .. import model as M
+from .. import scanstate as S
+from ..errors import ToolError
+from ..schema import guarded
+from . import _bind
 
-from . import model as M
-from . import scanstate as S
-from .schema import BOX, NORMAL, arr, boolean, element_ref, enum, guarded, integer, location, num, obj, one_of, vec3
-
-GROUP = "scan"
 SURFACE_LIMIT = 20000
 DRAFT_LIMIT = 400_000
 PATTERN_HEIGHTS, PATTERN_HEIGHTS_MAX, PATTERN_COUNT = 6, 12, 60
 OUTLINE_TOLERANCE, OUTLINE_CELLS, OUTLINE_LOOPS = 0.2, 250_000, 4
 HEIGHT_CELLS, HEIGHT_SIDE, HEIGHT_CELLS_FINE, HEIGHT_SIDE_FINE, HEIGHT_LEVELS = 1600, 40, 25_600, 160, 12
-INFO = "The 3D scan measured (ScanRuler, ported): open it and read what it holds."
 
 
-
-
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def document_mesh(ref):
         d = session.doc
         ms = [o for o in (d.Objects if d else []) if o.TypeId == "Mesh::Feature"]
@@ -60,9 +59,9 @@ def tools(session):
 
         import numpy as np
 
-        from . import noise_core as NC
-        from . import qa_core as Q
-        from .dev_surface import NominalSurface
+        from .. import noise_core as NC
+        from .. import qa_core as Q
+        from ..dev_surface import NominalSurface
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -200,7 +199,7 @@ def tools(session):
     def scan_draft(a):
         import numpy as np
 
-        from . import draft_core as DC
+        from .. import draft_core as DC
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -226,7 +225,7 @@ def tools(session):
                 if el:
                     split = {"point": el["fit"]["center"], "normal": el["fit"]["normal"], "from": el["name"]}
                 else:
-                    from .symmetry import accepted, find_symmetry
+                    from ..symmetry import accepted, find_symmetry
 
                     r = find_symmetry(scan)
                     if not r or not accepted(r):
@@ -259,9 +258,9 @@ def tools(session):
 
         import numpy as np
 
-        from . import repeat_core as RC
-        from . import section_core as SC
-        from .construct import ref_axis
+        from .. import repeat_core as RC
+        from .. import section_core as SC
+        from ..construct import ref_axis
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -316,7 +315,7 @@ def tools(session):
         return {"axis": {**({"name": name} if name else {}), "origin": M.js(origin, 6), "dir": M.js(d, 6), "zeroDir": M.js(zero, 6)}, "heights": out}
 
     def HM_cast(surface, R_):
-        from . import heightmap_core as HM
+        from .. import heightmap_core as HM
 
         t, faces, hits = HM.cast(surface, R_["start"] - 1e-3 * R_["ray"], R_["ray"], R_["du"], R_["dv"], R_["g"], R_["far"] + 2e-3)
         return t - 1e-3, faces, hits
@@ -326,8 +325,8 @@ def tools(session):
         a plane (its frame), over the box asked for or the whole scan."""
         import numpy as np
 
-        from . import heightmap_core as HM
-        from . import section_core as SC
+        from .. import heightmap_core as HM
+        from .. import section_core as SC
 
         st = S.state(session)
         plane = a.get("plane")
@@ -414,9 +413,8 @@ def tools(session):
 
         import numpy as np
 
-        from . import heightmap_core as HM
-        from . import section_core as SC
-        from .dev_surface import NominalSurface
+        from .. import heightmap_core as HM
+        from ..dev_surface import NominalSurface
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -429,7 +427,7 @@ def tools(session):
             raise ToolError("invalid_input", 'slopeDeg is for the levels of a height — give levels: true, of: "height".')
         dev = None
         if of == "deviation":
-            from . import fam_deviation as FD
+            from . import deviation as FD
 
             d = FD.dstate(session)
             readings = FD.map_values(d)
@@ -521,7 +519,7 @@ def tools(session):
                                     "largest": [{"cells": x["cells"], "area": round(x["cells"] * g["cell"] ** 2, 2), "box": {"min": M.js(x["box"]["min"], 3), "max": M.js(x["box"]["max"], 3)},
                                                  "joins": [round(h, 3) for h in x["joins"]]} for x in rr["ramps"][:HM.RAMPS_NAMED]]}
         if show_picture:
-            from agentlink import render as R
+            R = lent.render()
 
             img = np.zeros((g["rows"], g["cols"], 3)) + R.BG
             if fin.any():
@@ -540,10 +538,9 @@ def tools(session):
         return out
 
     def scan_outline(a):
-        import numpy as np
 
-        from . import heightmap_core as HM
-        from . import outline_core as OC
+        from .. import heightmap_core as HM
+        from .. import outline_core as OC
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -647,7 +644,7 @@ def tools(session):
     def scan_fit_surface(a):
         import numpy as np
 
-        from . import height_surface as HS
+        from .. import height_surface as HS
 
         st = S.state(session)
         scan = M.require_scan(st)
@@ -680,17 +677,21 @@ def tools(session):
             out["best"] = r["best"]
         return out
 
-    return [
-        Tool("scan_open", "Open a 3D scan (STL, PLY, OBJ, OFF, 3MF; glTF/GLB, Collada, VRML, 3DS in the units their format says) to measure, in place of the one open: units mm (default), cm, m or in — or object: a mesh in the document (one Agent Link's meshobj tools cleaned, say), in millimetres. A scan with elements or dimensions on it is kept unless discard: true. Returns the scan's summary and warnings: a scan under 1 mm or over 5 m across is most likely in other units than read (open it again with units); over 2 million triangles, mesh_reduce first; vertices that are not numbers (NaN or infinite) are dropped with their triangles.", obj({"path": {"type": "string"}, "object": {"type": "string"}, "units": {"type": "string", "enum": list(S.UNITS)}, "discard": {"type": "boolean"}}), scan_open),
-        Tool("scan_nearest", "Where a place lands on the scan: the vertex (a point snaps to the nearest), its coordinates and outward normal, a triangle it is a corner of, and how far it lies from the point asked about. Use it to check a point lies on the surface before fitting there. Changes nothing.", obj({"at": location("The place on the scan.")}, ["at"]), guarded(scan_nearest)),
-        Tool("scan_query", "The scan's vertices inside a box, or within a radius of a point (near), with their outward normals — the points on a face; normal keeps only those facing a direction. Returns matched, the vertex numbers, points and normals (mm, current frame), the box round them, centroid and mean normal; fields: count, ids or all (the default) says how much. Trap: at most limit come back (1000 by default, 20000 at most), every k-th spread evenly, step saying k — mark: true marks every matching vertex, not the thinned list, for element_fit_marked { marked: true }. Changes nothing on the part.", obj({"box": BOX, "near": obj({"at": vec3("The centre, mm."), "radius": num("mm.", exclusiveMinimum=0)}, ["at", "radius"], "A ball about a point, in place of box."), "normal": NORMAL, "limit": integer("How many vertices at most; 1000 by default, 20000 at most.", minimum=1, maximum=20000), "mark": boolean("Leave every matching vertex marked, for element_fit_marked { marked: true }."), "fields": enum(["count", "ids", "all"], "count: the numbers alone (the default with mark); ids: with the vertices; all: with points and normals (the default).")}), guarded(scan_query)),
-        Tool("scan_segment", "The scan's planar regions, found all at once: grown from the flattest places outward within maxDeg (15°) and maxRms (0.05 mm), those smaller than minArea given back. Returns found, considered, claimed and the regions, largest first, at most limit (20): id, normal, point, sigma, area (mm²), box, vertices, neighbours { id, deg }. mark: a region's id, or several, leaves their points marked for element_fit_marked { marked: true }. Changes nothing.", obj({"kind": enum(["plane"], "What to find; plane, the default and for now the only one."), "box": BOX, "minArea": num("mm²; by default a square 2 % of the scan's diagonal on a side.", minimum=0), "maxRms": num("mm; 0.05 by default.", exclusiveMinimum=0), "maxDeg": num("Degrees; 15 by default.", exclusiveMinimum=0, maximum=60), "limit": integer("How many regions are listed; 20 by default.", minimum=1, maximum=200), "mark": one_of([integer("A region's id.", minimum=1), arr(integer(minimum=1), "Several regions' ids.", minItems=1)], "Leave this region's points marked, or several regions'."), "list": boolean("With mark: the list of regions too.")}), guarded(scan_segment)),
-        Tool("scan_fit_surface", "A patch of the scan measured as a surface — a sloped side, a twisted ruled face, a dome, a saddle — from vertices or a box (normal keeps those facing a way). Returns the patch's frame (origin, normal, basisU, basisV) and each model as a height over (u, v): plane (a + b·u + c·v), bilinear (+ d·u·v) and quadric (+ d·u² + e·u·v + f·v², with curvature { k1, k2, r1, r2, axis1, axis2, shape }), each with coefficients, rms and worst; model: best (the default) fits every one and names the simplest whose rms is within a tenth of the lowest. Trap: 7 points at least, at most limit (20000) spread evenly. Changes nothing.", obj({"vertices": arr(integer(minimum=0), "The scan vertices of the patch.", minItems=7), "box": BOX, "normal": NORMAL, "model": enum(["plane", "bilinear", "quadric", "best"], "Which surface; best (the default) fits each and names the simplest that holds."), "limit": integer("How many points at most; 20000 by default.", minimum=7, maximum=20000)}), guarded(scan_fit_surface)),
-        Tool("scan_qa", "One call before modelling, to know what the scan will and will not give. Returns rims (the open edges of its holes: count, total length, the longest few with rim number, centre, size and circle where one fits), noise (the median scatter of small plane fits, mm; 0 on a CAD tessellation, with measured: the bends between facets), sheet where most of the area has a second skin facing back within reach (gauge { p5, p50, p95 }, twoSkins: that share), apart on such a part with flat walls (what stands over reach off every main wall — tabs bent in, ribs, bosses), tessellation where the mesh is an STL exported from CAD (cad, sparse, densifyTo), thickness through the part along axis — given, the alignment's z, or the way most of it faces — (p5, p50, p95; the main faces' tiltDeg, run and faces { topDeg, bottomDeg }) and notes, what looks wrong, plainly. Traps: a scanned skin with no rims, or only pinholes, is a wrap bridging the holes it did not see through; on a sheet or a thin shell, thickness reads the box across the part — the wall is sheet.gauge. Changes nothing.", obj({"axis": one_of([enum(["x", "y", "z"], "A world axis."), vec3("A direction, any length.")], "The thickness axis.")}), guarded(scan_qa)),
-        Tool("scan_draft", "The scan's walls that run near a pull direction — the sides a mould opens along — gathered into patches, each with draftDeg, the angle it leans off the pull: positive where the wall faces partly along the pull, negative where it faces back (a back draft, an undercut); with sigmaDeg, spreadDeg, centroid, box, area (mm²), count, facing, turnDeg and round for a boss's or hole's round side. Needs pull; box, nearDeg (10), patches (12), minArea (1 mm²) and split (a plane no patch reaches across: \"symmetry\", a plane element, \"XY\", \"YZ\", \"XZ\" or { point, normal }) narrow it. Trap: read it early on a moulded or cast part, along each direction the tools open — walls that lean half a degree to a few explain fits that miss by the lean. Changes nothing.", obj({"pull": vec3("The pull direction, any length."), "box": BOX, "nearDeg": num("Degrees off square to the pull a wall may lean and count; 10 by default.", exclusiveMinimum=0, maximum=45), "patches": integer("How many patches, the largest first; 12 by default.", minimum=1, maximum=100), "minArea": num("mm²; 1 by default.", minimum=0), "split": one_of([{"type": ["string", "integer"]}, obj({"point": vec3("A point on the plane."), "normal": vec3("Its normal.")}, ["point", "normal"])], "A plane no patch reaches across.")}, ["pull"]), guarded(scan_draft)),
-        Tool("scan_pattern", "Rotational repeats about an axis — a fan's blades, a flange's holes, a wheel's spokes, a gear's teeth — counted from the scan: it is cut square to the axis at each height in at (six spread over the part by default), and each cut (between radius.min and radius.max) is turned against itself. Needs axis: a cylinder, cone, line or circle element, \"X\", \"Y\", \"Z\", or { origin, dir }. Returns per height count, pitchDeg, phaseDeg (from zeroDir), betweenDeg, score (0 to 1; under 0.5 count is 1 and tried says the best), rms, worst, instances (angleDeg, radius, offDeg, rms, worst, share — a copy out of place or worn reads off) and rings (round outlines about the axis: radius, off, towardDeg, rms). Changes nothing.", obj({"axis": one_of([{"type": ["string", "integer"]}, obj({"origin": vec3("A point on the axis."), "dir": vec3("Its direction.")}, ["origin", "dir"])], "The axis the pattern turns about."), "at": arr(num("Height along the axis, mm."), "Heights to cut at.", minItems=1), "radius": obj({"min": num("mm.", minimum=0), "max": num("mm.", exclusiveMinimum=0)}, [], "Only the outline between these radii."), "count": integer("The most copies looked for; 60 by default.", minimum=2, maximum=128), "instances": boolean("Each copy's figures; true by default.")}, ["axis"]), guarded(scan_pattern)),
-        Tool("scan_heightmap", "Where the scan is first met looking along an axis (axis, -z by default: the top surface from above) or square onto a plane (plane: an element, \"XY\", \"YZ\", \"XZ\", or { origin, normal, u? }), over a grid of cells: pocket floors, ledges, a step's height, a face's tilt, a pad's tiers, an icon on a key in one call. of: height (the default), deviation (the deviation map's reading where each ray lands) or relief (the height less the surface round it, for icons, grooves and lettering; smooth, mm, three cells by default). Returns cell, origin [u0, v0], cols, rows, grid (rows from the low v up, null where nothing; grid[r][c] stands at u0 + (c + ½)·cell, v0 + (r + ½)·cell), min, max, hit, valued; with plane also its frame (a cell's point is origin + u·U + v·V + height·normal). levels: true gathers the values into levels in place of the grid, largest first — of a height, the sloped cells (past slopeDeg, 10°) left out first, each level of 5 % or more with its plane { origin, normal } (normal toward the viewer), which align_datum levels on; a gentle warp that ran levels together is taken out first and said (warp { rise, bow, note }); ramps says where the slopes between tiers lie when they are many. picture: true writes the map coloured as a PNG. Trap: with plane, box is [u, v, height] in the plane's frame (or { world: { min, max } }); scanLies says where the scan lies when few cells meet it. Changes nothing.", obj({"axis": enum(["+x", "-x", "+y", "-y", "+z", "-z"], "The way looked: -z (the default) from above."), "plane": one_of([element_ref('A plane element, or "XY", "YZ", "XZ".'), obj({"origin": vec3("A point on the plane, mm."), "normal": vec3("Its normal: the side looked from."), "u": vec3("A direction for u, flattened into the plane; a sketch's by default.")}, ["origin", "normal"])], "Look square onto this plane instead of along an axis."), "flip": boolean("With plane: look from its other side."), "of": enum(["height", "deviation", "relief"], "height (the default), deviation or relief."), "smooth": num("relief: the smoothing sigma, mm; three cells by default.", exclusiveMinimum=0), "box": {"type": "object", "description": "The part looked at: min and max (with plane [u, v, height]), or world: { min, max }.", "properties": {"min": vec3("Lowest corner."), "max": vec3("Highest corner."), "world": BOX}}, "cell": num("mm.", exclusiveMinimum=0), "grid": boolean("The grid of numbers; the default without levels. false gives the picture alone."), "levels": boolean("The values gathered into levels."), "gap": num("levels: the least gap between two levels, mm.", exclusiveMinimum=0), "slopeDeg": num("levels of a height: cells steeper than this are left out, degrees; 90 keeps every one.", exclusiveMinimum=0, maximum=90), "picture": boolean("Write the map coloured as a PNG."), "path": {"type": "string"}}), guarded(scan_heightmap)),
-        Tool("scan_outline", "The scan's outline seen along an axis, or square onto a plane, read as a sketch would draw it: a flange's plan, a bezel's opening, a gasket's shape — each loop as the fewest lines and arcs that follow it within tolerance (mm, 0.2 by default), a round loop as one circle. axis, plane, flip and box as scan_heightmap takes them, u, v as it lays them. Returns loops, the largest first (4 by default): hole, area (mm²), box, points ([u, v] corners), rounds { at, radius, center }, arcs { from, radius, center, mid } (from points[from] through mid to the next point) or circle { center, radius, rms }, and worst (mm the trace strays from what is drawn, worstAt when past the tolerance). Changes nothing.", obj({"axis": enum(["+x", "-x", "+y", "-y", "+z", "-z"], "The way looked: -z (the default) from above."), "plane": one_of([element_ref('A plane element, or "XY", "YZ", "XZ".'), obj({"origin": vec3("A point on the plane, mm."), "normal": vec3("Its normal: the side looked from."), "u": vec3("A direction for u, flattened into the plane.")}, ["origin", "normal"])], "Look square onto this plane instead of along an axis."), "flip": boolean("With plane: look from its other side."), "box": {"type": "object", "description": "Only the scan inside it: min and max (with plane [u, v, height]), or world: { min, max }.", "properties": {"min": vec3("Lowest corner."), "max": vec3("Highest corner."), "world": BOX}}, "tolerance": num("How closely the sketch follows the outline, mm; 0.2 by default.", exclusiveMinimum=0), "loops": integer("How many loops, the largest first; 4 by default.", minimum=1, maximum=50)}), guarded(scan_outline)),
-        Tool("scan_cloud", "The scan as a point cloud: every vertex with its outward normal, in the pose it is measured in now, as binary PLY (the default) or XYZ text (x y z nx ny nz a line). path, or with your files. Changes nothing.", obj({"format": enum(["ply", "xyz"], "ply or xyz."), "path": {"type": "string"}}), guarded(scan_cloud)),
-        Tool("scan_info", "The scan open: file, units, vertices, triangles, box, centre, area; and how many elements and dimensions are on it. Changes nothing.", obj({}), scan_info),
-    ]
+    return {
+        "scan_open": scan_open,
+        "scan_nearest": guarded(scan_nearest),
+        "scan_query": guarded(scan_query),
+        "scan_segment": guarded(scan_segment),
+        "scan_fit_surface": guarded(scan_fit_surface),
+        "scan_qa": guarded(scan_qa),
+        "scan_draft": guarded(scan_draft),
+        "scan_pattern": guarded(scan_pattern),
+        "scan_heightmap": guarded(scan_heightmap),
+        "scan_outline": guarded(scan_outline),
+        "scan_cloud": guarded(scan_cloud),
+        "scan_info": scan_info,
+    }
+
+
+NAMES = ("scan_open", "scan_nearest", "scan_query", "scan_segment", "scan_fit_surface", "scan_qa", "scan_draft", "scan_pattern", "scan_heightmap", "scan_outline", "scan_cloud", "scan_info")
+HANDLERS = _bind.table(bind, NAMES)

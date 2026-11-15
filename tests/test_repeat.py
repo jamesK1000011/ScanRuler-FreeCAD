@@ -55,7 +55,7 @@ class Tool(unittest.TestCase):
     def test_scan_pattern(self):
         sys.path.insert(0, HERE)
         from meshkit import box_mesh, cylinder_mesh
-        from scanrulerfc import fam_scan
+        from scanrulerfc.agentlink import fam_scan
         from scanrulerfc import scanstate as S
 
         parts = [cylinder_mesh(5, 10, seg=96, rows=4)]

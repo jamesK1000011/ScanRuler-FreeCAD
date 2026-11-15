@@ -14,13 +14,13 @@ import os
 import zipfile
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import pack_core as P
-from . import scanstate as S
+from .. import lent
+from .. import pack_core as P
+from .. import scanstate as S
+from ..errors import ToolError
+from . import _bind
 
-GROUP = "pack"
-INFO = "Library pack (ScanRuler, ported): a part bundled for sharing — models, renders, README, LICENSE — upstream licences checked, personal details scrubbed."
 VIEWS = ["iso", "iso-rear-left", "front", "top", "right", "iso-front-left"]
 
 
@@ -37,7 +37,9 @@ def _safe(name):
     return "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "part"
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def provenance_upstream():
         try:
             with open(os.path.join(session.out_dir, "provenance.json"), encoding="utf-8") as f:
@@ -88,7 +90,7 @@ def tools(session):
                 "note": "A guide from each licence's terms as commonly read, not legal advice: the person confirms each upstream licence."}
 
     def pack_write(a):
-        from agentlink import render as R
+        R = lent.render()
 
         ps = pstate(session)
         s = ps["settings"]
@@ -152,24 +154,12 @@ def tools(session):
                 "scrubbed": [{"what": w, "count": c} for w, c in scrubbed.items()], "credited": pl["credited"], "leftOut": pl["leftOut"],
                 "note": "Read README.md before uploading; the upload is the person's to do."}
 
-    return [
-        Tool("pack_setup",
-             "The library pack: title, author (the copyright holder), summary, printSettings, licence (an id — CC-BY-4.0, CC-BY-SA-4.0, CC-BY-NC-4.0, CC-BY-NC-SA-4.0, "
-             "CC-BY-ND-4.0, CC-BY-NC-ND-4.0, CC0-1.0, MIT, GPL-3.0-only, ARR — or as a page wrote it), includeStep, include3mf, renders (0–6), bodies (all by default), "
-             "files to add (a sliced 3MF, photos, the manual's HTML), upstream (the parts taken from others: { part, body?, title, author, url, licence, source, "
-             "redistribute, modified, permission }; catalog_provenance's records by default). With nothing, reads it.",
-             obj({"title": {"type": "string"}, "author": {"type": "string"}, "summary": {"type": "string"}, "printSettings": {"type": "string"}, "licence": {"type": "string"},
-                  "includeStep": {"type": "boolean"}, "include3mf": {"type": "boolean"}, "renders": {"type": "integer", "minimum": 0, "maximum": 6},
-                  "bodies": {"type": "array", "items": {"type": "string"}}, "files": {"type": "array", "items": {"type": "string"}},
-                  "upstream": {"type": "array", "items": {"type": "object"}}}),
-             pack_setup),
-        Tool("pack_plan",
-             "Whether the pack can go out under its licence: each upstream part checked (credited, with what the pack must carry for it; blocked, with why; leftOut — "
-             "parts from sources whose terms don't allow passing files on, linked in the README instead), and what is missing. A guide, not legal advice. Changes nothing.",
-             obj({}), pack_plan),
-        Tool("pack_write",
-             "Write the pack as a zip (path, or <title>.zip with your files): models/ (STL, 3MF, STEP of each body), images/ (renders), files/, README.md with attribution, "
-             "LICENSE. Every file scrubbed first — absolute paths and the user name in them, access codes, keys, tokens, printer serials and addresses, e-mails, a STEP "
-             "header's author, an STL header's text, picture metadata — and each kind of change reported. Refused while pack_plan says it can't go out.",
-             obj({"path": {"type": "string"}}), pack_write),
-    ]
+    return {
+        "pack_setup": pack_setup,
+        "pack_plan": pack_plan,
+        "pack_write": pack_write,
+    }
+
+
+NAMES = ("pack_setup", "pack_plan", "pack_write")
+HANDLERS = _bind.table(bind, NAMES)

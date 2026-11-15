@@ -10,16 +10,14 @@
 
 import math
 
-from agentlink.protocol import Tool, ToolError
+from .. import noise_core as N
+from .. import scanstate as S
+from .. import thread_core as T
+from ..errors import ToolError
+from ..model import Refusal, find_element
+from . import _bind, noise
+from ._bind import bound
 
-from . import fam_noise
-from . import noise_core as N
-from . import scanstate as S
-from . import thread_core as T
-from .model import Refusal, find_element
-
-GROUP = "scan-thread"
-INFO = "Thread match on the scan (ScanRuler, ported): ISO metric, UNC/UNF/UNEF, NPT, G/R pipe, Tr, ACME and the 45° print form named from a fitted bore or boss."
 POINTS = 200_000
 BAND_MM, BAND_SHARE = 0.6, 0.2
 # The forms FreeCAD's PartDesign Hole cuts (thread_cut).
@@ -70,7 +68,9 @@ def _axis(st, a):
     return ax["origin"], ax["direction"], float(ax["radius"]), ax.get("length"), {}
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def scan_thread(a):
         st = S.state(session)
         scan = S.scan_of(session)
@@ -101,7 +101,7 @@ def tools(session):
                     "note": "No repeat stands clear of the scan's noise: a plain wall, or teeth the scan did not resolve (fine pitch, a coarse scanner)."}
         rng = rd["threaded"] or rd["span"]
         shape = T.read_shape(P, origin, d, radius, band, rng[0], rng[1], rd["pitch"])
-        plan = fam_noise.plan_now(session)
+        plan = noise.plan_now(session)
         own = max(rd["noise"], (shape or {}).get("noise", 0))
         reading = T.reading_of(rd, shape, plan["sigmaMm"] if plan else 0.0)
         families = a.get("families") or T.FAMILY_IDS
@@ -138,46 +138,16 @@ def tools(session):
         st.setdefault("threads", []).append({"verdict": v["verdict"], "best": best["designation"] if best else None, "tied": v["tied"], "at": [round(float(x), 3) for x in origin]})
         return out
 
-    fams = {"type": "array", "items": {"enum": T.FAMILY_IDS}, "minItems": 1, "description": f"Families to try: {', '.join(T.FAMILY_IDS)}; all by default."}
-    axis = {"type": "object", "description": "{ element } — a cylinder fitted in the bore or on the boss (element_fit kind cylinder) — or { origin, direction, radius, length? }.",
-            "properties": {"element": {"type": ["integer", "string"]}, "origin": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
-                           "direction": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}, "radius": {"type": "number", "exclusiveMinimum": 0},
-                           "length": {"type": "number", "exclusiveMinimum": 0}}, "additionalProperties": False}
-    return [
-        Tool("scan_thread",
-             "Name a scanned thread: the points about a fitted cylinder's axis read for pitch (the sectors' autocorrelation, window by window), crests and roots, the hand, "
-             "then folded along the helix for a sharper pitch, starts, the flank angle and the taper, and decided against ISO metric, UNC, UNF, UNEF, NPT, G/R pipe, Tr, ACME "
-             "and the 45° print form. verdict: match (high or low confidence), ambiguous (tied: the sizes this scan can't tell apart, deciding: the hand measurement that "
-             "would, and what each reads) or none. The diameter tolerance goes by the wall's noise raised to the scan noise to plan with (scan_noise, scanner), so a noisy "
-             "scanner ties sizes it can't resolve. pitchFloor: the least share a pitch is resolved to (0.01; raise it for a scanner whose scale you trust less). "
-             "Trap: a bore is matched on its crests (the minor diameter), a boss on its own (the major).",
-             obj({"axis": axis, "families": fams, "band": {"type": "number", "exclusiveMinimum": 0, "description": "mm either side of the radius a point counts; max(0.6, 0.2·radius) by default."},
-                  "length": {"type": "number", "exclusiveMinimum": 0, "description": "mm along the axis, centred on its origin; the cylinder's length by default."},
-                  "pitchFloor": {"type": "number", "minimum": 0.002, "maximum": 0.05}, "detail": {"enum": ["brief", "full"]}}, ["axis"]),
-             scan_thread),
-    ]
+    return {
+        "scan_thread": scan_thread,
+    }
 
 
 def read_for_agent_link(session, args):
-    """scan_thread for Agent Link's thread_identify { scan }."""
-    t = next(x for x in tools(session) if x.name == "scan_thread")
-    return t.fn(args)
+    """scan_thread for Agent Link's thread_identify { scan } (the family
+    layer registers it, refusals made Agent Link's there)."""
+    return bound(session, bind)["scan_thread"](args)
 
 
-def register():
-    # Agent Link API 1: a reader of kind "thread_scan", whoever answers
-    # thread_identify { scan } (Workshop's Make add-on since 14 Nov 2026).
-    try:
-        from agentlink import hooks
-    except ImportError:
-        hooks = None
-    if hooks is not None:
-        hooks.register_reader("thread_scan", read_for_agent_link)
-        return
-    try:  # an Agent Link from before the hooks
-        from agentlink.families import thread
-    except ImportError:
-        return
-    hook = getattr(thread, "SCAN_READERS", None)
-    if hook is not None and read_for_agent_link not in hook:
-        hook.append(read_for_agent_link)
+NAMES = ("scan_thread",)
+HANDLERS = _bind.table(bind, NAMES)

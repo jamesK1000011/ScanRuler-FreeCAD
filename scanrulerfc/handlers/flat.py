@@ -14,15 +14,13 @@ import os
 
 import numpy as np
 
-from agentlink.protocol import Tool, ToolError
-
-from . import flat_core as FC
-from . import scanstate as S
-from .fam_sections import find_section, flat_chains, sec_state
-from .geom2d import FitError, fit_arc, fit_arc_region, fit_circle, fit_circle_region, fit_line, fit_line_region, flat_point, with_circle_zone
-
-GROUP = "flat"
-INFO = "The 2D sheet (ScanRuler, ported): a flatbed image or a section — calibrate, detect edges, fit lines and circles, dimension, report, DXF/SVG."
+from .. import flat_core as FC
+from .. import lent
+from .. import scanstate as S
+from ..errors import ToolError
+from ..geom2d import FitError, fit_arc, fit_arc_region, fit_circle, fit_circle_region, fit_line, fit_line_region, flat_point, with_circle_zone
+from . import _bind
+from .sections import find_section, flat_chains
 
 METHODS = {
     "point": [("flat-point-pick", "pick", 1), ("flat-point-midpoint", "construct", ["point", "point"]), ("flat-point-intersect", "construct", ["line", "line"]), ("flat-point-center", "construct", ["point"])],
@@ -65,7 +63,7 @@ def sheet(session):
 
 
 def FC_nice(x):
-    from .dev_field import nice_ceil
+    from ..dev_field import nice_ceil
 
     return nice_ceil(x)
 
@@ -177,7 +175,9 @@ def read_image(path, data):
     raise ValueError("only PNG is read where Qt's image reader is not available — save the scan as PNG")
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def detect(f, sensitivity):
         img = f["image"]
         p = f["pxPerMm"]
@@ -360,12 +360,10 @@ def tools(session):
             fh.write(text)
         return {"file": {"path": path, "bytes": os.path.getsize(path)}, "elements": len(drawing["elements"]), "chains": len(chains or [])}
 
-    spot = {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
-    ref = {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "minLength": 1}]}
     def flat_objects(a):
         import math
 
-        from . import flat_objects as FO
+        from .. import flat_objects as FO
 
         f = fl_state(session)
         img = f.get("image")
@@ -396,7 +394,7 @@ def tools(session):
     def flat_profile(a):
         import math
 
-        from . import flat_objects as FO
+        from .. import flat_objects as FO
 
         f = fl_state(session)
         units, unit, chains, _ = sheet(session)
@@ -544,7 +542,7 @@ def tools(session):
         return out
 
     def flat_render(a):
-        from agentlink import render as R
+        R = lent.render()
 
         f = fl_state(session)
         units, unit, chains, sec = sheet(session)
@@ -623,11 +621,10 @@ def tools(session):
                         "note": "pixel (column c, row r from the top) is the sheet place [left + c·unitsPerPx, top − r·unitsPerPx]"},
                 **({"grid": FC_nice(max(hi - lo) / 8)} if "grid" in show else {})}
 
-    kinds = ", ".join(f"{k}: {', '.join(f'{m[0]} ({m[1]})' for m in v)}" for k, v in METHODS.items())
     def flat_curvature(a):
         """How an edge bends, as the curvature comb draws it (ScanRuler 0.11.2)."""
-        from . import curvature as K
-        from . import section_core as SC
+        from .. import curvature as K
+        from .. import section_core as SC
 
         f = fl_state(session)
         units, scale, chains, sec = sheet(session)
@@ -716,43 +713,24 @@ def tools(session):
         return out
 
 
-    return [
-        Tool("flat_objects", "The separate parts on the flatbed image, parted from the background by a grey level (Otsu's unless threshold is given; dark: whether the parts are darker, read from the border by default) and numbered in reading order — what flat_profile takes by number. Returns each with area, holes, box, centroid, equivalentDiameter, feret (largest and smallest caliper widths and their directions), axisAngleDeg and, with outline: true, its outline. minArea drops specks (sheet units²). Changes nothing on the sheet.",
-             obj({"threshold": {"type": "integer", "minimum": 0, "maximum": 255}, "dark": {"type": "boolean"}, "minArea": {"type": "number", "minimum": 0}, "minHoleArea": {"type": "number", "minimum": 0},
-                  "outline": {"type": "boolean"}, "limit": {"type": "integer", "minimum": 1, "maximum": 1000}}), flat_objects),
-        Tool("flat_profile", "An outline read against a centre (kind radial, the default: a part seen from above — a knurl's or a gear's teeth round it) or along an axis (axial: a part lying on its side, each side apart), and its peaks counted by prominence. The outline: object (a number from flat_objects) or chains (edge chains by number). about: a 2D circle, arc or point (radial) or line (axial); else the object's own centroid or long axis. Returns per side peaks, pitch (degrees radial, sheet units axial), max, min, peakMean, valleyMean, depth; detail: full lists the peaks. samples and prominence override the defaults. Changes nothing.",
-             obj({"object": {"type": "integer", "minimum": 1}, "chains": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1}, "kind": {"type": "string", "enum": ["radial", "axial"]},
-                  "about": {"type": ["integer", "string"]}, "samples": {"type": "integer", "minimum": 3, "maximum": 4096}, "prominence": {"type": "number", "exclusiveMinimum": 0},
-                  "detail": {"type": "string", "enum": ["brief", "full"]}}), flat_profile),
-        Tool("flat_open_image", "Open a flatbed scan of a part — PNG (or JPEG where Qt's image reader loads) at the highest optical resolution — on the 2D sheet, in place of what was there, and find its edges. The scale the file declares (pHYs, JFIF) is taken until it is calibrated. Returns the 2D state, image.decoder saying how it was read.",
-             obj({"path": {"type": "string", "minLength": 1}}, ["path"]), flat_open_image),
-        Tool("flat_calibrate", "Set the image's scale against a known length: distance takes two places a known distance apart, diameter three or more on a circle of known diameter; mm is that length; places in the sheet's units as they are now. The edges are found again (their chain numbers change).",
-             obj({"mode": {"type": "string", "enum": ["distance", "diameter"]}, "points": {"type": "array", "items": spot, "minItems": 2}, "mm": {"type": "number", "exclusiveMinimum": 0}}, ["mode", "points", "mm"]), flat_calibrate),
-        Tool("flat_detect_edges", "Find the image's edges again at a sensitivity from 0 (only the strongest) to 1 (every faint one): subpixel Canny chains, gaps bridged, chains under a millimetre and texture dropped. Returns how many chains.", obj({"sensitivity": {"type": "number", "minimum": 0, "maximum": 1}}), flat_detect_edges),
-        Tool("flat_curvature", "How an edge bends, as ScanRuler's curvature comb draws it: along detected edges or a section's cut (chains, by number as flat_edges lists them) or a fitted arc or circle (element), told as stretches in order — straight, arc (radius from its middle reading, least and most; on a section convex, a round, or concave, a fillet's hollow) or the transition between; from/to are the arc length along it. A chain is read smoothed over window (2 by default), which leaves one window off each end of an open chain and turns a sudden change into a ramp about a window long, the change in its middle — a fillet's tangent point is the middle of the transition before it; a transition much longer than the window is a blend that is no arc. straightBelow (1/unit) is straight; tolerance how far an arc's readings may stray (0.1); step adds readings that far apart. comb: true also draws the comb into the document (on the section's plane on the part), scale and spacing to size it.",
-             obj({"chains": {"type": "array", "items": {"type": "integer", "minimum": 0}}, "element": {"type": ["integer", "string"]}, "window": {"type": "number", "minimum": 0.2, "maximum": 20}, "straightBelow": {"type": "number", "exclusiveMinimum": 0},
-                  "tolerance": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}, "step": {"type": "number", "exclusiveMinimum": 0}, "comb": {"type": "boolean"}, "scale": {"type": "number", "exclusiveMinimum": 0}, "spacing": {"type": "number", "exclusiveMinimum": 0}, "name": {"type": "string"}}), flat_curvature),
-        Tool("flat_edges", "The sheet's edge chains, longest first: chain number, points, length and bounds in the sheet's units, closed. Changes nothing.", obj({"limit": {"type": "integer", "minimum": 1}}), flat_edges),
-        Tool("flat_fit", f"Make a 2D element — kind point, line, circle or arc, by a method of that kind: {kinds}. A pick method takes points (snapped to the nearest edge within reach unless snap: false; picks says where each landed); an edge method chains (whole) and/or box (sheet units), strays voted out; a construct method refs, other 2D elements. Seed methods are not ported.",
-             obj({"kind": {"type": "string", "enum": list(METHODS)}, "method": {"type": "string"}, "points": {"type": "array", "items": spot, "minItems": 1}, "chains": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1},
-                  "box": obj({"min": spot, "max": spot}, ["min", "max"]), "refs": {"type": "array", "items": ref}, "name": {"type": "string", "minLength": 1}, "snap": {"type": "boolean"}, "reach": {"type": "number", "exclusiveMinimum": 0}}, ["kind"]), flat_fit),
-        Tool("flat_dimension_add", "Measure between two 2D elements: flat-dist-point-point, flat-dist-point-line, flat-dist-line-line (near-parallel only), flat-angle-line-line. Points, circles and arcs count as their centre, lines as lines. Without type, the first that takes the two in the order given. Returns the dimensions and the report.",
-             obj({"refs": {"type": "array", "items": ref, "minItems": 2, "maxItems": 2}, "type": {"type": "string", "enum": [t["id"] for t in FC.DIMENSION_TYPES]}, "name": {"type": "string", "minLength": 1}}, ["refs"]), flat_dimension_add),
-        Tool("flat_note_add", "Write a text note on the 2D sheet: one line; at is its lower-left corner, sheet units. Listed in the report and written into the SVG and DXF exports. Returns the note with its id.",
-             obj({"text": {"type": "string", "minLength": 1}, "at": spot}, ["text", "at"]), flat_note_add),
-        Tool("flat_edit", "Change one thing on the 2D sheet: an element or a dimension (by id or name) takes a new name; a note (by id) new text or a new place (at); any of them visible: false to leave it out of the exports. Returns the 2D state.",
-             obj({"element": ref, "dimension": ref, "note": {"type": "integer", "minimum": 1}, "name": {"type": "string"}, "text": {"type": "string"}, "at": spot, "visible": {"type": "boolean"}}), flat_edit),
-        Tool("flat_remove", "Remove elements, dimensions and notes from the 2D sheet, each by id or name (a note by id). An element built on a removed one stays and says it has lost its source (lostSource), a dimension on one turns invalid (invalidDimensions). Returns what is left.",
-             obj({"elements": {"type": "array", "items": ref}, "dimensions": {"type": "array", "items": ref}, "notes": {"type": "array", "items": {"type": "integer", "minimum": 1}}}), flat_remove),
-        Tool("flat_set_alignment", "Put the part's zero point at origin and its X axis through xAxis (sheet places): the report and the exports then read in that frame. clear: true takes it off. Returns the 2D state.",
-             obj({"origin": spot, "xAxis": spot, "clear": {"type": "boolean"}}), flat_set_alignment),
-        Tool("flat_render", "A picture of the 2D sheet as a PNG (path, or sheet.png with your files), in its own units — +X right, +Y up — with the image, the edge chains (teal), the elements in their colours and a grid; show picks the layers (image, edges, elements, grid); frame { min, max } zooms in; size the long side in pixels (1200). map says where it lies. Changes nothing.",
-             obj({"frame": obj({"min": spot, "max": spot}, ["min", "max"]), "show": {"type": "array", "items": {"type": "string", "enum": ["image", "edges", "elements", "grid"]}},
-                  "size": {"type": "integer", "minimum": 200, "maximum": 4000}, "path": {"type": "string"}}), flat_render),
-        Tool("flat_report", "The 2D report as ScanRuler's Copy button gives it: the image or section, the scale it rests on, every element and dimension. Changes nothing.", obj({}), flat_report),
-        Tool("flat_export", "Write the sheet at true scale: dxf (AutoCAD 2000, millimetres declared, y up; edges as LWPOLYLINE thinned to 0.01 mm, fits as LINE/CIRCLE/ARC/POINT, labels as TEXT) or svg (one unit per millimetre, y down). To path, the session's folder by default.",
-             obj({"format": {"type": "string", "enum": ["dxf", "svg"]}, "path": {"type": "string", "minLength": 1}}, ["format"]), flat_export),
-    ]
+    return {
+        "flat_objects": flat_objects,
+        "flat_profile": flat_profile,
+        "flat_open_image": flat_open_image,
+        "flat_calibrate": flat_calibrate,
+        "flat_detect_edges": flat_detect_edges,
+        "flat_curvature": flat_curvature,
+        "flat_edges": flat_edges,
+        "flat_fit": flat_fit,
+        "flat_dimension_add": flat_dimension_add,
+        "flat_note_add": flat_note_add,
+        "flat_edit": flat_edit,
+        "flat_remove": flat_remove,
+        "flat_set_alignment": flat_set_alignment,
+        "flat_render": flat_render,
+        "flat_report": flat_report,
+        "flat_export": flat_export,
+    }
 
 
 def scale_fit(fit, k):
@@ -809,3 +787,7 @@ def construct(mid, fits):
             raise FitError("A circle through centers takes points, circles or arcs.")
         return fit_circle(np.array(pts))
     raise FitError(f"Unknown method {mid}.")
+
+
+NAMES = ("flat_objects", "flat_profile", "flat_open_image", "flat_calibrate", "flat_detect_edges", "flat_curvature", "flat_edges", "flat_fit", "flat_dimension_add", "flat_note_add", "flat_edit", "flat_remove", "flat_set_alignment", "flat_render", "flat_report", "flat_export")
+HANDLERS = _bind.table(bind, NAMES)

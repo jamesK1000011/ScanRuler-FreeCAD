@@ -3,10 +3,9 @@
 # src/commands/refs.ts (locationSchema, elementRefSchema)
 #
 # The JSON schema pieces the tool inputs are built from, and the wrapper that
-# turns a model Refusal into Agent Link's ToolError.
+# turns a model Refusal into a refusal (errors.ToolError).
 
-from agentlink.protocol import ToolError
-
+from .errors import ToolError
 from .model import Refusal
 
 
@@ -62,7 +61,7 @@ NORMAL = obj({"dir": vec3("A direction, any length."), "withinDeg": num("Degrees
 
 
 def guarded(fn):
-    """The tool's function with model refusals made Agent Link's."""
+    """The tool's function with model refusals made its refusals."""
 
     def run(a):
         try:

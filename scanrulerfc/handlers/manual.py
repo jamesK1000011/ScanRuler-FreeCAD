@@ -10,19 +10,16 @@
 # the bodies where they sit and writes how to put them together.
 
 import json
-import math
 import os
 
 import numpy as np
-from agentlink.protocol import Tool, ToolError
 
-from . import manual_core as MC
-from . import scanstate as S
+from .. import errors, lent
+from .. import manual_core as MC
+from .. import scanstate as S
+from ..errors import ToolError
+from . import _bind
 
-GROUP = "manual"
-INFO = "Assembly instructions (ScanRuler, ported): steps from bodies in their assembled places, each part's way in checked, the words linted, an HTML manual with a picture per step."
-# A long job: Agent Link queues and times it (hooks.md, HEAVY).
-HEAVY = {"manual_render"}
 FACES_MAX = 5000
 SAMPLES = 16
 CLEAR = 2.0
@@ -48,13 +45,15 @@ def _unit(v):
     return v / n
 
 
-def tools(session):
+def bind(session):
+    """{tool name: fn(args)} for one session (Agent Link's, or the
+    add-on's own runner's context)."""
     def shape_of(part):
         if not part.get("body"):
             return None
         try:
             o = session.body(part["body"])
-        except ToolError:
+        except errors.REFUSED:  # the host's refusal too (Agent Link's session.body)
             raise ToolError("not_found", f"Part {part['name']!r}: no body {part['body']!r} in the document.")
         return o.Shape.copy()
 
@@ -217,7 +216,7 @@ def tools(session):
         return out
 
     def manual_render(a):
-        from agentlink import render as R
+        R = lent.render()
 
         m = mstate(session)
         if not m["steps"]:
@@ -288,34 +287,12 @@ def tools(session):
                 **({"lint": lint} if lint else {}),
                 "note": "One HTML page with its pictures inside: open it in a browser, print it to PDF. manual_check first if the ways in are not checked."}
 
-    v3 = {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}
-    part = obj({"name": {"type": "string"}, "body": {"type": "string"}, "kind": {"enum": ["part", "hardware"]}, "designation": {"type": "string"},
-                "source": {"type": "string"}, "qty": {"type": "integer", "minimum": 1}}, ["name"])
-    step = obj({"id": {"type": "string"}, "at": {"type": "integer", "minimum": 1},
-                "place": {"type": "array", "items": obj({"part": {"type": "string"}, "move": v3, "travel": {"type": "number", "exclusiveMinimum": 0}}, ["part"])},
-                "sub": {"type": "string"}, "tools": {"type": "array", "items": {"type": "string"}}, "torque": {"type": "string"}, "notes": {"type": "string"},
-                "warnings": {"type": "array", "items": obj({"level": {"enum": MC.SIGNALS}, "text": {"type": "string"}}, ["level", "text"])},
-                "text": {"type": "string"}, "view": {"type": "string"}})
-    return [
-        Tool("manual_plan",
-             "The assembly manual's plan, as data kept with the project: settings (title, explode — how far new parts are drawn out along their move, a share of their travel, 1 —, "
-             "view, product, version, publisher, safety, intendedUse, disposal), style (name ste100 — the default: short sentences, one instruction each, the verb first —, plain, "
-             "or custom with your own Markdown rules in custom: \"maxWords: 25\", \"passive: off\", \"- avoid -> use\"; words: the project's word list), parts ({ name, body, kind "
-             "part|hardware, designation, source, qty }; fromBodies: true adds every body not yet a part), steps (the whole list) or step (add or replace by id; at: a position). "
-             "A step: place [{ part, move: the direction it moves in to its place, travel mm (clear of itself by default) }], sub (build a sub-assembly apart; a later step places it by that name), "
-             "tools, torque, warnings [{ level danger|warning|caution|notice, text }], text, view. export: a file path to write the plan; import: one to read. With nothing, reads it.",
-             obj({"settings": {"type": "object"}, "style": obj({"name": {"enum": MC.STYLES}, "words": {"type": "object"}, "custom": {"type": "string"}}),
-                  "parts": {"type": "array", "items": part}, "removeParts": {"type": "array", "items": {"type": "string"}}, "fromBodies": {"type": "boolean"},
-                  "steps": {"type": "array", "items": step}, "step": {"type": "array", "items": step}, "export": {"type": "string"}, "import": {"type": "string"}}),
-             manual_plan),
-        Tool("manual_check",
-             "Check the manual: each part swept in along its move against the parts already there (in its sub-assembly, or the main one) — blockedShortBy mm where it runs into one, "
-             "overlapsInPlace where it sits in another — and each step's words linted to the style (length, passive, one instruction, the verb first, the word list). A body over "
-             "5000 faces is named as not checked. Changes nothing.",
-             obj({}), manual_check),
-        Tool("manual_render",
-             "Write the manual as one HTML page with its pictures inside (path, or <title>.html with your files): the parts list, then each step's picture — parts in place grey, the "
-             "step's own in colour drawn out along their moves with arrows in —, its parts, tools, torque, safety messages and words. Answers the lint findings. Print it to PDF from a browser.",
-             obj({"path": {"type": "string"}, "width": {"type": "integer", "minimum": 200, "maximum": 2000}, "height": {"type": "integer", "minimum": 200, "maximum": 2000}}),
-             manual_render),
-    ]
+    return {
+        "manual_plan": manual_plan,
+        "manual_check": manual_check,
+        "manual_render": manual_render,
+    }
+
+
+NAMES = ("manual_plan", "manual_check", "manual_render")
+HANDLERS = _bind.table(bind, NAMES)

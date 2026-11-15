@@ -138,8 +138,8 @@ except ImportError:
 @unittest.skipUnless(HAVE_AL, "Agent Link is not importable here")
 class Tools(unittest.TestCase):
     def test_measure_calibrate_export(self):
-        from scanrulerfc import fam_deviation as D
-        from scanrulerfc import fam_fitcomp
+        from scanrulerfc.handlers import deviation as D
+        from scanrulerfc.agentlink import fam_fitcomp
         from scanrulerfc import scanstate as S
 
         class Sess:

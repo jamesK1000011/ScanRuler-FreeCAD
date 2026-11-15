@@ -45,7 +45,7 @@ def plate(w=40.0, h=30.0, r=5.0, hole=5.0, step=0.1):
 @unittest.skipUnless(HAVE, "Agent Link is not importable here")
 class Outline(unittest.TestCase):
     def test_plate(self):
-        from scanrulerfc import fam_scan
+        from scanrulerfc.agentlink import fam_scan
         from scanrulerfc import scanstate as S
 
         V, F = plate()

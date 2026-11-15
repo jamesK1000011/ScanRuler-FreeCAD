@@ -96,21 +96,3 @@ def read(shape, spacing=1.5, reach=12.0, cap=2500, cone_rays=8):
     return {"least": round(float(t[j]), 3), "at": [round(float(x), 3) for x in centre[idx[j]]], "samples": int(len(idx)), "read": len(readings),
             "readings": readings, "normals": normals, "spacing": step, "by": BY}
 
-
-def register():
-    # Agent Link API 1: a reader of kind "wall", whoever asks for the
-    # thinnest wall (the DFM check, Workshop's Make add-on since 14 Nov 2026).
-    try:
-        from agentlink import hooks
-    except ImportError:
-        hooks = None
-    if hooks is not None:
-        hooks.register_reader("wall", read)
-        return
-    try:  # an Agent Link from before the hooks
-        from agentlink import printability
-    except ImportError:
-        return
-    hook = getattr(printability, "WALL_READERS", None)
-    if hook is not None and read not in hook:
-        hook.append(read)
