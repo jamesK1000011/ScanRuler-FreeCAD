@@ -6,12 +6,11 @@
 #
 # Everything past the families hooks into Agent Link where this Agent Link
 # has the hook. An older Agent Link lacks some (render.register_layer, the
-# printability wall readers, thread scan readers, add-on guides): each is
+# printability wall readers, thread scan readers): each is
 # tried on its own and skipped when missing or failing, so importing this
 # module never raises because of the Agent Link it runs in.
 
 import importlib
-import os
 import sys
 
 NAMES = ["fam_scan", "fam_elements", "fam_align", "fam_dimensions", "fam_sections", "fam_meshtools", "fam_flat", "fam_deviation", "fam_thickness", "fam_noise", "fam_thread", "fam_wear", "fam_catalog", "fam_manual", "fam_pack", "fam_fitcomp", "fam_cad"]
@@ -67,17 +66,5 @@ def _thread():
     register()
 
 
-def _guides():
-    # The scan guides beside Agent Link's own (guide_read: measure-scan,
-    # mesh-tools), where this Agent Link takes guides from add-ons.
-    try:
-        from agentlink import tools as al_tools
-    except ImportError:
-        return
-    register_guides = getattr(al_tools, "register_guides", None)
-    if register_guides is not None:
-        register_guides(os.path.join(os.path.dirname(os.path.abspath(__file__)), "guides"))
-
-
-for _name, _call in (("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("guides", _guides)):
+for _name, _call in (("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread)):
     _hook(_name, _call)
