@@ -13,10 +13,14 @@
 #               in memory) and sets Results, Status and its own Shape (the
 #               visible solid bodies as one compound). It raises only when
 #               nothing can build; a feature that fails says so in Results.
-#   body        Part::FeaturePython: Source (the container), BodyId (a float,
-#               so island ids hold), Surface. execute() copies its shape
-#               from the container's build. Matched by BodyId, so a name, a
-#               colour or a link from outside survives a rebuild.
+#   body        Part::FeaturePython: BodyId (a float, so island ids hold),
+#               Surface. execute() copies its shape from the build of the
+#               container whose Group holds it. Matched by BodyId, so a
+#               name, a colour or a link from outside survives a rebuild.
+#               No link back to the container: its Group already puts it
+#               after its bodies, and a link back closes a cycle (FreeCAD:
+#               "The graph must be a DAG"). The edit touches the bodies it
+#               keeps, so they take the new build.
 #
 # Every edit is one transaction: edit(container, verb, name, change) opens
 # "Reverse: <verb> <name>", writes PartJson, recomputes, adds and removes
@@ -161,7 +165,26 @@ def builder_of(obj):
     b = _BUILDERS.get(_key(obj))
     if b is None:
         b = _BUILDERS[_key(obj)] = Builder(Kernel())
+        b.restored_results = None
     return b
+
+
+def restored_build(obj):
+    """The build of a container this session has not built (its document
+    just opened: the builder lives in memory, the Results are transient),
+    made in memory without writing the document, so the bodies are listed
+    and the results read; the build's results, or None when it has built."""
+    b = builder_of(obj)
+    if getattr(b, "built", False):
+        return None
+    b.built = True
+    ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
+    b.step_files = step_texts(obj)
+    try:
+        b.restored_results = build_part(part_of(obj.PartJson), b, ctx)["results"]
+    except Exception:  # noqa: BLE001 — unreadable: the next edit says why
+        b.restored_results = []
+    return b.restored_results
 
 
 class Container:
@@ -185,10 +208,13 @@ class Container:
             if name not in have:
                 obj.addProperty(kind, name, "Reverse", doc, mode)
         # The build's own answers: written in execute, they must not touch
-        # the container for another recompute (older documents too).
+        # the container for another recompute (older documents too). Set
+        # only when missing, and Credit only when it differs: a reopen
+        # writes nothing, so it leaves the document unchanged and untouched.
         for name in ("Results", "Status"):
             try:
-                obj.setPropertyStatus(name, ["Output", "NoRecompute"])
+                if not {"Output", "NoRecompute"} <= set(obj.getPropertyStatus(name)):
+                    obj.setPropertyStatus(name, ["Output", "NoRecompute"])
             except Exception:  # noqa: BLE001 — a FreeCAD without the call: the mode above stands
                 pass
         if "Group" not in have:
@@ -196,7 +222,8 @@ class Container:
                 obj.addExtension("App::GroupExtensionPython")
             except TypeError:  # FreeCAD before 1.0 takes the extension's proxy too
                 obj.addExtension("App::GroupExtensionPython", None)
-        obj.Credit = CREDIT
+        if obj.Credit != CREDIT:
+            obj.Credit = CREDIT
 
     def onDocumentRestored(self, obj):
         self.setup(obj)
@@ -213,6 +240,7 @@ class Container:
             raise RuntimeError(f"The Reverse engineer part cannot be read: {e}") from e
         ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
         builder_of(obj).step_files = step_texts(obj)
+        builder_of(obj).built = True
         out = build_part(part, builder_of(obj), ctx)
         obj.Results = json.dumps(out["results"])
         obj.Status = status_of(out["results"])
@@ -237,15 +265,20 @@ class Body:
 
     def __init__(self, obj):
         obj.Proxy = self
-        for name, kind, doc in (("Source", "App::PropertyLink", "The Reverse engineer container"), ("BodyId", "App::PropertyFloat", "The body's id in the build (maker id, + n/1024 for a piece)"),
+        for name, kind, doc in (("BodyId", "App::PropertyFloat", "The body's id in the build (maker id, + n/1024 for a piece)"),
                                 ("Surface", "App::PropertyBool", "A sheet, never exported alone")):
             if name not in obj.PropertiesList:
                 obj.addProperty(kind, name, "Reverse", doc)
 
+    def onDocumentRestored(self, obj):
+        # Older documents linked back to the container: the cycle goes.
+        if "Source" in obj.PropertiesList:
+            obj.removeProperty("Source")
+
     def execute(self, obj):
         import Part
 
-        src = obj.Source
+        src = container_of(obj)
         shape = builder_of(src).body(obj.BodyId) if src else None
         obj.Shape = shape.copy() if shape is not None else Part.Shape()
 
@@ -276,6 +309,11 @@ def find_container(doc):
     return next((o for o in doc.Objects if o.Name.startswith(CONTAINER) and hasattr(o, "PartJson")), None)
 
 
+def container_of(body):
+    """The container whose Group holds `body`, or None."""
+    return next((o for o in getattr(body, "InList", []) if hasattr(o, "PartJson") and body in (o.Group or [])), None)
+
+
 def bodies_of(container):
     return [o for o in container.Group if hasattr(o, "BodyId")]
 
@@ -297,7 +335,6 @@ def sync_bodies(container):
             continue
         o = doc.addObject("Part::FeaturePython", BODY)
         Body(o)
-        o.Source = container
         o.BodyId = b["id"]
         o.Surface = b["surface"]
         o.Label = (styles.get(str(b["id"])) or {}).get("name") or b["name"]
@@ -331,9 +368,12 @@ def edit(container, verb, name, change):
         container.touch()
         doc.recompute()
         sync_bodies(container)
-        # A body added to or taken from the Group touches the container
-        # again, and the bodies' recompute re-runs it: the build is done
+        # The bodies take their shapes from the build: touched, as nothing
+        # links them to the container. That, and a body added to or taken
+        # from the Group, re-runs the container: the build is done
         # (_SETTLED), so only the bodies take their shapes.
+        for o in bodies_of(container):
+            o.touch()
         if hasattr(container, "purgeTouched"):
             container.purgeTouched()
         doc.recompute()
