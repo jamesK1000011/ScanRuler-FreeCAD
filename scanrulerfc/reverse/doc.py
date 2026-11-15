@@ -42,8 +42,8 @@ _READ_ONLY, _TRANSIENT, _OUTPUT, _NO_RECOMPUTE = 1, 2, 8, 16
 # The Builder of each container, by document and object name: the prefix
 # cache an undo or an edit further down rebuilds from.
 _BUILDERS = {}
-# Where the scan's sections and elements come from (the scan family sets
-# it): fn(doc) -> {sections, elements, modelCenter}.
+# Where the scan's sections and elements come from (scan_context.bind sets
+# it): fn(doc) -> {sections, elements, modelCenter, scan}.
 CONTEXT = {"of": None}
 # While an edit runs, by container: the inputs its build was made from (None
 # until it is made). FreeCAD runs the container again in the same edit
@@ -115,6 +115,20 @@ def built_features(part):
     return feats if rolled is None else feats[:max(0, min(len(feats), rolled))]
 
 
+def use_scan(builder, scan):
+    """The scan (V, F) the builder reads, handed over only when it is
+    another: a new scan lets the kept states go (build_sheets set_scan)."""
+    if not hasattr(builder, "set_scan"):
+        return
+    was = getattr(builder, "_scan_source", None)
+    if scan is None and was is None:
+        return
+    if scan is not None and was is not None and scan[0] is was[0] and scan[1] is was[1]:
+        return
+    builder._scan_source = scan
+    builder.set_scan(*(scan or (None, None)))
+
+
 def build_part(part, builder, ctx=None):
     """Parameters evaluated, features resolved and built: the build's
     answer with the parameter readings."""
@@ -125,7 +139,9 @@ def build_part(part, builder, ctx=None):
     table = evaluate_parameters(part.get("parameters") or [])
     applied = apply_parameters(built_features(part), table["scope"])
     feats = applied["features"]
-    steps = resolve_features(feats, ctx or {"sections": [], "elements": [], "modelCenter": [0, 0, 0]}, lambda f: find_regions(f["sketch"]))
+    ctx = ctx or {"sections": [], "elements": [], "modelCenter": [0, 0, 0]}
+    use_scan(builder, ctx.get("scan"))
+    steps = resolve_features(feats, ctx, lambda f: find_regions(f["sketch"]))
     sketches = {f["id"]: f["sketch"] for f in feats if f["kind"] == "sketch"}
     out = builder.build(steps, sketches.get, reuse=True)
     return {**out, "parameters": table["readings"]}
@@ -196,6 +212,7 @@ class Container:
         except Exception as e:  # noqa: BLE001 — nothing can build: the one case that raises
             raise RuntimeError(f"The Reverse engineer part cannot be read: {e}") from e
         ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
+        builder_of(obj).step_files = step_texts(obj)
         out = build_part(part, builder_of(obj), ctx)
         obj.Results = json.dumps(out["results"])
         obj.Status = status_of(out["results"])
@@ -352,6 +369,37 @@ def import_part(doc, part, members=None, name=None):
         return part
 
     return edit(c, "load", name, change)
+
+
+def step_texts(container):
+    """The STEP texts the container holds (StepFiles: reverse-steps.json,
+    {key: text}), or {}."""
+    path = str(getattr(container, "StepFiles", "") or "")
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)} if isinstance(data, dict) else {}
+
+
+def put_step_file(container, key, text):
+    """A STEP text kept in the container beside the ones it holds — call it
+    inside an edit, so it is that edit's undo step."""
+    import os
+    import tempfile
+
+    held = step_texts(container)
+    if held.get(key) == text:
+        return
+    held[key] = text
+    folder = tempfile.mkdtemp(prefix="scanruler-reverse-")
+    path = os.path.join(folder, "reverse-steps.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(held, f)
+    container.StepFiles = path
 
 
 def forget(container):

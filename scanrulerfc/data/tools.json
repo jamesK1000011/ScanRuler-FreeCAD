@@ -6048,6 +6048,28 @@
    "changes": true,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (set)",
    "date": "2026-11-15"
+  },
+  "reverse_import_step": {
+   "group": "reverse",
+   "description": "Bring a STEP file in as bodies of their own, as the Import STEP key does: a body for every solid in the file, in the frame the file was drawn in (a file of faces alone comes in as a surface body) — a bought-in part, a mating part, the CAD model to check the scan against. An Import feature at the rollback bar; the file's text is kept with the part. name: the feature's name (default the file's, less .step/.stp). Put the bodies in place with reverse_feature_add { kind: moveBody, bodies, translate, rotate } — copy: true moves a copy. Returns the feature and the bodies made. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ],
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (importStep)",
+   "date": "2026-11-15"
   }
  }
 }

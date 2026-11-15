@@ -137,11 +137,13 @@ moved on.
   `reverse_parameter_add`, `reverse_parameter_set`,
   `reverse_parameter_rename`, `reverse_parameter_remove`,
   `reverse_parameter_list`, `reverse_body_names`, `reverse_body_describe`,
-  `reverse_body_check`, `reverse_body_clearance`, `reverse_body_set`. On the
-  Reverse engineer page the keys of the kinds this port builds run these
-  tools; sketch editing, Import STEP, sheet, split, loft, sweep, fit
-  surface, patch network, trim and thicken are still coming with the
-  engine port.
+  `reverse_body_check`, `reverse_body_clearance`, `reverse_body_set`,
+  `reverse_import_step`. The engine builds every feature kind, sheet,
+  split, loft, sweep, fit surface, patch network, trim and thicken
+  included (a split within its sheets' regions and splitting a sheet
+  refuse, not ported yet); the scan's sections and measured planes and
+  axes are references. On the Reverse engineer page the keys of the kinds
+  the page has turned on run these tools; sketch editing is still coming.
 - **More model formats**: glTF/GLB, Collada, VRML 2 and 3DS open as the scan
   or the reference through Agent Link's readers. FBX does not: export it as
   glTF.

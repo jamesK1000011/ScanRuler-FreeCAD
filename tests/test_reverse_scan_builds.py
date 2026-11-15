@@ -103,6 +103,17 @@ class LoftFold(unittest.TestCase):
         self.assertEqual(words, "The smooth loft crosses itself at z 10.5 near (4, 0) (folded over z 10.5): Sketch 2 and Sketch 3 are 1 mm apart and differ — drop or move one, or make the loft ruled.")
 
 
+def said(r):
+    """A result row in brief, for a failure's message: the build's own
+    reports hold whole grids."""
+    out = {k: r[k] for k in ("id", "status", "message", "warning", "note") if k in r}
+    if "network" in r:
+        out["network"] = {k: r["network"].get(k) for k in ("closed", "worstGap", "worstAngle", "unfilled", "lost")}
+    if "trim" in r:
+        out["trim"] = {k: r["trim"].get(k) for k in ("faces", "kept", "closed")}
+    return str(out)[:600]
+
+
 def surface_step(i, region, shape, **more):
     return {"kind": "surface", "id": i, "name": f"Surface {i}", "region": region, "fit": {"net": None, "degree": 3, "expandPct": 35, "smoothness": 0.01},
             "shape": shape, "constrain": {"mode": "auto"}, "refs": constrain_refs([]), "refSurfaces": [], **more}
@@ -129,7 +140,7 @@ class InFreeCAD(unittest.TestCase):
         sheet = {"kind": "sheet", "id": 2, "name": "Sheet 2", "sketchId": 9, "pieces": [{"kind": "line", "a": [3, -5, 0], "b": [3, 15, 0]}], "dir": [0, 0, 1], "from": -5, "to": 15}
         split = {"kind": "split", "id": 3, "name": "Split 3", "body": 1, "tools": [2], "keep": "scan", "tolerance": 0.3, "overlap": 0.5}
         out = b.build([cube, sheet, split])
-        self.assertEqual([r["status"] for r in out["results"]], ["ok", "ok", "ok"], out["results"])
+        self.assertEqual([r["status"] for r in out["results"]], ["ok", "ok", "ok"], [said(r) for r in out["results"]])
         got = {x["id"]: x for x in out["bodies"]}
         self.assertAlmostEqual(got[1]["volume"], 700, delta=1e-6 * 700)
 
@@ -138,7 +149,7 @@ class InFreeCAD(unittest.TestCase):
         top = [int(i) for i in np.nonzero(np.isclose(V[:, 2], 10))[0]]
         b = self.builder(V, F)
         out = b.build([surface_step(1, top, "plane"), surface_step(2, top, "freeform")])
-        self.assertEqual([r["status"] for r in out["results"]], ["ok", "ok"], out["results"])
+        self.assertEqual([r["status"] for r in out["results"]], ["ok", "ok"], [said(r) for r in out["results"]])
         plane = out["results"][0]["surface"]
         self.assertEqual(plane["shape"], "plane")
         self.assertLess(plane["rms"], 1e-6)
@@ -154,8 +165,8 @@ class InFreeCAD(unittest.TestCase):
                   plane_tool([5, 5, 0], Z, X, Y), plane_tool([5, 5, 10], Z, X, Y)]
         out = b.build([{"kind": "trim", "id": 1, "name": "Trim 1", "bodies": [], "primitives": planes, "tolerance": 0.3, "overlap": 0.5}])
         r = out["results"][0]
-        self.assertEqual(r["status"], "ok", r)
-        self.assertTrue(r["trim"]["closed"], r)
+        self.assertEqual(r["status"], "ok", said(r))
+        self.assertTrue(r["trim"]["closed"], said(r))
         self.assertEqual(r["trim"]["kept"], 6)
         body = out["bodies"][0]
         self.assertFalse(body["surface"])
@@ -167,12 +178,12 @@ class InFreeCAD(unittest.TestCase):
         thick = [{"kind": "thicken", "id": 10 + n, "name": f"Thicken {n}", "sheet": 1, "thickness": 2, "side": side, "op": "new"} for n, side in enumerate(("out", "in", "both"))]
         out = b.build([net, *thick])
         res = {r["id"]: r for r in out["results"]}
-        self.assertEqual(res[1]["status"], "ok", res[1])
+        self.assertEqual(res[1]["status"], "ok", said(res[1]))
         self.assertFalse(res[1]["network"]["closed"])
         self.assertEqual(len(res[1]["network"]["patches"]), 4)
-        self.assertEqual((res[10]["status"], res[11]["status"]), ("ok", "ok"), (res[10], res[11]))
+        self.assertEqual((res[10]["status"], res[11]["status"]), ("ok", "ok"), (said(res[10]), said(res[11])))
         self.assertEqual(res[12]["status"], "failed")
-        self.assertTrue(res[12]["message"].startswith("A patch network’s sheet of several patches thickens one way at a time"), res[12])
+        self.assertTrue(res[12]["message"].startswith("A patch network’s sheet of several patches thickens one way at a time"), said(res[12]))
         vols = {x["id"]: x["volume"] for x in out["bodies"] if not x["surface"]}
         area = next(x["area"] for x in out["bodies"] if x["id"] == 1)
         # A shell 2 thick on a sphere of radius 40: its area times 2, give
@@ -185,9 +196,9 @@ class InFreeCAD(unittest.TestCase):
         b = self.builder(*sphere_scan(R, 0.02, 6))
         out = b.build([closed_network()])
         r = out["results"][0]
-        self.assertEqual(r["status"], "ok", r)
-        self.assertTrue(r["network"]["closed"], r["network"])
+        self.assertEqual(r["status"], "ok", said(r))
         body = out["bodies"][0]
+        self.assertTrue(r["network"]["closed"], (said(r), body))
         self.assertTrue(body["closed"])
         self.assertLess(abs(body["volume"] / ((4 / 3) * math.pi * R ** 3) - 1), 0.01)
 

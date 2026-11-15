@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# The Reverse engineer wired in: its 21 tools in data/tools.json and the
+# The Reverse engineer wired in: its 22 tools in data/tools.json and the
 # handlers registry, a deferred group of its own, its echo declared with the
 # other families', the page's keys calling the present tools through the
 # runner, and a .scanruler project's part opening in the document's
@@ -45,7 +45,7 @@ BASE = "0f44f35"
 ADDED = sorted("""reverse_feature_add reverse_feature_update reverse_feature_remove reverse_feature_move reverse_feature_suppress
 reverse_feature_rollback reverse_feature_clear reverse_feature_list reverse_feature_schema reverse_build reverse_build_stop
 reverse_parameter_list reverse_parameter_add reverse_parameter_set reverse_parameter_rename reverse_parameter_remove
-reverse_body_names reverse_body_describe reverse_body_check reverse_body_clearance reverse_body_set""".split())
+reverse_body_names reverse_body_describe reverse_body_check reverse_body_clearance reverse_body_set reverse_import_step""".split())
 
 
 # Renamed since: Agent Link's core has snapshot_list / snapshot_latest.
@@ -77,8 +77,8 @@ def _base_entries():
 
 
 class Registry(unittest.TestCase):
-    def test_21_tools_in_the_data_and_the_handlers(self):
-        self.assertEqual(len(ADDED), 21)
+    def test_22_tools_in_the_data_and_the_handlers(self):
+        self.assertEqual(len(ADDED), 22)
         self.assertEqual(sorted(RH.tool_names()), ADDED)
         self.assertEqual(sorted(n for n, e in _declared().items() if e["group"] == "reverse"), ADDED)
         self.assertIn("reverse", handlers.MODULES)
@@ -111,7 +111,8 @@ class Registry(unittest.TestCase):
         # The workbench's keys may lag the engine (they are the GUI's to turn
         # on), never lead it: a kind the engine cannot build has no live key.
         self.assertLessEqual(set(RB.LATER) | {"import"}, set(W.REVERSE_LATER))
-        self.assertIn("reverse_import_step", RH.LATER)
+        self.assertNotIn("reverse_import_step", RH.LATER)  # build step 10: here
+        self.assertIn("reverse_import_step", RH.tool_names())
 
 
 @unittest.skipUnless(HAVE_AL, "Agent Link is not importable here")

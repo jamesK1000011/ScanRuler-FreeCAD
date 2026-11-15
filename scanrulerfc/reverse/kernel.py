@@ -653,7 +653,13 @@ class Occt:
         P = _part()
         sewn = self.sew(faces, tolerance)
         try:
-            return P.Solid(P.Shell(sewn.Faces))
+            shell = sewn.Shells[0] if len(sewn.Shells) == 1 else P.Shell(sewn.Faces)
+            if not shell.isClosed():
+                return shell
+            solid = P.Solid(shell)
+            if solid.Volume < 0:  # the sewn shell faced inward: the solid it bounds, faced out
+                solid.reverse()
+            return solid
         except Exception:  # noqa: BLE001 — they do not close: the sewn shell, as OCCT's sewing leaves it
             return sewn.Shells[0] if len(sewn.Shells) == 1 else sewn
 

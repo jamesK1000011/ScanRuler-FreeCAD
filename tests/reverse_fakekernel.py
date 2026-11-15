@@ -107,6 +107,16 @@ class FakeKernel:
             pieces = out
         return [Shape([p]) for p in pieces]
 
+    def read_step_parts(self, text):
+        """A "STEP file" of boxes, one a line: x0 y0 z0 x1 y1 z1 after the
+        header."""
+        parts = []
+        for line in text.splitlines()[1:]:
+            v = [float(x) for x in line.split()]
+            if len(v) == 6:
+                parts.append({"shape": Shape([Piece((v[:3], v[3:]))]), "name": None})
+        return parts
+
     def traced_history(self, before, after):
         return {}
 

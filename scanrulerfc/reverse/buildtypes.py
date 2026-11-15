@@ -71,6 +71,23 @@ def boxes_meet(a, b):
     return True
 
 
+def plain(v):
+    """numpy arrays and numbers as lists and floats, all the way down — what
+    a result row holds, so the container can write it as JSON."""
+    if isinstance(v, dict):
+        return {k: plain(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [plain(x) for x in v]
+    if hasattr(v, "tolist"):
+        return plain(v.tolist())
+    if v is None or isinstance(v, (bool, str, int, float)):
+        return v
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return v
+
+
 class StepFailed(Exception):
     """A step that cannot be made, in the words its row says."""
 
