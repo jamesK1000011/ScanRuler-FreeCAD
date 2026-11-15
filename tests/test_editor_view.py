@@ -164,8 +164,15 @@ class StandInView:
         x, y = pos
         return {"Document": "D", "Object": "Scan", "Component": "Facet1", "x": x - 400.0, "y": y - 300.0, "z": 30.0}
 
-    def redirectToSceneGraph(self, on):  # noqa: N802
-        self.redirected = on
+    def getViewer(self):  # noqa: N802
+        """FreeCAD's View3DInventorViewerPy, where the redirect lives."""
+        view = self
+
+        class Viewer:
+            def setRedirectToSceneGraph(self, on):  # noqa: N802
+                view.redirected = on
+
+        return Viewer()
 
     def graphicsView(self):  # noqa: N802
         if self.widget is None:
