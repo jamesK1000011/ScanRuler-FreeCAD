@@ -359,6 +359,20 @@ class Mesh(unittest.TestCase):
         self.assertEqual(sec(m, "tools")["hint"], MT.HINT_NO_TOOL)
         self.assertFalse(sec(m, "tool")["visible"])
 
+    def test_no_scan_keys_off_and_say_why(self):
+        # As 3D Measure's: no tool key works without a scan (GUI pass, round 4).
+        m = MT.build(fresh())
+        keys = sec(m, "tools")["keys"]
+        self.assertFalse(any(k["enabled"] for k in keys))
+        self.assertTrue(all(k["tip"].endswith(MT.NEED_SCAN) for k in keys))
+        self.assertEqual(sec(m, "tools")["hint"], MT.NEED_SCAN)
+        self.assertTrue(all(k["enabled"] for k in sec(MT.build(scanned()), "tools")["keys"]))
+
+    def test_triangle_limit_is_a_count(self):
+        f = {fd["id"]: fd for fd in MT.tool_section("reduce", dict(MT.DEFAULTS))["fields"]}
+        self.assertTrue(f["triangle-limit"]["integer"])
+        self.assertFalse(f["tolerance"]["integer"])
+
 
 class Reverse(unittest.TestCase):
     def test_keys_on_for_the_ported_engine(self):
@@ -366,14 +380,16 @@ class Reverse(unittest.TestCase):
         self.assertEqual([s["header"] for s in m["sections"]],
                          ["Model", "Parameters", "Create feature", "Features", "Bodies", "Notes for the agent"])
         keys = sec(m, "create_feature")["keys"]
-        self.assertEqual(len(keys), 26)
         self.assertEqual(sec(m, "create_feature")["grid"], 4)
-        later = [k for k in keys if k["id"] in W.REVERSE_LATER]
-        self.assertEqual(len(later), 9)
-        self.assertFalse(any(k["enabled"] for k in later))
-        self.assertTrue(all(k["tip"].endswith("coming with the engine port") for k in later))
-        self.assertTrue(all(k["enabled"] and not k["tip"].endswith("coming with the engine port") for k in keys if k not in later))
-        self.assertEqual(sec(m, "notes")["hint"], "coming with the engine port")
+        # Unfinished controls are left off, not shown as placeholders (GUI
+        # pass, round 4): the kinds still to come, the sketch plane, the notes.
+        self.assertEqual(len(keys), 26 - len(W.REVERSE_LATER))
+        self.assertFalse(any(k["id"] in W.REVERSE_LATER for k in keys))
+        self.assertTrue(all(k["enabled"] for k in keys))
+        self.assertEqual(sec(m, "create_feature")["fields"], [])
+        self.assertIsNone(sec(m, "create_feature")["hint"])
+        self.assertFalse(sec(m, "notes")["visible"])
+        self.assertFalse(any("coming with" in str(x) for x in m["sections"]))
         self.assertEqual(keys[0]["command"], "ScanRuler_ReExtrude")
 
     @NEED
@@ -383,8 +399,10 @@ class Reverse(unittest.TestCase):
         marks = ["Model <InfoDot", "<ParameterList", "Create feature <InfoDot", 'Features <InfoDot title="The feature list"', "<BodyList", "<NoteList"]
         pos = [src.index(x) for x in marks]
         self.assertEqual(pos, sorted(pos))
+        tsx = re.findall(r"<span>([^<{]+)</span>", T.read(rel)[T.read(rel).index('data-test="feature-keys"'):])[:26]
+        self.assertEqual([lab for _i, lab, _t, _ic in W._REVERSE], tsx)
         self.assertEqual([k["label"] for k in sec(RV.build(fresh()), "create_feature")["keys"]],
-                         re.findall(r"<span>([^<{]+)</span>", T.read(rel)[T.read(rel).index('data-test="feature-keys"'):])[:26])
+                         [lab for i, lab, _t, _ic in W._REVERSE if i in RV.READY_KINDS])
         self.assertTrue(T.text_in("plugins/reverse/ui/ParameterList.tsx", "Parameters"))
         self.assertTrue(T.text_in("plugins/reverse/ui/BodyList.tsx", "<span>Bodies</span>"))
         self.assertTrue(T.text_in("plugins/reverse/ui/NoteList.tsx", "Notes for the agent"))

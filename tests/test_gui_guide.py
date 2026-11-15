@@ -177,5 +177,95 @@ class ToolbarsStaySwitched(unittest.TestCase):
         self.assertEqual(len(prefs), sum(len(b) for b in W.TOOLBARS.values()))
 
 
+class ToolbarsSwapLive(unittest.TestCase):
+    """GUI pass, round 4: the toolbar row was the same in all six
+    workspaces; the switch is now applied to the QToolBars themselves, after
+    FreeCAD's restore too, by these decisions."""
+
+    def present(self):
+        return [(n, n) for n, _t, _c in WB.toolbars()]
+
+    def test_each_workspace_shows_only_its_own(self):
+        for w in W.WORKSPACES:
+            plan = C.toolbar_plan(w["id"], self.present())
+            self.assertEqual({n for n, v in plan.items() if v}, set(C.toolbar_names(w["id"])))
+            self.assertEqual(len(plan), sum(len(b) for b in W.TOOLBARS.values()))
+        rows = {w["id"]: frozenset(n for n, v in C.toolbar_plan(w["id"], self.present()).items() if v) for w in W.WORKSPACES}
+        self.assertEqual(len(set(rows.values())), len(W.WORKSPACES))  # six different rows
+
+    def test_other_toolbars_left_alone(self):
+        plan = C.toolbar_plan("mesh", self.present())
+        self.assertNotIn(W.WORKSPACE_TOOLBAR, plan)
+        self.assertNotIn(W.VIEW_TOOLBAR, plan)
+        self.assertEqual(C.toolbar_plan("mesh", [("Std_File", "File")]), {})
+
+    def test_nothing_shown_in_another_workbench(self):
+        self.assertEqual(C.toolbar_plan("mesh", self.present(), active=False), {})
+
+    def test_found_by_title_when_named_otherwise(self):
+        name = C.toolbar_names("flat")[0]
+        self.assertEqual(C.toolbar_plan("flat", [("toolbar_7", name)]), {"toolbar_7": True})
+
+    def test_rehide_only_another_workspaces_toolbar(self):
+        mine, other = C.toolbar_names("mesh")[0], C.toolbar_names("elements")[0]
+        self.assertTrue(C.rehide(other, other, True, "mesh", True))
+        self.assertFalse(C.rehide(mine, mine, True, "mesh", True))
+        self.assertFalse(C.rehide(other, other, False, "mesh", True))
+        self.assertFalse(C.rehide(other, other, True, "mesh", False))
+        self.assertFalse(C.rehide("Std_View", "View", True, "mesh", True))
+
+
+class SectionToggles(unittest.TestCase):
+    """GUI pass, round 4: Section View opened FreeCAD's Clipping dock, could
+    not close it, and grew the main window each time."""
+
+    def test_open_then_close(self):
+        self.assertEqual(C.section_action([]), "open")
+        self.assertEqual(C.section_action([("Combo View", True)]), "open")
+        self.assertEqual(C.section_action([(C.CLIP_DOCK, False)]), "open")  # another document's, hidden
+        self.assertEqual(C.section_action([("Combo View", True), (C.CLIP_DOCK, True)]), "close")
+
+    def test_window_size_kept(self):
+        self.assertEqual(C.size_to_restore((1600, 2082), (1600, 2334), False), (1600, 2082))
+        self.assertIsNone(C.size_to_restore((1600, 2082), (1600, 2082), False))
+        self.assertIsNone(C.size_to_restore((1600, 2082), (1600, 2334), True))
+
+    def test_the_view_key_is_the_toggle(self):
+        g = next(g for g in W.VIEW_BAR if g["key"] == "ViewSection")
+        self.assertEqual(g["native"], C.CLIP_COMMAND)
+
+
+class PanelFollowsTheGuide(unittest.TestCase):
+    """GUI pass, round 4: panel buttons and group titles in Title Case, the
+    credit once, three dots as one ellipsis. No Qt: the view's helpers."""
+
+    def test_buttons_and_group_titles(self):
+        from scanrulerfc.pages import kit as K
+
+        self.assertEqual(K.button_text("Auto-align"), "Auto-Align")
+        self.assertEqual(K.button_text("Align part"), "Align Part")
+        self.assertEqual(K.button_text("Move / rotate by numbers"), "Move / Rotate by Numbers")
+        self.assertEqual(K.group_title(K.section("1", "x", "Create element")), "Create Element")
+        self.assertEqual(K.group_title(K.section("1", "x", "In use for analysis")), "In Use for Analysis")
+
+    def test_credit_drawn_once(self):
+        import inspect
+
+        from scanrulerfc.pages import kit as K
+        from scanrulerfc.pages import measure3d as M3
+
+        for fn in (K.widget, M3.widget):
+            self.assertNotIn('model["footer"]', inspect.getsource(fn))
+        dock = open(os.path.join(os.path.dirname(HERE), "scanrulerfc", "dock.py"), encoding="utf-8").read()
+        self.assertEqual(dock.count("QLabel(W.CREDIT)"), 1)
+
+    def test_no_three_dot_ellipsis(self):
+        texts = [r["MenuText"] for r in resources().values()] + [C.NEED_SCAN]
+        for name, title, _c in WB.toolbars():
+            texts += [name, title]
+        for t in texts:
+            self.assertNotIn("...", t)
+
+
 if __name__ == "__main__":
     unittest.main()

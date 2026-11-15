@@ -25,6 +25,7 @@ PAGE = "mesh"
 TOOLS = tuple(("holes" if i == "fill" else i, lab, tip) for i, _c, lab, tip, _ic, _t in W._MESH)
 COMMAND = {("holes" if i == "fill" else i): "ScanRuler_" + c for i, c, _l, _t, _ic, _tool in W._MESH}
 DEFAULT_TOOL = "reduce"  # meshStore.ts `tool: 'reduce'`
+NEED_SCAN = "Open a scan first."
 HINT_NO_TOOL = "Pick a tool. <b>Escape</b>, or its key again, puts the one in hand away."
 HINT_COPY = ("Not in use yet — every other workspace measures the scan as it was. <b>Deviation</b> in the view bar "
              "shows how far the copy is from it.")
@@ -72,7 +73,7 @@ def tool_section(tool, m, ready=True, busy=False):
     n, t, tg, ck, sel = K.number, K.toggle, K.key, K.check, K.select
     if tool == "reduce":
         s["fields"] = [n("tolerance", "Tolerance", m["tolerance"], auto=m["toleranceAuto"]),
-                       n("triangle-limit", "Triangle limit", m["maxTriangles"], unit="")]
+                       n("triangle-limit", "Triangle limit", m["maxTriangles"], unit="", integer=True)]
         s["keys"] = [tg("reduce", "Reduce", go, primary=True)]
     elif tool == "islands":
         s["fields"] = [n("piece-size", "Smaller than", m["pieceSize"], auto=m["pieceSizeAuto"])]
@@ -195,8 +196,12 @@ def build(st, ui=None, units="mm"):
             s["hint"] = None if scan is not None else K.HINT_DROP
         elif sid == "tools":
             s = K.section(num, sid, "Tools", "Mesh tools", _i("Mesh tools"), grid=3)
-            s["keys"] = [dict(K.key(i, lab, not busy, tip, pressed=tool == i), command=COMMAND[i]) for i, lab, tip in TOOLS]
-            s["hint"] = HINT_NO_TOOL if tool is None else None
+            # Like 3D Measure's keys: none works without a scan, so none can
+            # be pressed, and each says why (GUI pass, round 4).
+            ready = scan is not None and not busy
+            s["keys"] = [dict(K.key(i, lab, ready, tip if scan is not None else f"{tip}. {NEED_SCAN}", pressed=tool == i),
+                              command=COMMAND[i]) for i, lab, tip in TOOLS]
+            s["hint"] = NEED_SCAN if scan is None else (HINT_NO_TOOL if tool is None else None)
         elif sid == "tool":
             if tool is None:
                 s = K.section(num, sid, "", visible=False)
