@@ -198,6 +198,37 @@ class Boolean(unittest.TestCase):
         self.assertEqual(kept, len(F))
         np.testing.assert_array_equal(V2[vmap], V)
 
+    def test_inside_is_read_off_the_surface_in_the_result(self):
+        # As the original: a bore is judged by how much of its surface the
+        # result holds, never by the result's volume. This stand-in hands back
+        # the mesh and, of the bore, only the faces whose corners all lie in
+        # the box — the bore's bottom cap, a part of its surface — and nothing
+        # of the volume a real cut would leave; a bore poking out is cut.
+        def part(op, a, b):
+            inner = (np.abs(b[0][b[1]]) < 10).all(axis=(1, 2))
+            return np.vstack([a[0], b[0]]), np.vstack([a[1], b[1][inner][:, ::-1] + len(a[0])])
+
+        V, F = box_mesh(20, 20, 20, 8)
+        bore = cylinder(3, -5, 15)
+        _, _, _, rep = BO.boolean_mesh(V, F, [(*bore, "Bore")], "subtract", part)
+        self.assertGreater(rep["added"], 0)
+        self.assertGreater(BO.surface_share(*part("subtract", (V, F), bore), bore, (V, F)), BO.SHARE_NONE)
+
+        # All of it back: a hollow sealed inside, refused in the original's words.
+        def sealed(op, a, b):
+            return np.vstack([a[0], b[0]]), np.vstack([a[1], b[1][:, ::-1] + len(a[0])])
+
+        with self.assertRaisesRegex(M.MeshError, "^Bore lies wholly inside the mesh — taking it away would seal a hollow"):
+            BO.boolean_mesh(V, F, [(*cylinder(3, -5, 5), "Bore")], "subtract", sealed)
+        # None of it back, yet in the mesh: a kernel that drops the sealed
+        # shell — still a hollow, not a miss.
+        with self.assertRaisesRegex(M.MeshError, "^Bore lies wholly inside the mesh"):
+            BO.boolean_mesh(V, F, [(*cylinder(3, -5, 5), "Bore")], "subtract", lambda op, a, b: a)
+        with self.assertRaisesRegex(M.MeshError, "^Boss lies wholly inside the mesh — there is nothing to add"):
+            BO.boolean_mesh(V, F, [(*cylinder(3, -5, 5), "Boss")], "add", lambda op, a, b: a)
+        self.assertAlmostEqual(BO.winding(V, F, [0, 0, 0]), 1, 6)
+        self.assertAlmostEqual(BO.winding(V, F, [0, 0, 30]), 0, 6)
+
     @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
     def test_bore_boss_and_common_with_freecad(self):
         V, F = box_mesh(20, 20, 20, 8)

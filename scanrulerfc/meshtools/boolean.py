@@ -18,9 +18,14 @@
 # float32 the scan's own point rounds to); and a solid that does nothing
 # anyone would want — taken away but never reaching the mesh, or lying wholly
 # inside it and sealing a hollow there; added wholly inside it — is refused,
-# naming it. Manifold reads that off how much of each piece's surface is in
-# the result; here off how much of its volume the mesh holds (none: it
-# misses; all: it lies inside), the same cases.
+# naming it. As in the original, that is read off how much of each piece's
+# surface is in the result (none of a piece taken away that missed or of one
+# added inside, all of one taken away from inside). Manifold tags each
+# result triangle with the solid it came from; FreeCAD's booleans keep no
+# such tag, so a result triangle is the piece's when it lies on the piece's
+# surface and not on the mesh's. A kernel that drops a shell meeting nothing
+# leaves none of the piece either way; then one of its points, inside the
+# mesh or not, tells which.
 
 import numpy as np
 
@@ -91,6 +96,42 @@ def volume(V, F):
         return 0.0
     t = np.asarray(V, dtype=float)[F]
     return float(np.einsum("ij,ij->i", t[:, 0], np.cross(t[:, 1], t[:, 2])).sum() / 6)
+
+
+def _area(V, F):
+    t = np.asarray(V, dtype=float)[np.asarray(F, dtype=np.int64).reshape(-1, 3)]
+    return np.linalg.norm(np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0]), axis=1) / 2
+
+
+def surface_share(RV, RF, piece, subject):
+    """How much of a tool piece's surface is in the result: the area of the
+    result's triangles lying on the piece's surface and not on the subject's,
+    over the piece's own area."""
+    from . import grid as G
+
+    PV, PF = piece
+    RF = np.asarray(RF, dtype=np.int64).reshape(-1, 3)
+    whole = float(_area(PV, PF).sum())
+    if len(RF) == 0 or whole <= 0:
+        return 0.0
+    pts = np.vstack([np.asarray(PV, dtype=float), np.asarray(subject[0], dtype=float)])
+    diag = float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0)))
+    tol = max(1e-6, 1e-5 * diag)  # the kernel's points come back in single precision
+    c = np.asarray(RV, dtype=float)[RF].mean(axis=1)
+    on_piece, _, _, _ = G.NearSurface(PV, PF, tol).nearest(c)
+    on_subject, _, _, _ = G.NearSurface(*subject, tol).nearest(c)
+    mine = on_piece & ~on_subject
+    return float(_area(RV, RF[mine]).sum()) / whole
+
+
+def winding(V, F, p):
+    """The winding number of a closed mesh round a point: 1 inside, 0 out."""
+    t = np.asarray(V, dtype=float)[np.asarray(F, dtype=np.int64).reshape(-1, 3)] - np.asarray(p, dtype=float)
+    a, b, c = t[:, 0], t[:, 1], t[:, 2]
+    la, lb, lc = (np.linalg.norm(x, axis=1) for x in (a, b, c))
+    num = np.einsum("ij,ij->i", a, np.cross(b, c))
+    den = la * lb * lc + np.einsum("ij,ij->i", a, b) * lc + np.einsum("ij,ij->i", b, c) * la + np.einsum("ij,ij->i", c, a) * lb
+    return float(2 * np.arctan2(num, den).sum() / (4 * np.pi))
 
 
 def pieces_of(V, F):
@@ -172,23 +213,22 @@ def boolean_mesh(V, F, tools, op, kernel=None):
 
     if op != "intersect":
         for piece in pieces:
-            vp = volume(*piece)
-            if len(pieces) == 1 and len(solids) == 1:
-                common = before - after if op == "subtract" else before + vp - after
-            else:
-                common = volume(*kernel("intersect", (V, F), piece))
-            share = common / vp if vp > 0 else 0.0
-            none, inside = share < SHARE_NONE, share > 1 - SHARE_NONE
-            if not (none or inside):
-                continue
-            if op == "add" and not inside:
+            share = surface_share(RV, RF, piece, (V, F))
+            none, all_ = share < SHARE_NONE, share > 1 - SHARE_NONE
+            if none and winding(V, F, piece[0][0]) > 0.5:
+                # Nothing of it came back, yet it is in the mesh: a kernel
+                # that dropped the sealed shell of one taken away from inside.
+                none, all_ = op == "add", op == "subtract"
+            elif none and op == "add":
+                continue  # outside and left out: a kernel that dropped a piece apart
+            if not (none or (op == "subtract" and all_)):
                 continue
             if len(tools) == 1:
                 who_names = [names[0]] if names[0] else []
             else:
                 who_names = [n for n, s in zip(names, solids) if n and volume(*kernel("intersect", s, piece)) > 1e-9]
             who, many = subject_of(who_names)
-            if op == "subtract" and inside:
+            if op == "subtract" and all_:
                 raise M.MeshError(f"{who} {'lie' if many else 'lies'} wholly inside the mesh — taking {'them' if many else 'it'} away would seal a hollow inside the part, not open a hole. Move {'their' if many else 'its'} end out through the surface first.")
             if op == "subtract":
                 raise M.MeshError(f"{who} {'do' if many else 'does'} not reach the mesh — there is nothing to take away.")
