@@ -86,6 +86,7 @@ scanrulerfc/reverse/sketch_spline.py
 scanrulerfc/reverse/solver.py
 scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
+scanrulerfc/reverse/surface_fit.py
 scanrulerfc/reverse/sweep_route.py
 scanrulerfc/reverse/topo.py
 scanrulerfc/reverse/units.py
@@ -146,6 +147,7 @@ tests/test_reverse_resolve.py
 tests/test_reverse_sketch_shapes.py
 tests/test_reverse_solver.py
 tests/test_reverse_stations.py
+tests/test_reverse_surface_fit.py
 tests/test_reverse_topo.py
 tests/test_reverse_where.py
 tests/test_scan.py
