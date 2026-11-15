@@ -548,6 +548,27 @@ class Occt:
             out += [_hash(e, upper), len(faces), *faces]
         return out
 
+    def openEdgeMids(self, shape):
+        """The middles of the edges that bound one face of the shape only (a
+        seam's two sides counted by sameness, kept apart from hashing:
+        OCCT 7.8 changed what a shape's hash code means). Degenerate edges
+        (a sphere's pole) are not edges here."""
+        buckets = {}
+        for f in shape.Faces:
+            for e in f.Edges:
+                if getattr(e, "Degenerated", False):
+                    continue
+                p = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+                key = (round(p.x, 4), round(p.y, 4), round(p.z, 4))
+                group = buckets.setdefault(key, [])
+                for item in group:
+                    if item[0].isSame(e):
+                        item[1] += 1
+                        break
+                else:
+                    group.append([e, 1, [p.x, p.y, p.z]])
+        return [item[2] for group in buckets.values() for item in group if item[1] < 2]
+
     def wireframe(self, shape, deflection):
         points = []
         groups = []
@@ -1939,6 +1960,10 @@ class Kernel:
             return out
 
         return run("Reading the edges", go)
+
+    def open_edges(self, shape):
+        """The middles of the shape's edges that bound one face only."""
+        return run("Reading the open edges", lambda: self.occt.openEdgeMids(shape))
 
     # topo.py reads a body through these two names.
     def describe_faces(self, shape):
