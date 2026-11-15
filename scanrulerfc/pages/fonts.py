@@ -55,8 +55,28 @@ def load():
             if fid >= 0:
                 names = QtGui.QFontDatabase.applicationFontFamilies(fid)
                 got = got or (names[0] if names else fam)
-        _loaded[fam] = got or FALLBACK[fam]
+        _loaded[fam] = got or _system(QtGui, FALLBACK[fam])
     return dict(_loaded)
+
+
+def _system(QtGui, generic):
+    """A real family for a generic name: Qt warns of a missing family for
+    "sans-serif" on macOS (seen in the Report view in the GUI pass)."""
+    try:
+        kind = QtGui.QFontDatabase.SystemFont.FixedFont if generic == "monospace" else QtGui.QFontDatabase.SystemFont.GeneralFont
+    except AttributeError:  # PySide2
+        kind = QtGui.QFontDatabase.FixedFont if generic == "monospace" else QtGui.QFontDatabase.GeneralFont
+    try:
+        return QtGui.QFontDatabase.systemFont(kind).family() or generic
+    except Exception:
+        return generic
+
+
+def absolute_spacing(QtGui):
+    """QFont's AbsoluteSpacing on PySide2 and PySide6 alike: PySide6 has no
+    enum value on a QFont instance (font.AbsoluteSpacing fails there)."""
+    kind = getattr(QtGui.QFont, "SpacingType", None)
+    return getattr(kind, "AbsoluteSpacing", None) or QtGui.QFont.AbsoluteSpacing
 
 
 def family(role):

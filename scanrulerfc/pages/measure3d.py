@@ -284,7 +284,7 @@ def widget(model, on_key=None, parent=None):
         f = cap.font()
         if fam.get("Barlow Semi Condensed"):
             f.setFamily(fam["Barlow Semi Condensed"])
-        f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.2)
+        f.setLetterSpacing(fonts.absolute_spacing(QtGui), 1.2)
         f.setBold(True)
         cap.setFont(f)
         row.addWidget(cap)
