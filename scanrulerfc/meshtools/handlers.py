@@ -206,6 +206,15 @@ def mesh_apply_wrap(session, a):
     return out
 
 
+# Trim to scan cuts with FreeCAD's mesh booleans. In real FreeCAD (1.0, 1.1,
+# newest) the cut still leaves nothing on the break's side of a simple box, so
+# until that is found the tool says it isn't ready rather than tell the person
+# to flip a side that is right. The algorithm itself is ported and tested.
+TRIM_READY = False
+TRIM_NOT_READY = ("Trim to scan isn't ready in FreeCAD yet: its cut with FreeCAD's mesh booleans doesn't "
+                  "give the original's result. Use Cut with a plane, or Boolean subtract, for now.")
+
+
 def mesh_trim(session, a):
     key, name, BV, BF = solid_named(session, a["body"])
     marked = region_vertices(session, a["region"]) if a.get("region") is not None else None
@@ -213,6 +222,8 @@ def mesh_trim(session, a):
     depth = float(a.get("depth", TR.DEFAULT_BREAK_DEPTH))
     flip = bool(a.get("flip", False))
     V, F, _ = working(session)
+    if not TRIM_READY:
+        raise ToolError("unavailable", TRIM_NOT_READY)
     try:
         body = TR.prepare_body(BV, BF, name)
         PV, PF, mating, gap, rep = TR.trim_to_scan(V, F, body, depth, offset, flip, marked)
