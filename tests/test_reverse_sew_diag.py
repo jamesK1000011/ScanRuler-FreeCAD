@@ -28,7 +28,7 @@ except ImportError:
     HAVE_FC = False
 
 LIMIT = 4000
-TOLS = (1e-6, 1e-4, 1e-3, 1e-2, 1e-1)
+TOLS = (1e-6, 1e-3, 1e-1)
 
 
 def _f(x, p=3):
@@ -193,9 +193,19 @@ class SewDiag(unittest.TestCase):
             try:
                 from Part import ShapeFix  # noqa: F401
 
-                out(" Part.ShapeFix:", ",".join(n for n in dir(ShapeFix) if not n.startswith("_"))[:200])
+                for cls, meth in (("FaceConnect", "build"), ("FaceConnect", "add"), ("ShapeTolerance", "setTolerance")):
+                    fn = getattr(getattr(ShapeFix, cls, None), meth, None)
+                    out(f" ShapeFix.{cls}.{meth}:", ((fn.__doc__ or "").strip().replace(chr(10), " ")[:110]) if fn else "absent")
             except Exception as e:  # noqa: BLE001
                 out(" Part.ShapeFix: none", type(e).__name__)
+            # The kernel's own sewing, as network_body calls it: the route used.
+            for t in (first, 1e-3):
+                o = k.occt
+                try:
+                    got = o.sew(faces, t)
+                    out(f" kernel sew({_f(t)}): route={o.last_sew.get('route')} {_summary(got)} tried={o.last_sew['tried']}"[:400])
+                except Exception as e:  # noqa: BLE001
+                    out(f" kernel sew({_f(t)}): err {e} tried={getattr(o, 'last_sew', {}).get('tried')}"[:400])
             # The seams left open by the sewing network_body does, side by side.
             c = Part.Compound(faces)
             c.sewShape(first)
