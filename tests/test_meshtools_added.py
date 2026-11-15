@@ -558,7 +558,6 @@ class Break(unittest.TestCase):
         V2, F2 = BO.outward(*cracked_box([0, 0, 0], [2, 3, 4], 4, True, False))
         self.assertAlmostEqual(BO.volume(V2, F2), 24, 6)
 
-    @unittest.expectedFailure  # open: Trim's cut in real FreeCAD (handlers.TRIM_READY); an unexpected success here means it works
     @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
     def test_a_box_trimmed_to_a_flat_sheet(self):
         body = TR.prepare_body(*box_mesh(20, 20, 20, 8), "Box")
@@ -645,10 +644,10 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class TrimNotReady(unittest.TestCase):
-    def test_says_it_is_not_ready(self):
+class TrimReady(unittest.TestCase):
+    def test_is_on(self):
         from scanrulerfc.meshtools import handlers as H
 
-        self.assertFalse(H.TRIM_READY)
-        self.assertIn("isn't ready", H.TRIM_NOT_READY)
+        # Back on since 5be1e43 passed in real FreeCAD 1.0, 1.1 and newest.
+        self.assertTrue(H.TRIM_READY)
 
