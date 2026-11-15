@@ -206,6 +206,36 @@ class TheKey(unittest.TestCase):
         self.assertFalse(C._state["view"]["ViewSplit"])
 
 
+class OutsideDeviation(unittest.TestCase):
+    """Pressed in another workspace (Reverse engineer, a scan open): the
+    key says why in the Report view and the panel, and is let up."""
+
+    def test_the_reason_said_and_the_key_let_up(self):
+        s = session()
+        SV._live["split"] = SV.SplitView(Gui(), stand_in_coin(), QT, lambda: s)
+        self.addCleanup(SV._live.__setitem__, "split", None)
+        self.addCleanup(C._state["view"].pop, "ViewSplit", None)
+        C._state["view"]["ViewSplit"] = True
+        said = []
+        with unittest.mock.patch.object(C, "_say", said.append):
+            why = DK.split_view_key("ViewSplit", True, lambda: s, "reverse")
+        self.assertIn("Surface Deviation", why)
+        self.assertEqual(said, [f"ScanRuler: Split view: {why}"])
+        self.assertFalse(C._state["view"]["ViewSplit"])
+        self.assertFalse(SV._live["split"].open)
+        self.assertIn(why, DK.header_html({**DK.header({}), "error": why}))
+        # In Surface Deviation with both open, it opens.
+        self.assertIsNone(DK.split_view_key("ViewSplit", True, lambda: s, "deviation"))
+        self.assertTrue(SV._live["split"].open)
+
+    def test_the_command_is_active_everywhere(self):
+        spec = next(x for x in _view_specs() if x["command"] == "ScanRuler_ViewSplit")
+        was = C._state["workspace"]
+        self.addCleanup(C._state.__setitem__, "workspace", was)
+        C._state["workspace"] = "reverse"
+        self.assertTrue(C.ViewCommand(spec).IsActive())
+
+
 class RunAsACommand(unittest.TestCase):
     """FreeCADGui.runCommand(name) — Agent Link's cmd_run — calls a
     checkable command's Activated with 0 and leaves its action as it was:

@@ -74,6 +74,8 @@ class Picks(unittest.TestCase):
         self.assertEqual(K.picks_line(ed.record), "1 face picked")
         self.assertTrue(K.picks_line({"kind": "fillet", "edges": []}).startswith("Click the edges of the body"))
         self.assertIsNone(K.picks_line({"kind": "extrude"}))
+        # Each hint a whole sentence, its full stop too.
+        self.assertTrue(all(t.endswith(".") for t in K.NONE_PICKED.values()))
 
 
 class ExtrudeEnd(unittest.TestCase):

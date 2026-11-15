@@ -301,7 +301,10 @@ VIEW_BAR = (
         _k("ScanRuler_ViewOverlaps", "Overlaps", "Hatch where bodies overlap in red", "opIntersect"),
         _k("ScanRuler_ViewTangentEdges", "Tangent edges", "How edges between rounds and flats are drawn", "tangentEdges"),
     ]},
-    {"group": "Split view", **_k("ScanRuler_ViewSplit", "Split view", "Scan and reference side by side, moving together", "splitView"), "ws": ("deviation",), "menu": []},
+    {"group": "Split view", **_k("ScanRuler_ViewSplit", "Split view", "Scan and reference side by side, moving together", "splitView"), "ws": ("deviation",), "menu": [],
+     # Pressable everywhere: outside Surface Deviation it says why it does
+     # not open (dock.split_view_key) instead of doing nothing at all.
+     "anywhere": True},
     {"group": "Colour plot", **_k("ScanRuler_ViewColourPlot", "Colour plot", "Colour the scan by deviation (results are kept when off)", "colourPlot"), "ws": ("deviation",), "menu": []},
     {"group": "On reference", **_k("ScanRuler_ViewOnReference", "On reference", "Show the map on the reference instead", "colourPlot"), "ws": ("deviation",), "menu": []},
     {"group": "Deviation", **_k("ScanRuler_ViewCopyDeviation", "Deviation", "Colour the edited copy by how far it moved from the scan", "compare"), "ws": ("mesh",), "menu": []},

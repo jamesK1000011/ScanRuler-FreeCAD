@@ -121,6 +121,18 @@ class FakeObject:
     def getPropertyStatus(self, name):
         return ["Output", "NoRecompute"] if name in self.quiet else []
 
+    def removeProperty(self, name):
+        """As FreeCAD 1.1 did live: a link property removed while it still
+        points somewhere leaves its target's back-link (InList) behind until
+        the document is saved and opened again; set to None first, the
+        back-link goes with the value."""
+        if name in self.links and self.__dict__.get(name) is not None:
+            self.Document.stale.append((self, self.__dict__[name]))
+        self.props.remove(name)
+        if name in self.links:
+            self.links.remove(name)
+        self.__dict__.pop(name, None)
+
     def setPropertyStatus(self, name, status):
         if {"Output", "NoRecompute"} & set(status):
             self.quiet.add(name)
@@ -150,7 +162,8 @@ class FakeObject:
     def needs(self):
         """What it depends on: its Group's members (FreeCAD puts a group
         after its children) and the objects its links point at."""
-        return [*(getattr(self, "Group", None) or []), *(getattr(self, n) for n in self.links if getattr(self, n) is not None)]
+        return [*(getattr(self, "Group", None) or []), *(getattr(self, n) for n in self.links if getattr(self, n) is not None),
+                *(t for o, t in getattr(self.Document, "stale", []) if o is self)]
 
 
 class FakeDocument:
@@ -162,7 +175,7 @@ class FakeDocument:
     Name, HasPendingTransaction = "Fake", True
 
     def __init__(self):
-        self.Objects, self.runs = [], []
+        self.Objects, self.runs, self.stale = [], [], []
 
     def addObject(self, kind, name):
         o = FakeObject(self, f"{name}{len(self.Objects):03d}")
@@ -293,6 +306,26 @@ class OneBuildAnEdit(unittest.TestCase):
                 b.Proxy.onDocumentRestored(b)
         self.assertEqual(writes, [])
         self.assertFalse(self.c.touched)
+
+    def test_an_old_document_s_back_link_goes_on_reopen(self):
+        # Older documents linked each body back to its container (Source).
+        # Removing the property alone left the container's InList holding
+        # the body until a save and reopen: "still touched after recompute"
+        # on every recompute, "The graph must be a DAG" on load.
+        self.edit(1)
+        for b in D.bodies_of(self.c):
+            b.addProperty("App::PropertyLink", "Source")
+            b.Source = self.c
+        self.assertIsNotNone(self.doc.cycle())
+        for b in D.bodies_of(self.c):
+            b.Proxy.onDocumentRestored(b)
+            self.assertNotIn("Source", b.PropertiesList)
+        self.assertIsNone(self.doc.cycle())
+        self.assertEqual(self.doc.stale, [])
+        self.c.touch()
+        self.doc.recompute()
+        self.assertEqual(self.doc.still, [])
+        self.assertTrue(all(b not in self.c.InList for b in D.bodies_of(self.c)))
 
     def test_outside_an_edit_a_recompute_builds(self):
         self.edit(1)

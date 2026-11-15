@@ -19,11 +19,11 @@ from .vec import dot, sub
 PICKS = {"fillet": "edges", "chamfer": "edges", "shell": "faces", "moveFace": "faces", "deleteFace": "faces"}
 # What the box says of its picks, in the original's words (FeatureEditor.tsx).
 NONE_PICKED = {
-    "shell": "None — a closed hollow body. Click faces of the body to take them away",
-    "fillet": "Click the edges of the body — a round runs on along the edges tangent to it. Click a picked edge again to let it go",
-    "chamfer": "Click the edges of the body — a round runs on along the edges tangent to it. Click a picked edge again to let it go",
-    "deleteFace": "Click a face of the round, the hole or the boss to take off",
-    "moveFace": "Click the faces of the body to move — flat or round ones",
+    "shell": "None — a closed hollow body. Click faces of the body to take them away.",
+    "fillet": "Click the edges of the body — a round runs on along the edges tangent to it. Click a picked edge again to let it go.",
+    "chamfer": "Click the edges of the body — a round runs on along the edges tangent to it. Click a picked edge again to let it go.",
+    "deleteFace": "Click a face of the round, the hole or the boss to take off.",
+    "moveFace": "Click the faces of the body to move — flat or round ones.",
 }
 
 

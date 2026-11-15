@@ -13,6 +13,17 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- Fixes from a live run in FreeCAD 1.1.3: a fillet's or chamfer's edge
+  clicked in the 3D view is picked (and let go on a second click) also when
+  the pick lands on the Reverse engineer container's compound or the
+  navigation takes the press; a miss says why in the Report view. A feature
+  box that opens is scrolled into view in the panel. Split view is pressable
+  in every workspace and says why it does not open outside Surface
+  Deviation, in the Report view and the panel's header. The status strip is
+  added without Qt's "Index out of range" warnings. An older document's
+  bodies drop their link back to the container on open, so it recomputes
+  clean without a save. The pick hints end with a full stop, and "Unsaved
+  changes" has its own line in the header.
 - Surface Deviation's Split view, ported from ScanRuler by Stefan Hermann (CNC
   Kitchen): the key opens a two-pane 3D viewer with the scan on the left,
   coloured by its deviation map while Colour plot is on, and the reference on

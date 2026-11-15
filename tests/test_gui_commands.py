@@ -141,7 +141,10 @@ class Commands(unittest.TestCase):
         self.assertTrue(C.build()["ScanRuler_WsMeshTools"].GetResources()["Checkable"])
         self.assertFalse(C.build()["ScanRuler_Ws3DMeasure"].GetResources()["Checkable"])
         self.assertTrue(C.build()["ScanRuler_ViewCopyDeviation"].IsActive())
-        self.assertFalse(C.build()["ScanRuler_ViewSplit"].IsActive())
+        self.assertFalse(C.build()["ScanRuler_ViewColourPlot"].IsActive())
+        # Split view runs anywhere, and says why it does not open outside
+        # Surface Deviation (FreeCAD runs no inactive command, silently).
+        self.assertTrue(C.build()["ScanRuler_ViewSplit"].IsActive())
 
     def test_reverse_keys_wait_for_their_engine(self):
         # Kinds this port builds stand for reverse_feature_add; the rest wait.

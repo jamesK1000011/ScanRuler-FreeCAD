@@ -71,11 +71,11 @@ def current_workspace():
     return _state["workspace"]
 
 
-def _say(msg):
+def _say(msg, warn=False):
     try:
         import FreeCAD
 
-        FreeCAD.Console.PrintMessage(msg + "\n")
+        (FreeCAD.Console.PrintWarning if warn else FreeCAD.Console.PrintMessage)(msg + "\n")
     except ImportError:
         pass
 
@@ -436,7 +436,9 @@ class ViewCommand(_Base):
 
     def IsActive(self):
         ws = self.spec.get("ws")  # a group shows in its workspaces; its menu follows it
-        return ws is None or _state["workspace"] in ws
+        # FreeCAD runs no inactive command, by click or by name, and says
+        # nothing: a key that explains itself elsewhere stays active.
+        return ws is None or self.spec.get("anywhere", False) or _state["workspace"] in ws
 
     def Activated(self, checked=None):
         # A click hands the action's new state. FreeCADGui.runCommand(name)

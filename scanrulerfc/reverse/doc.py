@@ -272,8 +272,19 @@ class Body:
 
     def onDocumentRestored(self, obj):
         # Older documents linked back to the container: the cycle goes.
-        if "Source" in obj.PropertiesList:
-            obj.removeProperty("Source")
+        # The link is let go first: FreeCAD drops the container's back-link
+        # (its InList) when a PropertyLink is set to None, while a property
+        # removed with a value still in it left the back-link until the
+        # document was saved and opened again ("still touched after
+        # recompute" each time, "The graph must be a DAG" on load).
+        if "Source" not in obj.PropertiesList:
+            return
+        try:
+            obj.Source = None
+        except Exception:  # noqa: BLE001 — not a link after all: removed as it is
+            pass
+        obj.removeProperty("Source")
+        _report_back_link(obj)
 
     def execute(self, obj):
         import Part
@@ -290,6 +301,22 @@ class Body:
 
     __getstate__ = dumps
     __setstate__ = loads
+
+
+def _report_back_link(body):
+    """Say so in the Report view if the container still lists the body in
+    its InList once the old link is gone (the cycle FreeCAD warns of):
+    saving the document once clears it."""
+    c = next((o for o in getattr(body, "InList", []) if hasattr(o, "PartJson")), None)
+    if c is None or body not in getattr(c, "InList", []):
+        return
+    try:
+        import FreeCAD
+
+        FreeCAD.Console.PrintWarning(f"ScanRuler: {body.Document.Name}#{body.Name} still depends on {c.Name} after its old link was "
+                                     "removed; save the document once to clear it.\n")
+    except ImportError:
+        pass
 
 
 def make_container(doc, part=None):
