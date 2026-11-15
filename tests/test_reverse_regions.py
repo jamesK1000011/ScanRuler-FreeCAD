@@ -13,6 +13,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
+from scanrulerfc.reverse.profiles import picked_profiles  # noqa: E402
 from scanrulerfc.reverse.regions import find_regions, loop_geometry, match_region, match_regions, parse_region_key, point_in_polygon  # noqa: E402
 from scanrulerfc.reverse.sketch import add_entity, add_rectangle, clone_sketch, empty_sketch, entity_of  # noqa: E402
 
@@ -88,9 +89,25 @@ class RegionMatch(unittest.TestCase):
         self.assertIsNone(match_region(key, find_regions(other)))
         self.assertEqual(len(match_regions([key, key], find_regions(s))), 1)
 
-    @unittest.skip("pickedProfiles is profiles.ts: ported with resolve.py (build order step 5)")
     def test_extrude_keeps_profile(self):
-        pass
+        frame = {"origin": [0, 0, 0], "normal": [0, 0, 1], "basisU": [1, 0, 0], "basisV": [0, 1, 0]}
+
+        def sketch_feature(sk):
+            return {"id": 1, "kind": "sketch", "name": "Sketch 1", "plane": {"kind": "world", "axis": "z", "offset": 0}, "frame": frame, "sketch": sk, "visible": True}
+
+        def extrude_of(regions):
+            return {"id": 2, "kind": "extrude", "name": "Extrude 1", "sketchId": 1, "regions": regions, "extent": {"kind": "distance", "from": 0, "to": 10}, "op": "new", "visible": True}
+
+        s = empty_sketch()
+        ids = add_rectangle(s, [0, 0], [20, 10])
+        key = find_regions(s)[0]["key"]
+        edited = clone_sketch(s)
+        entity_of(edited, ids[1])["b"] = [25, 12]
+        entity_of(edited, ids[2])["a"] = [25, 12]
+        profiles = picked_profiles(extrude_of([key]), sketch_feature(edited), lambda f: find_regions(f["sketch"]))
+        self.assertNotIsInstance(profiles, str)
+        self.assertEqual(len(profiles), 1)
+        self.assertRegex(picked_profiles(extrude_of([key]), sketch_feature(empty_sketch()), lambda f: find_regions(f["sketch"])), "no longer closed")
 
 
 def bracket_sketch():

@@ -116,6 +116,19 @@ def fixed_number(x, places):
     return float(to_fixed(x, places))
 
 
+def precision_number(x, digits):
+    """Number(x.toPrecision(digits)): the exact value of the double to that
+    many significant figures, halves away from zero."""
+    if not math.isfinite(x) or x == 0:
+        return x
+    d = Decimal(x)
+    q = Decimal(1).scaleb(d.adjusted() - digits + 1)
+    r = d.quantize(q, rounding=ROUND_HALF_UP)
+    if r.adjusted() > d.adjusted():
+        r = d.quantize(q * 10, rounding=ROUND_HALF_UP)
+    return float(r)
+
+
 # ---- JSON --------------------------------------------------------------------------
 
 
