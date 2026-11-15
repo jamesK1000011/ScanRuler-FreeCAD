@@ -13,6 +13,17 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- Reverse engineer's feature editor, ported from ScanRuler by Stefan Hermann
+  (CNC Kitchen): a Create feature key opens the feature's box (its numbers,
+  the preview line, Create or Save changes, Cancel) instead of making the
+  feature at once, and a feature with numbers reopens from the list's Edit.
+  In the 3D view the ghost of what it would make (a tool body see-through,
+  red and drawn through for a cut; a body as a fillet or shell would leave
+  it, solid in its place), and grips: arrows on an extrude's faces and far
+  edge, a ring about a revolve's axis, an arrow on a fillet's, chamfer's,
+  shell's or moved face's first pick, a Move's gizmo. A dragged grip opens
+  a field on it that takes a number or an expression over the parameters. A
+  press away from the grips stays with FreeCAD's navigation.
 - Release preparation: Addon Manager metadata with the bug tracker and
   readme links, the workbench's description, numpy (and scipy, optional)
   declared, and FreeCAD 1.0 as the minimum CI runs; a README with what you
