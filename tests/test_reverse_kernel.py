@@ -479,3 +479,89 @@ class SewRoutes(unittest.TestCase):
         self.assertEqual(said["tried"][2], ("ShapeTolerance+sewShape", "invalid"))
         with self.assertRaises(K.KernelError):
             self.sew_with([("sewShape", RuntimeError("x"))])
+
+
+class SharedSeams(unittest.TestCase):
+    """The shared-edge route on stand-ins: two square patches side by side,
+    each with its own copy of every edge and corner, come out holding one
+    vertex per corner and one edge on their common side."""
+
+    def setUp(self):
+        import types
+
+        class Pt:
+            def __init__(self, *c):
+                self.c = c
+
+            def __sub__(self, o):
+                return types.SimpleNamespace(Length=sum((a - b) ** 2 for a, b in zip(self.c, o.c)) ** 0.5)
+
+        class V:
+            def __init__(self, *c):
+                self.Point = Pt(*c)
+
+            def isSame(self, o):
+                return self is o
+
+        class E:
+            Degenerated = False
+            FirstParameter, LastParameter = 0.0, 1.0
+
+            def __init__(self, a, b):
+                self.Vertexes = [a, b]
+
+            def isSame(self, o):
+                return self is o
+
+            def valueAt(self, t):
+                a, b = self.Vertexes[0].Point.c, self.Vertexes[1].Point.c
+                return Pt(*[x + (y - x) * t for x, y in zip(a, b)])
+
+            def distToShape(self, v):
+                m = self.valueAt(0.5)
+                return ((m - v.Point).Length,)
+
+        class F:
+            def __init__(self, edges):
+                self.Edges = edges
+
+            @property
+            def Vertexes(self):  # noqa: N802
+                out = []
+                for e in self.Edges:
+                    for v in e.Vertexes:
+                        if v not in out:
+                            out.append(v)
+                return out
+
+            def replaceShape(self, subs):
+                m = dict((id(a), b) for a, b in subs)
+                edges = []
+                for e in self.Edges:
+                    if id(e) in m:
+                        edges.append(m[id(e)])
+                    elif any(id(v) in m for v in e.Vertexes):
+                        edges.append(E(*[m.get(id(v), v) for v in e.Vertexes]))
+                    else:
+                        edges.append(e)
+                return F(edges)
+
+        def square(x0):
+            c = [V(x0, 0, 0), V(x0 + 1, 0, 0), V(x0 + 1, 1, 0), V(x0, 1, 0)]
+            return F([E(c[i], c[(i + 1) % 4]) for i in range(4)])
+
+        self.fixed = []
+        edge_fix = types.SimpleNamespace(fixAddPCurve=lambda e, f, seam, tol: self.fixed.append(e), fixSameParameter=lambda e: None)
+        shell = lambda faces: types.SimpleNamespace(ShapeType="Shell", Faces=faces)  # noqa: E731
+        self.P = types.SimpleNamespace(Vertex=lambda m: V(*m.c), ShapeFix=types.SimpleNamespace(Edge=lambda: edge_fix), Shell=shell, makeShell=shell)
+        self.faces = [square(0), square(1)]
+
+    def test_one_vertex_per_corner_one_edge_on_the_common_side(self):
+        got = K.share_seams(self.P, self.faces, 1e-3)
+        a, b = got.Faces
+        common = [e for e in a.Edges if any(e is x for x in b.Edges)]
+        self.assertEqual(len(common), 1)
+        self.assertEqual(K.share_seams.last, {"vertices": 2, "edges": 1})
+        self.assertEqual(self.fixed, common)  # the shared edge given a curve on the second patch
+        corners = {id(v) for f in got.Faces for v in f.Vertexes}
+        self.assertEqual(len(corners), 6)
