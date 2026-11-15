@@ -76,12 +76,14 @@ scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
 scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
+scanrulerfc/reverse/network_curve.py
 scanrulerfc/reverse/network_spline.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/profiles.py
 scanrulerfc/reverse/regions.py
 scanrulerfc/reverse/resolve.py
+scanrulerfc/reverse/scan_path.py
 scanrulerfc/reverse/sketch.py
 scanrulerfc/reverse/sketch_spline.py
 scanrulerfc/reverse/solver.py
@@ -105,6 +107,8 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 tests/meshes.py
 tests/meshkit.py
+tests/network_meshes.py
+tests/reverse_fixtures/network_curve_goldens.json
 tests/reverse_fixtures/network_spline_goldens.json
 tests/reverse_fixtures/part_roundtrip.json
 tests/reverse_fixtures/step_keys_goldens.json
@@ -142,6 +146,7 @@ tests/test_reverse_autoconstrain.py
 tests/test_reverse_corners.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
+tests/test_reverse_network_curve.py
 tests/test_reverse_network_spline.py
 tests/test_reverse_parameters.py
 tests/test_reverse_part_file.py
