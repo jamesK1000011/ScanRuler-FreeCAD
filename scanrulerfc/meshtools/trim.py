@@ -21,7 +21,9 @@
 # the kernel is FreeCAD's Mesh booleans (behind a lazy import — without
 # FreeCAD the trim refuses), and each triangle of the result is told apart
 # by where it lies: on the body's own surface, on the slab's front skin, on
-# its back skin, or on its rim wall.
+# its back skin, or on its rim wall. A hollow's inner wall stays with the
+# solid round it, as Manifold's pieces keep it; where FreeCAD's kernel drops
+# a sealed shell the slab never meets, it is put back.
 
 import numpy as np
 
@@ -384,6 +386,58 @@ def _solids(V, F, tol):
     return solids
 
 
+def _restore_sealed(BV, BF, SV, SF, RV, RF, eps):
+    """The body's sealed shells the slab never meets — a hollow's inner wall
+    — put back where the kernel's answer lost them: FreeCAD's mesh booleans
+    drop a closed shell that meets nothing of the other mesh, where
+    Manifold carries it through the cut. (RV, RF, shells put back)."""
+    shells = B.pieces_of(BV, BF)
+    if len(shells) < 2:
+        return RV, RF, 0
+    c = RV[RF].mean(axis=1) if len(RF) else RV[:0]
+    Vs, Fs, off, back = [RV], [RF], len(RV), 0
+    for PV, PF in shells:
+        if len(c) and G.NearSurface(PV, PF, eps).nearest(c)[0].any():
+            continue  # some of it came back: the kernel kept it
+        if B.winding(SV, SF, PV[0]) > 0.5 or G.NearSurface(SV, SF, eps).nearest(PV)[0].any():
+            continue  # the slab meets it: the cut took it, and rightly
+        Vs.append(PV)
+        Fs.append(PF + off)
+        off += len(PV)
+        back += 1
+    if not back:
+        return RV, RF, 0
+    return np.vstack(Vs), np.vstack(Fs), back
+
+
+def _nested(solids):
+    """Solids with each hollow's wall — a closed piece faced inward, its
+    signed volume below zero — taken as part of the smallest solid round it,
+    as Manifold keeps a hollow in the solid it lies in. A piece faced
+    inward that nothing holds stays its own (wound inside out)."""
+    vols = [B.volume(PV, PF) for PV, PF in solids]
+    closed = [M.closedness(PF, len(PV))["open"] == 0 for PV, PF in solids]
+    into = list(range(len(solids)))
+    for i, (PV, PF) in enumerate(solids):
+        if not (closed[i] and vols[i] < 0):
+            continue
+        round_it = [j for j in range(len(solids)) if j != i and vols[j] > 0 and abs(B.winding(*solids[j], PV[0])) > 0.5]
+        if round_it:
+            into[i] = min(round_it, key=lambda j: vols[j])
+    out = []
+    for j in range(len(solids)):
+        if into[j] != j:
+            continue
+        group = [solids[j]] + [solids[i] for i in range(len(solids)) if into[i] == j and i != j]
+        Vs, Fs, off = [], [], 0
+        for PV, PF in group:
+            Vs.append(PV)
+            Fs.append(PF + off)
+            off += len(PV)
+        out.append((np.vstack(Vs), np.vstack(Fs)))
+    return out
+
+
 def _cut_body(kernel, BV, BF, body_volume, SV, SF, n_front, flip):
     """The body minus the slab, the pieces on the kept side, one mesh with
     its mating face marked. SF's first n_front triangles are its front skin,
@@ -402,9 +456,11 @@ def _cut_body(kernel, BV, BF, body_volume, SV, SF, n_front, flip):
     eps = 1e-3
     on_body = G.NearSurface(BV, BF, eps)
     on_slab = G.NearSurface(SV, SF, eps)
+    RV, RF, restored = _restore_sealed(BV, BF, SV, SF, RV, RF, eps)
+    LAST_CUT["restored"] = restored
     speck = SPECK_SHARE * body_volume
     kept, volume, dropped, specks = [], 0.0, 0, 0
-    for PV, PF in _solids(RV, RF, tol):
+    for PV, PF in _nested(_solids(RV, RF, tol)):
         v = B.volume(PV, PF)
         c = PV[PF].mean(axis=1)
         fb, _, _, _ = on_body.nearest(c)
