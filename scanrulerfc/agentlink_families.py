@@ -185,17 +185,13 @@ def _tab():
 
 
 def _echo():
-    # The echo's tables for these tools: an Agent Link that reads them from
-    # the families has them through declare(); the keys a tool lights go in
-    # its command table where nothing of Agent Link's has the name.
+    # The echo's tables for these tools, through declare(): WORKBENCHES,
+    # AREAS, SHOWN, COMMANDS and command_for (asked before COMMANDS, so a
+    # tool whose key depends on its arguments, e.g. element_fit by kind,
+    # lights the right one). Nothing goes into Agent Link's own table.
     from agentlink import echo
 
     echo.declare(sys.modules[__name__])
-    table = getattr(echo, "COMMAND", None)
-    if isinstance(table, dict):
-        for tool, cmd in COMMANDS.items():
-            if cmd:
-                table.setdefault(tool, cmd)
 
 
 for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("services", _register), ("panel tab", _tab), ("echo", _echo)):

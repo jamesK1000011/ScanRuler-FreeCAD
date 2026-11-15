@@ -223,7 +223,12 @@ class Echo(Fresh):
         self.assertEqual(fl.COMMANDS["mesh_wrap"], "ScanRuler_MeshWrap")
         self.assertEqual(fl.command_for("element_fit", {"kind": "sphere"}), W.command_for("element_fit", {"kind": "sphere"}))
         self.assertIn(("deviation_", "ScanRulerWorkbench"), echo.WORKBENCH)
-        self.assertEqual(echo.COMMAND.get("mesh_wrap"), "ScanRuler_MeshWrap")
+        # Through declare(), not Agent Link's own table: the argument-dependent
+        # key (element kind) must win over a fixed one.
+        self.assertNotIn("mesh_wrap", echo.COMMAND)
+        self.assertEqual(echo.command_for("mesh_wrap", {}), "ScanRuler_MeshWrap")
+        self.assertEqual(echo.command_for("element_fit", {"kind": "sphere"}), "ScanRuler_ElementSphere")
+        self.assertEqual(echo.command_for("element_fit", {"kind": "cylinder"}), "ScanRuler_ElementCylinder")
         self.assertTrue(any(t.get("title") == DK.TAB_TITLE for t in hooks.TABS))
         self.assertEqual(fl.SKIPPED, [])
 
