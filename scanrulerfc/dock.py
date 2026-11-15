@@ -27,6 +27,7 @@ DOCK_TITLE = "ScanRuler"
 DOCK_OBJECT = "ScanRulerDock"
 TAB_TITLE = "ScanRuler"
 TAB_ORDER = 70  # design 2.0
+WORKBENCH = "ScanRulerWorkbench"
 REFRESH_MS = 100
 UNTITLED = "Untitled project"
 AGENT_TEXT = {"connected": "Agent: connected", "refused": "Agent: turned away", "listening": "Agent: listening"}
@@ -258,7 +259,10 @@ def make_tab(panel):
 def register_tab(hooks):
     """Agent Link's hooks module, handed in by agentlink_families."""
     if not any(t.get("title") == TAB_TITLE for t in hooks.TABS):
-        hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER)
+        try:  # the tab only while ScanRuler is the workbench in front
+            hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER, workbench=WORKBENCH)
+        except TypeError:  # an Agent Link before tabs per workbench
+            hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER)
 
 
 _dock = {}
@@ -285,7 +289,11 @@ def open_panel(mw=None):
 
     if scanrulerfc._hosted:
         try:
-            importlib.import_module("agentlink.panel").show()
+            show = importlib.import_module("agentlink.panel").show
+            try:
+                show(tab=TAB_TITLE)  # the tab in front, even outside the workbench
+            except TypeError:  # an Agent Link before tabs per workbench
+                show()
         except Exception:  # noqa: BLE001 — no Agent Link panel here: the dock of its own
             pass
     d = live()
@@ -300,27 +308,28 @@ def open_panel(mw=None):
 
 
 def show_dock(mw=None):
-    """The dock of its own, tabbed beside the Combo View (no Agent Link)."""
-    from PySide import QtCore, QtWidgets
+    """The dock of its own (no Agent Link), placed where the panel layout
+    setting puts it (layout.py: right by default, a Combo View tab, or a
+    slide-out over the 3D view)."""
+    from PySide import QtWidgets
+
+    from . import layout
 
     if mw is None:
         import FreeCADGui
 
         mw = FreeCADGui.getMainWindow()
     if "dock" in _dock:
-        _dock["dock"].show()
-        _dock["dock"].raise_()
+        dw = _dock["dock"]
         C.set_ui(_dock["model"].handle)  # the keys come back to it from a closed panel's tab
         _dock["live"] = _dock["model"]
-        return _dock["dock"]
-    dw = QtWidgets.QDockWidget(DOCK_TITLE, mw)
-    dw.setObjectName(DOCK_OBJECT)
-    d = Dock()
-    dw.setWidget(d.widget)
-    mw.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dw)
-    combo = mw.findChild(QtWidgets.QDockWidget, "Combo View")
-    if combo is not None:
-        mw.tabifyDockWidget(combo, dw)
-    dw.raise_()
-    _dock.update(dock=dw, model=d)
+    else:
+        dw = QtWidgets.QDockWidget(DOCK_TITLE, mw)
+        dw.setObjectName(DOCK_OBJECT)
+        d = Dock()
+        dw.setWidget(d.widget)
+        _dock.update(dock=dw, model=d)
+    p = layout.placer()
+    p.show(DOCK_OBJECT, dw, WORKBENCH, DOCK_TITLE)
+    p.reveal(DOCK_OBJECT)
     return dw

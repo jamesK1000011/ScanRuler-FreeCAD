@@ -47,6 +47,24 @@ def menus():
     return out
 
 
+PANEL_COMMAND = "ScanRuler_Panel"
+PANEL_TOOLBAR = "ScanRuler Panel"
+
+
+class PanelCommand:
+    def GetResources(self):
+        return {"Pixmap": C.icon_path("ScanRulerWorkbench"), "MenuText": "ScanRuler Panel",
+                "ToolTip": "Show or hide ScanRuler's panel"}
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        from . import dock, layout
+
+        layout.toggle_or(dock.open_panel)
+
+
 def make_class(Gui):
     """ScanRulerWorkbench on this FreeCADGui's Workbench base."""
 
@@ -65,8 +83,14 @@ def make_class(Gui):
             # appendToolbar takes the title as the toolbar's object name too:
             # the per-workspace ones carry their workspace in it, as
             # "Create element" is in both Measure workspaces.
-            for name, _title, cmds in toolbars():
+            # Show or hide the panel (it slides out over the 3D view when
+            # the panel layout is left-slide): its own bar after the
+            # workspaces'; the view bar stays last.
+            Gui.addCommand(PANEL_COMMAND, PanelCommand())
+            for k, (name, _title, cmds) in enumerate(toolbars()):
                 self.appendToolbar(name, cmds)
+                if k == 0:
+                    self.appendToolbar(PANEL_TOOLBAR, [PANEL_COMMAND])
             for path, cmds in menus():
                 self.appendMenu(path, cmds)
 
