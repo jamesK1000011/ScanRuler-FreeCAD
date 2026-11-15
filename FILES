@@ -360,6 +360,7 @@ tests/test_reverse_stations.py
 tests/test_reverse_surface_fit.py
 tests/test_reverse_topo.py
 tests/test_reverse_where.py
+tests/test_reverse_wiring.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_snapshot.py
