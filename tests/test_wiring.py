@@ -256,14 +256,15 @@ class ProjectImport(Fresh):
                         "sections": [{"name": "Mid", "kind": "cut", "frame": {"origin": [0, 0, 5], "normal": [0, 0, 1]}}]}}
         path = _project(d, man, b"solid x\nendsolid x\n")
         calls = []
-        got = P.load(path, lambda t, a: calls.append((t, a)) or (True, {}), folder=d)
+        got = P.load(path, lambda t, a: calls.append((t, a)) or (True, {}), folder=d, doc_fn=lambda: None)
         self.assertEqual([c[0] for c in calls], ["scan_open", "element_fit", "section_cut"])
         self.assertEqual(calls[0][1], {"path": os.path.join(d, "bracket.stl"), "discard": True, "units": "mm"})
         self.assertEqual(calls[1][1], {"kind": "plane", "at": {"vertex": 4}, "name": "Top"})
         self.assertEqual(calls[2][1], {"across": {"origin": [0, 0, 5], "normal": [0, 0, 1]}, "name": "Mid", "kind": "cut"})
         self.assertEqual((got["project"], got["scan"], got["elements"], got["sections"]), ("Bracket", "bracket.stl", 1, 1))
         self.assertIn(P.REVERSE_LATER, got["notLoaded"])
-        self.assertIn("coming with the engine port", P.REVERSE_LATER)
+        self.assertIn("needs FreeCAD", P.REVERSE_LATER)
+        self.assertIsNone(got["reverse"])
         self.assertEqual(len(got["notLoaded"]), 3)  # reverse, the line, the reference
 
     def test_load_command_tells_the_panel(self):
@@ -321,7 +322,9 @@ class ToolDump(Fresh):
         sess = types.SimpleNamespace(family_state={}, out_dir=tempfile.mkdtemp(), doc=None)
         now = {t.name: (t.description, t.schema, t.changes, fam.GROUP) for fam in fl.FAMILIES for t in fam.tools(sess)}
         was = {k: (v["description"], v["inputSchema"], v["changes"], v["group"]) for k, v in base.items()}
-        self.assertEqual(sorted(set(now) - set(was)), sorted(SNAPSHOT + MESH_ADDED))
+        from scanrulerfc.reverse.handlers import tool_names
+
+        self.assertEqual(sorted(set(now) - set(was)), sorted(SNAPSHOT + MESH_ADDED + tuple(tool_names())))
         self.assertEqual(set(was) - set(now), set())
         changed = sorted(k for k in was if was[k] != now[k])
         # mesh_export also writes the trimmed piece and the wrap.

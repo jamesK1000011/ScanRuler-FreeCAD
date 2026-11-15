@@ -44,8 +44,11 @@ READS = {"reverse_feature_list", "reverse_feature_schema", "reverse_parameter_li
 
 
 def doc():
-    with open(os.path.join(HERE, "..", "scanrulerfc", "reverse", "tools.json"), encoding="utf-8") as f:
-        return json.load(f)
+    """data/tools.json with only the reverse group's entries."""
+    with open(os.path.join(HERE, "..", "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
+        d = json.load(f)
+    d["entries"] = {k: v for k, v in d["entries"].items() if v["group"] == H.GROUP}
+    return d
 
 
 class ToolData(unittest.TestCase):
@@ -91,10 +94,11 @@ class Echo(unittest.TestCase):
         self.assertEqual(H.ECHO["AREAS"], {"reverse": "Reverse engineer"})
 
     def test_a_command_for_every_grid_key(self):
-        self.assertEqual(set(H.GRID_COMMANDS), set(KIND_LABELS))
-        self.assertTrue(all(c.startswith("ScanRuler_Reverse") for c in H.GRID_COMMANDS.values()))
-        self.assertEqual(H.command_for("reverse_feature_add", {"feature": {"kind": "extrude"}}), "ScanRuler_ReverseExtrude")
-        self.assertEqual(H.command_for("reverse_feature_add", {"features": [{"kind": "boolean"}]}), "ScanRuler_ReverseCombine")
+        self.assertEqual(set(H.GRID_COMMANDS), set(KIND_LABELS) - {"sketch", "coil"})
+        self.assertTrue(all(c.startswith("ScanRuler_Re") for c in H.GRID_COMMANDS.values()))
+        self.assertEqual(H.command_for("reverse_feature_add", {"feature": {"kind": "extrude"}}), "ScanRuler_ReExtrude")
+        self.assertEqual(H.command_for("reverse_feature_add", {"features": [{"kind": "boolean"}]}), "ScanRuler_ReBoolean")
+        self.assertIsNone(H.command_for("reverse_feature_add", {"feature": {"kind": "sketch"}}))
         self.assertIsNone(H.command_for("reverse_feature_list", {}))
 
 

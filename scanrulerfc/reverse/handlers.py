@@ -5,8 +5,8 @@
 # commands as reverse_a_b, their inputs and answers in the original's
 # fields. Each change is one edit of the part (doc.py: one undo step,
 # PartJson written, the bodies rebuilt); a read changes nothing. Their
-# definitions are tools.json beside this file, in Agent Link's tool-data
-# format; handlers(session) binds a handler to each name. A refusal is
+# definitions are in data/tools.json (group reverse), in Agent Link's
+# tool-data format; handlers(session) binds a handler to each name. A refusal is
 # raised as Refusal (code, message), which Agent Link hands the agent as a
 # refusal, never a crash. Nothing here imports Agent Link or FreeCAD: the
 # document is reached through the session given, or a store handed in.
@@ -19,13 +19,15 @@ import copy
 import json
 import os
 
+from .. import workspaces as _W
+from ..errors import ToolError
 from . import doc as D
 from .features import KIND_LABELS, dependents_of, feature_of_draft, moved_list, name_for, start_extrude, start_feature, start_revolve
 from .part_file import validate_feature_json
 
 GROUP = "reverse"
 INFO = "Reverse engineer (ScanRuler by Stefan Hermann / CNC Kitchen, ported): the feature list, its build and its bodies."
-FOLDER = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tools.json")
 
 # The original's commands still to come, by tool name: the build step of
 # the port (design §7.1) that brings each.
@@ -41,20 +43,14 @@ LATER = {
 # Echo (design §4.2): what Agent Link's activity line, workbench switch and
 # command buttons do for these tools. Data for the merge to declare on the
 # family module (agentlink/echo.py declare()).
-GRID_COMMANDS = {
-    "sketch": "ScanRuler_ReverseSketch", "extrude": "ScanRuler_ReverseExtrude", "revolve": "ScanRuler_ReverseRevolve", "extract": "ScanRuler_ReverseExtract",
-    "import": "ScanRuler_ReverseImportStep", "shell": "ScanRuler_ReverseShell", "fillet": "ScanRuler_ReverseFillet", "chamfer": "ScanRuler_ReverseChamfer",
-    "draft": "ScanRuler_ReverseDraft", "moveFace": "ScanRuler_ReverseMoveFace", "deleteFace": "ScanRuler_ReverseDeleteFace", "hole": "ScanRuler_ReverseHole",
-    "thread": "ScanRuler_ReverseThread", "cutPlane": "ScanRuler_ReverseCutPlane", "mirror": "ScanRuler_ReverseMirror", "boolean": "ScanRuler_ReverseCombine",
-    "sheet": "ScanRuler_ReverseSheet", "split": "ScanRuler_ReverseSplit", "loft": "ScanRuler_ReverseLoft", "sweep": "ScanRuler_ReverseSweep",
-    "coil": "ScanRuler_ReverseCoil", "pattern": "ScanRuler_ReversePattern", "moveBody": "ScanRuler_ReverseMoveBody", "offsetBody": "ScanRuler_ReverseOffsetBody",
-    "surface": "ScanRuler_ReverseFitSurface", "network": "ScanRuler_ReversePatchNetwork", "trim": "ScanRuler_ReverseTrim", "thicken": "ScanRuler_ReverseThicken",
-}
+# The workbench's Create feature keys (workspaces._REVERSE), by kind: every
+# kind but sketch (made from "Sketch on") and coil (no key in the original).
+GRID_COMMANDS = {k: "ScanRuler_Re" + k[0].upper() + k[1:] for k, *_ in _W._REVERSE}
 ECHO = {
     "WORKBENCHES": {"reverse_": "ScanRulerWorkbench"},
     "AREAS": {"reverse": "Reverse engineer"},
-    "COMMANDS": {"reverse_sketch_edit": "ScanRuler_ReverseSketch", "reverse_import_step": "ScanRuler_ReverseImportStep",
-                 "reverse_export_step": "ScanRuler_ReverseExportStep", "reverse_parameter_add": "ScanRuler_ReverseAddParameter"},
+    # Keys the workbench has for tools other than reverse_feature_add.
+    "COMMANDS": {"reverse_import_step": "ScanRuler_ReImport"},
     "SHOWN": ("reverse_feature_list", "reverse_body_describe", "reverse_body_names", "reverse_parameter_list", "reverse_plane_describe", "reverse_body_check", "reverse_body_review"),
     "NO_BUTTON": ("reverse_feature_schema", "reverse_body_probe", "reverse_body_face_triangles", "reverse_body_selected_faces", "reverse_build_stop"),
 }
@@ -68,14 +64,11 @@ def command_for(name, args):
     return GRID_COMMANDS.get(f.get("kind")) if isinstance(f, dict) else None
 
 
-class Refusal(Exception):
+class Refusal(ToolError):
     """A tool's refusal: code (invalid_input, not_found, invalid_state,
-    unavailable, failed) and the message the agent reads."""
-
-    def __init__(self, code, message):
-        super().__init__(message)
-        self.code = code
-        self.message = message
+    unavailable, failed) and the message the agent reads. The add-on's own
+    ToolError, so its runner and Agent Link's family layer take it as
+    every other family's refusal."""
 
 
 def _invalid(message):
@@ -120,7 +113,9 @@ class DocStore:
         self.session = session
 
     def container(self, make=False):
-        doc = self.session.doc
+        doc = getattr(self.session, "doc", None)
+        if doc is None:
+            raise Refusal("unavailable", "No FreeCAD document is open: the Reverse engineer builds its bodies in one.")
         c = D.find_container(doc)
         if c is None and make:
             c = D.make_container(doc)
@@ -747,5 +742,5 @@ def schema_of(kind, part=None):
 
 def tool_names():
     """The tools tools.json defines for this group."""
-    with open(os.path.join(FOLDER, "tools.json"), encoding="utf-8") as f:
+    with open(DATA, encoding="utf-8") as f:
         return [k for k, v in json.load(f)["entries"].items() if v["group"] == GROUP]

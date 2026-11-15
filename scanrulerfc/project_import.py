@@ -9,9 +9,13 @@
 # What this port can take goes through the tools, as a person's keys do:
 # the scan through scan_open, each fitted element from its seed vertices
 # through element_fit, each section from its plane through section_cut.
-# Reverse engineer data waits for the engine port; anything else is named
-# as not loaded. `load(path, run)` takes a runner(tool, args) -> (ok,
-# result) and answers what it did.
+# The Reverse engineer part (the manifest's `reverse` key and its STEP
+# member) goes through reverse/part_file.py into the document's
+# ScanRulerReverse container (reverse/doc.py), after the scan, so its
+# plane and axis references find their elements; without FreeCAD it is
+# named as not loaded. Anything else is named as not loaded too.
+# `load(path, run)` takes a runner(tool, args) -> (ok, result) and answers
+# what it did.
 import json
 import os
 import tempfile
@@ -23,7 +27,7 @@ APP = "ScanRuler"
 SCHEMA = 1
 MANIFEST = "project.json"
 KINDS = ("plane", "sphere", "cylinder", "cone", "torus", "point", "circle")
-REVERSE_LATER = "Reverse engineer data: coming with the engine port — not loaded."
+REVERSE_LATER = "Reverse engineer data: needs FreeCAD's Part kernel to build — not loaded."
 
 
 def read_manifest(zf):
@@ -68,19 +72,59 @@ def _section_call(s):
     return args, None
 
 
-def load(path, run, folder=None):
-    """Open the project's scan, elements and sections through run; answer
-    {"project", "scan", "elements", "sections", "notLoaded", "errors"}."""
+def _freecad_doc():
+    """The active FreeCAD document (a new one if none), or None without
+    FreeCAD and its Part kernel."""
+    try:
+        import FreeCAD
+        import Part  # noqa: F401 — the kernel the part builds on
+    except ImportError:
+        return None
+    return FreeCAD.ActiveDocument or FreeCAD.newDocument("ScanRuler")
+
+
+def _reverse(path, doc_fn, out):
+    """The Reverse engineer part into the document's container: out
+    ["reverse"] {features, failed}, or why not in notLoaded / errors."""
+    from .reverse import doc as RD
+    from .reverse import part_file as PF
+
+    doc = (doc_fn or _freecad_doc)()
+    if doc is None:
+        out["notLoaded"].append(REVERSE_LATER)
+        return
+    try:
+        part, members = PF.read_scanruler(path)
+        if part is None:
+            return
+        results = RD.import_part(doc, part, members, out["project"])
+    except Exception as e:  # noqa: BLE001 — the rest of the project stands
+        out["errors"].append({"tool": "reverse", "code": "failed", "message": f"Reverse engineer data: {e}"})
+        return
+    out["reverse"] = {"features": len(part.get("features") or []), "failed": sum(1 for r in results if r.get("status") == "failed")}
+
+
+def load(path, run, folder=None, doc_fn=None):
+    """Open the project's scan, elements and sections through run, then its
+    Reverse engineer part in doc_fn()'s document (the active one by
+    default); answer {"project", "scan", "elements", "sections", "reverse",
+    "notLoaded", "errors"}."""
+    out = _load(path, run, folder)
+    if out.pop("_reverse", False):
+        _reverse(path, doc_fn, out)
+    return out
+
+
+def _load(path, run, folder=None):
     try:
         zf = zipfile.ZipFile(path)
     except (OSError, zipfile.BadZipFile) as e:
         raise ToolError("invalid_input", f"{os.path.basename(path)}: not a ScanRuler project file ({e}).")
-    out = {"project": None, "scan": None, "elements": 0, "sections": 0, "notLoaded": [], "errors": []}
+    out = {"project": None, "scan": None, "elements": 0, "sections": 0, "reverse": None, "notLoaded": [], "errors": []}
     with zf:
         m = read_manifest(zf)
         out["project"] = m.get("name") or os.path.splitext(os.path.basename(path))[0]
-        if m.get("reverse"):
-            out["notLoaded"].append(REVERSE_LATER)
+        out["_reverse"] = bool(m.get("reverse"))
         scan = m.get("scan")
         members = zf.namelist()
         if not scan:

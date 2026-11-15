@@ -5562,6 +5562,492 @@
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/snapshot.py",
    "date": "2026-11-14"
+  },
+  "reverse_feature_add": {
+   "group": "reverse",
+   "description": "Add a feature at the rollback bar (or right after one, with after), as the Reverse engineer panel's box makes it: a sketch on a plane, then features that use it (extrude, revolve), then features on the bodies (fillet, chamfer, shell, hole, thread, draft, combine, pattern...). Several (features) go in one after another. One undo step; returns once the bodies are rebuilt — read each added row's status: a feature can be made and still fail to build.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "type": "object",
+      "description": "The feature as the list stores it (reverse_feature_schema { kind } gives each kind's fields and defaults): kind, and its fields. Picks (edges, faces) are indices from reverse_body_describe or fingerprints.",
+      "properties": {
+       "kind": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "kind"
+      ],
+      "additionalProperties": true
+     },
+     "features": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "description": "The feature as the list stores it (reverse_feature_schema { kind } gives each kind's fields and defaults): kind, and its fields. Picks (edges, faces) are indices from reverse_body_describe or fingerprints.",
+       "properties": {
+        "kind": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind"
+       ],
+       "additionalProperties": true
+      },
+      "minItems": 1
+     },
+     "after": {
+      "description": "A feature: its id, or its name."
+     }
+    },
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (add)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_update": {
+   "group": "reverse",
+   "description": "Change fields of a feature (set: the fields, as reverse_feature_add takes them); the part is rebuilt from it on. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "description": "A feature: its id, or its name."
+     },
+     "set": {
+      "type": "object",
+      "additionalProperties": true
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "feature",
+     "set"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (update)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_remove": {
+   "group": "reverse",
+   "description": "Remove a feature. One that others use is refused unless dependents: true, which removes them too. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "description": "A feature: its id, or its name."
+     },
+     "dependents": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "feature"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (remove)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_move": {
+   "group": "reverse",
+   "description": "Move features to just after another (after; left out, to the top), where nothing then comes before what it builds on. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "description": "A feature: its id, or its name."
+     },
+     "features": {
+      "type": "array",
+      "items": {
+       "description": "A feature: its id, or its name."
+      }
+     },
+     "after": {
+      "description": "A feature: its id, or its name."
+     }
+    },
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (move)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_suppress": {
+   "group": "reverse",
+   "description": "Suppress a feature (left out of the build, kept in the list with its picks and numbers), or bring it back with suppressed: false. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "description": "A feature: its id, or its name."
+     },
+     "suppressed": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "feature"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (suppress)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_rollback": {
+   "group": "reverse",
+   "description": "Move the rollback bar: the features below it are not built. after: the last feature built; top: true for none; neither for all. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "after": {
+      "description": "A feature: its id, or its name."
+     },
+     "top": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (rollback)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_clear": {
+   "group": "reverse",
+   "description": "Take every feature and parameter away (confirm: true). One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "confirm": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "confirm"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (clear)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_list": {
+   "group": "reverse",
+   "description": "The feature list in order: each row's id, name, kind, status (ok, or failed with the message, or rolled back), its key value and expressions, and the rollback bar. Give feature for one feature whole, as stored, with its last result; detail full gives every feature whole.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "feature": {
+      "description": "A feature: its id, or its name."
+     },
+     "detail": {
+      "type": "string",
+      "enum": [
+       "brief",
+       "full"
+      ]
+     }
+    },
+    "additionalProperties": false
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (list)",
+   "date": "2026-11-15"
+  },
+  "reverse_feature_schema": {
+   "group": "reverse",
+   "description": "One feature kind's fields as reverse_feature_add takes them, with the box's defaults: read before adding a kind for the first time.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "kind"
+    ]
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (schema)",
+   "date": "2026-11-15"
+  },
+  "reverse_build": {
+   "group": "reverse",
+   "description": "Rebuild the part from its feature list (kept steps are taken up, not played again): each feature's status, what failed and why, and the bodies.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reFeatureCommands.ts (build)",
+   "date": "2026-11-15"
+  },
+  "reverse_build_stop": {
+   "group": "reverse",
+   "description": "Stop a build that hangs: throws the kernel away, suppresses the feature in play and rebuilds. Needs the build worker.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBuildStop.ts",
+   "date": "2026-11-15"
+  },
+  "reverse_parameter_list": {
+   "group": "reverse",
+   "description": "The model's parameters: each name, kind, expression, value (or the error) and comment.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reParameterCommands.ts (list)",
+   "date": "2026-11-15"
+  },
+  "reverse_parameter_add": {
+   "group": "reverse",
+   "description": "Add a named parameter: a number or a formula over the others (kind length, angle, integer or number). Feature fields read it through exprs. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "expression": {
+      "type": [
+       "string",
+       "number"
+      ]
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "length",
+       "angle",
+       "integer",
+       "number"
+      ]
+     },
+     "comment": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name",
+     "expression"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reParameterCommands.ts (add)",
+   "date": "2026-11-15"
+  },
+  "reverse_parameter_set": {
+   "group": "reverse",
+   "description": "Give a parameter a new expression (or comment); everything that reads it is rebuilt. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parameter": {
+      "type": [
+       "string",
+       "number"
+      ]
+     },
+     "expression": {
+      "type": [
+       "string",
+       "number"
+      ]
+     },
+     "comment": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "parameter"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reParameterCommands.ts (set)",
+   "date": "2026-11-15"
+  },
+  "reverse_parameter_rename": {
+   "group": "reverse",
+   "description": "Rename a parameter, in every expression and feature that reads it. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parameter": {
+      "type": [
+       "string",
+       "number"
+      ]
+     },
+     "to": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "parameter",
+     "to"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reParameterCommands.ts (rename)",
+   "date": "2026-11-15"
+  },
+  "reverse_parameter_remove": {
+   "group": "reverse",
+   "description": "Remove a parameter no expression reads (one that is read is refused, naming the readers). One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parameter": {
+      "type": [
+       "string",
+       "number"
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "parameter"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reParameterCommands.ts (remove)",
+   "date": "2026-11-15"
+  },
+  "reverse_body_names": {
+   "group": "reverse",
+   "description": "The bodies the build left: id, name, volume, whether each is a closed solid or a sheet, face count, box, style and whether it is shown.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (names)",
+   "date": "2026-11-15"
+  },
+  "reverse_body_describe": {
+   "group": "reverse",
+   "description": "A body's faces and edges with their fingerprints (kind, where, which way, how big, which feature made it), each by index: what a fillet's edges or a shell's faces are picked by.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "body": {
+      "description": "A body: its id (the maker feature's id; a piece id + n/1024), or its name."
+     },
+     "detail": {
+      "type": "string",
+      "enum": [
+       "brief",
+       "full"
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "body"
+    ]
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (describe)",
+   "date": "2026-11-15"
+  },
+  "reverse_body_check": {
+   "group": "reverse",
+   "description": "Whether a body is a valid closed solid: the kernel's check, its solids and shells, its volume.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "body": {
+      "description": "A body: its id (the maker feature's id; a piece id + n/1024), or its name."
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "body"
+    ]
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (check)",
+   "date": "2026-11-15"
+  },
+  "reverse_body_clearance": {
+   "group": "reverse",
+   "description": "How two bodies stand to each other: the least gap between them, or the volume they share where they meet.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "description": "A body: its id (the maker feature's id; a piece id + n/1024), or its name."
+     },
+     "b": {
+      "description": "A body: its id (the maker feature's id; a piece id + n/1024), or its name."
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "a",
+     "b"
+    ]
+   },
+   "changes": false,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (clearance)",
+   "date": "2026-11-15"
+  },
+  "reverse_body_set": {
+   "group": "reverse",
+   "description": "Name a body, colour it (#rrggbb or a swatch name) or show and hide it. One undo step.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "body": {
+      "description": "A body: its id (the maker feature's id; a piece id + n/1024), or its name."
+     },
+     "name": {
+      "type": "string"
+     },
+     "color": {
+      "type": "string"
+     },
+     "visible": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "body"
+    ]
+   },
+   "changes": true,
+   "source": "ScanRuler by Stefan Hermann (CNC Kitchen): plugins/reverse/app/reBodyCommands.ts (set)",
+   "date": "2026-11-15"
   }
  }
 }

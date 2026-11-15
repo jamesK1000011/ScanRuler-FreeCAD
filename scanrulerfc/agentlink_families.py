@@ -18,8 +18,9 @@ import sys
 
 import scanrulerfc
 from scanrulerfc import workspaces as _W
+from scanrulerfc.reverse import handlers as _R
 
-NAMES = ["fam_scan", "fam_elements", "fam_align", "fam_dimensions", "fam_sections", "fam_meshtools", "fam_flat", "fam_deviation", "fam_thickness", "fam_noise", "fam_thread", "fam_wear", "fam_catalog", "fam_manual", "fam_pack", "fam_fitcomp", "fam_cad", "fam_snapshot"]
+NAMES = ["fam_scan", "fam_elements", "fam_align", "fam_dimensions", "fam_sections", "fam_meshtools", "fam_flat", "fam_deviation", "fam_thickness", "fam_noise", "fam_thread", "fam_wear", "fam_catalog", "fam_manual", "fam_pack", "fam_fitcomp", "fam_cad", "fam_snapshot", "fam_reverse"]
 
 # Shown wherever these tools load (Agent Link's panel and tool groups): whose
 # work they are and under which licence.
@@ -46,15 +47,21 @@ WB = "ScanRulerWorkbench"
 # The workbench to bring up for a tool, by prefix. wear_, catalog_, pack_,
 # fit_scan_ and manual_ switch nothing.
 WORKBENCHES = {p: WB for p in ("scan_", "element_", "dimension_", "align_", "section_", "deviation_", "thickness_", "flat_", "mesh_", "report_get", "export_csv")}
+WORKBENCHES.update(_R.ECHO["WORKBENCHES"])
 # The Activity list's area, by prefix: the workspace tabs' names.
 AREAS = dict(_W.AREAS)
 # The key a tool lights, for every tool a key stands for; command_for(tool,
 # args) for the ones whose key hangs on an argument (element_fit's kind).
 COMMANDS = {k["tool"]: _W.command_for(k["tool"]) for k in _W.keys() + [_W.SNAPSHOT] if k.get("tool")}
+COMMANDS.update(_R.ECHO["COMMANDS"])
+# The Reverse engineer's Create feature keys hang on reverse_feature_add's
+# feature kind (workspaces.command_for asks reverse.handlers.command_for).
 command_for = _W.command_for
 # Read-only tools that still show something.
 SHOWN = ("element_list", "report_get", "deviation_stats", "deviation_hotspots", "thickness_stats", "scan_info", "scan_query",
-         "scan_nearest", "mesh_inspect", "section_list", "flat_objects")
+         "scan_nearest", "mesh_inspect", "section_list", "flat_objects") + tuple(_R.ECHO["SHOWN"])
+# Tools that light no key at all, whatever their prefix matches.
+NO_BUTTON = tuple(_R.ECHO["NO_BUTTON"])
 
 
 def _hook(name, call):
