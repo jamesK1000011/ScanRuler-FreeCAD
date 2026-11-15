@@ -74,8 +74,11 @@ scanrulerfc/reverse/datums.py
 scanrulerfc/reverse/expression.py
 scanrulerfc/reverse/features.py
 scanrulerfc/reverse/frames.py
+scanrulerfc/reverse/kernel.py
+scanrulerfc/reverse/kernel_thread.py
 scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
+scanrulerfc/reverse/origins.py
 scanrulerfc/reverse/parameters.py
 scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/profiles.py
@@ -140,6 +143,7 @@ tests/test_reverse_autoconstrain.py
 tests/test_reverse_corners.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
+tests/test_reverse_kernel.py
 tests/test_reverse_parameters.py
 tests/test_reverse_part_file.py
 tests/test_reverse_regions.py
