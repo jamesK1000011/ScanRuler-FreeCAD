@@ -54,6 +54,16 @@ scanrulerfc/linalg.py
 scanrulerfc/manual_core.py
 scanrulerfc/mesh_core.py
 scanrulerfc/meshgraph.py
+scanrulerfc/meshtools/__init__.py
+scanrulerfc/meshtools/boolean.py
+scanrulerfc/meshtools/densify.py
+scanrulerfc/meshtools/grid.py
+scanrulerfc/meshtools/handlers.py
+scanrulerfc/meshtools/shell.py
+scanrulerfc/meshtools/solids.py
+scanrulerfc/meshtools/tools.json
+scanrulerfc/meshtools/trim.py
+scanrulerfc/meshtools/wrap.py
 scanrulerfc/min_zone.py
 scanrulerfc/model.py
 scanrulerfc/noise_core.py
@@ -97,6 +107,7 @@ tests/test_manual.py
 tests/test_measuring_core.py
 tests/test_measuring_tools.py
 tests/test_meshtools.py
+tests/test_meshtools_added.py
 tests/test_noise.py
 tests/test_on_reference.py
 tests/test_outline.py
