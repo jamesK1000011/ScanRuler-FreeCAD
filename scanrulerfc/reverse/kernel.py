@@ -291,6 +291,43 @@ def _hash(s, upper=HASH_BOUND):
         return s.hashCode() % upper
 
 
+def sew_routes(P, shapes, tolerance):
+    """The ways of sewing faces at a tolerance, in the order tried: (name,
+    fn() -> shape). sewShape(tolerance) first, as on the FreeCADs that take
+    it; then OCCT's ShapeFix_FaceConnect, which sews at the tolerance it is
+    given; then the faces' own tolerances raised to it before sewShape(),
+    for a sewing that goes by them."""
+
+    def sew_shape():
+        c = P.Compound(list(shapes))
+        c.sewShape(tolerance)
+        return c
+
+    def face_connect():
+        fc = P.ShapeFix.FaceConnect()
+        faces = [f for s in shapes for f in s.Faces]
+        for i, a in enumerate(faces):
+            for b in faces[i + 1:]:
+                if a.BoundBox.isIntersection(b.BoundBox):
+                    fc.add(a, b)
+        shell = P.Shell(faces) if hasattr(P, "Shell") else P.makeShell(faces)
+        if shell.ShapeType != "Shell":
+            shell = P.makeShell(faces)
+        return fc.build(shell, tolerance, tolerance)
+
+    def tolerance_then_sew():
+        raised = []
+        for s in shapes:
+            c = s.copy()
+            P.ShapeFix.ShapeTolerance().setTolerance(c, tolerance)
+            raised.append(c)
+        c = P.Compound(raised)
+        c.sewShape(tolerance)
+        return c
+
+    return [("sewShape", sew_shape), ("ShapeFix.FaceConnect", face_connect), ("ShapeTolerance+sewShape", tolerance_then_sew)]
+
+
 class Occt:
     """occtTypes.ts OcctLike on FreeCAD Part: same names, a handle is a
     Part.Shape, a point a list [x, y, z]."""
@@ -666,9 +703,35 @@ class Occt:
         return s.toShape()
 
     def sew(self, shapes, tolerance=1e-6):
-        c = _part().Compound(list(shapes))
-        c.sewShape(tolerance)
-        return c
+        """The shapes sewn at the tolerance. FreeCAD 1.1.3's Shape.sewShape
+        takes no tolerance (its doc reads sewShape(); a value given is
+        ignored and OCCT's default 1e-6 mm used), so seams 1-26 µm apart
+        mid-span stayed open. The routes of sew_routes are tried in turn;
+        the one leaving the fewest open edges (by sameness) is kept, the
+        first that leaves none at once. last_sew says which was used and
+        what each did."""
+        shapes = list(shapes)
+        best = None
+        self.last_sew = {"tolerance": tolerance, "tried": []}
+        for name, make in sew_routes(_part(), shapes, tolerance):
+            try:
+                got = make()
+                if got is None or got.isNull() or not got.isValid():
+                    self.last_sew["tried"].append((name, "invalid"))
+                    continue
+                free = len(self.openEdgeMids(got))
+            except Exception as e:  # noqa: BLE001 — a route this FreeCAD lacks
+                self.last_sew["tried"].append((name, f"{type(e).__name__}: {e}"[:120]))
+                continue
+            self.last_sew["tried"].append((name, free))
+            if best is None or free < best[0]:
+                best = (free, name, got)
+            if free == 0:
+                break
+        if best is None:
+            raise KernelError("the faces could not be sewn.")
+        self.last_sew["route"] = best[1]
+        return best[2]
 
     def sewAndSolidify(self, faces, tolerance=1e-6):
         P = _part()

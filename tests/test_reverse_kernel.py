@@ -428,3 +428,54 @@ class Operations(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SewRoutes(unittest.TestCase):
+    """Sewing tries its routes in turn and keeps the one leaving the fewest
+    open edges, the first leaving none at once (FreeCAD 1.1.3's sewShape
+    takes no tolerance). On stand-ins for Part and the shapes."""
+
+    class Shape:
+        def __init__(self, free, valid=True):
+            self.free, self.valid = free, valid
+
+        def isNull(self):  # noqa: N802
+            return False
+
+        def isValid(self):  # noqa: N802
+            return self.valid
+
+    def sew_with(self, results):
+        from unittest import mock
+
+        def routes(P, shapes, tol):
+            def make(r):
+                def fn():
+                    if isinstance(r, Exception):
+                        raise r
+                    return r
+                return fn
+            return [(n, make(r)) for n, r in results]
+
+        o = K.Occt()
+        with mock.patch.object(K, "sew_routes", routes), mock.patch.object(K, "_part", lambda: None), \
+                mock.patch.object(K.Occt, "openEdgeMids", lambda self, s: [0] * s.free):
+            got = o.sew([], 1e-3)
+        return got, o.last_sew
+
+    def test_the_fewest_open_edges_and_the_first_with_none(self):
+        a, b, c = self.Shape(4), self.Shape(0), self.Shape(0)
+        got, said = self.sew_with([("sewShape", a), ("ShapeFix.FaceConnect", b), ("ShapeTolerance+sewShape", c)])
+        self.assertIs(got, b)
+        self.assertEqual(said["route"], "ShapeFix.FaceConnect")
+        self.assertEqual(said["tried"], [("sewShape", 4), ("ShapeFix.FaceConnect", 0)])
+
+    def test_a_route_that_fails_or_is_invalid_is_passed_over(self):
+        a = self.Shape(8)
+        got, said = self.sew_with([("sewShape", a), ("ShapeFix.FaceConnect", AttributeError("no FaceConnect")), ("ShapeTolerance+sewShape", self.Shape(2, valid=False))])
+        self.assertIs(got, a)
+        self.assertEqual(said["route"], "sewShape")
+        self.assertIn("AttributeError", said["tried"][1][1])
+        self.assertEqual(said["tried"][2], ("ShapeTolerance+sewShape", "invalid"))
+        with self.assertRaises(K.KernelError):
+            self.sew_with([("sewShape", RuntimeError("x"))])
