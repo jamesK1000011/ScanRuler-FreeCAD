@@ -87,7 +87,10 @@ scanrulerfc/reverse/solver.py
 scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
 scanrulerfc/reverse/sweep_route.py
+scanrulerfc/reverse/topo.py
+scanrulerfc/reverse/units.py
 scanrulerfc/reverse/vec.py
+scanrulerfc/reverse/where.py
 scanrulerfc/scanstate.py
 scanrulerfc/schema.py
 scanrulerfc/section_core.py
@@ -143,6 +146,8 @@ tests/test_reverse_resolve.py
 tests/test_reverse_sketch_shapes.py
 tests/test_reverse_solver.py
 tests/test_reverse_stations.py
+tests/test_reverse_topo.py
+tests/test_reverse_where.py
 tests/test_scan.py
 tests/test_sections.py
 tests/test_thickness.py

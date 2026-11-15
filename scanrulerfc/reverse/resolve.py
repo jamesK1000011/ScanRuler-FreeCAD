@@ -16,26 +16,17 @@ from .frames import WORLD_AXES, radial_frame, sketch_frame_on, world_axis_dir, w
 from .move import move_matrix
 from .profiles import lift_point, loft_problem, loft_profile, picked_profiles, route_sweep_geometry, sketch_pieces, sweep_geometry
 from .steps import SURFACE_MIN_REGION
+from .units import fmt_len
 from .vec import add_scaled, cross, dot, normalize, scale
 
 _NO = object()
 UP_MIN_SHARE = 0.1
-MM_PER_INCH = 25.4
 
 
 def _obj(*pairs):
     """An object literal: the pairs in order, those whose value is absent
     (the original's undefined) left out."""
     return {k: v for k, v in pairs if v is not _NO}
-
-
-def fmt_len(mm, units="mm", mm_decimals=3, bare=False):
-    """src/core/units.ts fmtLen: "12.700 mm" / "0.5000 in"."""
-    places = max(3, mm_decimals + 1) if units == "in" else mm_decimals
-    text = to_fixed(mm / (MM_PER_INCH if units == "in" else 1), places)
-    if float(text) == 0:
-        text = to_fixed(0, places)
-    return text if bare else f"{text} {units}"
 
 
 def resolve_plane_frame(ref, ctx, seed_u=None):
