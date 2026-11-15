@@ -45,9 +45,10 @@ def select(id_, label, options, value, enabled=True, info=None, info_text=None):
             "value": value, "enabled": bool(enabled), "info": info, "info_text": info_text}
 
 
-def number(id_, label, value, unit="mm", auto=None, step=None, minimum=None, enabled=True, hint=None):
+def number(id_, label, value, unit="mm", auto=None, step=None, minimum=None, enabled=True, hint=None, integer=False):
+    """A number field; `integer` for a count (an integer spin box, no decimals)."""
     return {"id": id_, "kind": "number", "label": label, "value": value, "unit": unit, "auto": auto, "step": step,
-            "min": minimum, "enabled": bool(enabled), "hint": hint, "info": None, "info_text": None}
+            "min": minimum, "enabled": bool(enabled), "hint": hint, "info": None, "info_text": None, "integer": bool(integer)}
 
 
 def check(id_, label, value, enabled=True, info=None, info_text=None):
@@ -99,21 +100,32 @@ def page(title, workspace, sections):
 
 # --- the Qt view --------------------------------------------------------------
 
+def button_text(label):
+    """A panel button's text: Title Case, as FreeCAD's design guide asks of
+    buttons (the model keeps the original's words)."""
+    return W.title_case(label)
+
+
+def group_title(s):
+    """A section's group title: its header in Title Case, the way FreeCAD
+    titles a task panel's group boxes (the original's caps caption stays in
+    the model)."""
+    return W.title_case(s["header"]) if s.get("header") else ""
+
+
 def widget(model, on_key=None, on_field=None, parent=None):
-    """A QWidget drawn from any page model: caps headers with an (i) key,
-    slots, rows, fields of every kind, keys in their grid, hints, and the
-    credit at the foot. on_key(section_id, key_id); on_field(section_id,
-    field_id, value)."""
+    """A QWidget drawn from any page model (every page's, 3D Measure's too):
+    a group box per section titled as FreeCAD titles them, with an (i) key,
+    slots, rows, fields of every kind, keys in their grid and hints. The
+    credit is the dock's footer, once (dock.Dock), not each page's.
+    on_key(section_id, key_id); on_field(section_id, field_id, value)."""
     import math
 
-    from PySide import QtCore, QtGui, QtWidgets
-
-    from . import fonts
+    from PySide import QtCore, QtWidgets
 
     if QtWidgets.QApplication.instance() is None:
         # A widget with no application aborts real FreeCAD's Qt: refuse first.
         raise RuntimeError("A ScanRuler page widget needs a QApplication (FreeCAD's GUI).")
-    fam = fonts.load()
     root = QtWidgets.QWidget(parent)
     lay = QtWidgets.QVBoxLayout(root)
 
@@ -127,22 +139,15 @@ def widget(model, on_key=None, on_field=None, parent=None):
         return dot
 
     def header(s, box):
-        if not s["header"]:
+        """The group's (i) key and count, at the top of its box."""
+        if not (s.get("info") or s.get("count") is not None):
             return
         row = QtWidgets.QHBoxLayout()
-        cap = QtWidgets.QLabel(s["caption"])
-        f = cap.font()
-        if fam.get("Barlow Semi Condensed"):
-            f.setFamily(fam["Barlow Semi Condensed"])
-        f.setLetterSpacing(fonts.absolute_spacing(QtGui), 1.2)
-        f.setBold(True)
-        cap.setFont(f)
-        row.addWidget(cap)
-        if s["info"]:
-            row.addWidget(info_button(s["info"], s["info_text"]))
         row.addStretch(1)
         if s.get("count") is not None:
             row.addWidget(QtWidgets.QLabel(str(s["count"])))
+        if s.get("info"):
+            row.addWidget(info_button(s["info"], s["info_text"]))
         box.addLayout(row)
 
     def emit(sid, fid, v):
@@ -151,7 +156,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
 
     def field(s, fd, box):
         row = QtWidgets.QHBoxLayout()
-        k = fd["kind"]
+        k = fd.get("kind", "select")
         if k == "check":
             w = QtWidgets.QCheckBox(fd["label"])
             w.setChecked(fd["value"])
@@ -167,10 +172,15 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 w.setCurrentIndex(vals.index(fd["value"]) if fd["value"] in vals else 0)
                 w.currentIndexChanged.connect(lambda i, sid=s["id"], fid=fd["id"], vals=vals: emit(sid, fid, vals[i]))
             elif k == "number":
-                w = QtWidgets.QDoubleSpinBox()
-                w.setDecimals(3)
-                w.setRange(fd["min"] if fd["min"] is not None else -1e9, 1e9)
-                w.setValue(float(fd["value"] or 0))
+                if fd.get("integer"):
+                    w = QtWidgets.QSpinBox()
+                    w.setRange(int(fd["min"]) if fd["min"] is not None else 0, 2**31 - 1)
+                    w.setValue(int(fd["value"] or 0))
+                else:
+                    w = QtWidgets.QDoubleSpinBox()
+                    w.setDecimals(3)
+                    w.setRange(fd["min"] if fd["min"] is not None else -1e9, 1e9)
+                    w.setValue(float(fd["value"] or 0))
                 if fd["unit"]:
                     w.setSuffix(" " + fd["unit"] if fd["unit"] != "×" else "×")
                 if fd["hint"]:
@@ -196,7 +206,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 group = QtWidgets.QButtonGroup(w)
                 group.setExclusive(True)
                 for o in fd["options"]:
-                    b = QtWidgets.QPushButton(o["label"])
+                    b = QtWidgets.QPushButton(button_text(o["label"]))
                     b.setCheckable(True)
                     b.setChecked(o["value"] == fd["value"])
                     b.setToolTip(o["tip"])
@@ -213,12 +223,12 @@ def widget(model, on_key=None, on_field=None, parent=None):
         grid = QtWidgets.QGridLayout()
         per = s.get("grid") or 1
         for i, k in enumerate(s["keys"]):
-            b = QtWidgets.QPushButton(k["label"])
+            b = QtWidgets.QPushButton(button_text(k["label"]))
             b.setToolTip(k["tip"])
             b.setEnabled(k["enabled"])
             b.setCheckable(k["pressed"])
             b.setChecked(k["pressed"])
-            if k["primary"]:
+            if k.get("primary"):
                 b.setStyleSheet("QPushButton{background:%s;color:white}" % W.ACCENT)
             if on_key:
                 b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
@@ -228,11 +238,16 @@ def widget(model, on_key=None, on_field=None, parent=None):
     def section_w(s, box):
         if not s["visible"]:
             return
+        if s.get("header"):
+            group = QtWidgets.QGroupBox(group_title(s))
+            box.addWidget(group)
+            box = QtWidgets.QVBoxLayout(group)
         header(s, box)
         for sl in s.get("slots") or ([s["slot"]] if s.get("slot") else []):
             row = QtWidgets.QHBoxLayout()
             row.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])))
-            b = QtWidgets.QPushButton(sl["button"]["label"])
+            b = QtWidgets.QPushButton(button_text(sl["button"]["label"]))
+            b.setToolTip(sl["button"].get("tip") or "")
             b.setEnabled(sl["button"]["enabled"])
             if on_key:
                 b.clicked.connect(lambda _=False, kid=sl["button"]["id"]: on_key(s["id"], kid))
@@ -254,7 +269,4 @@ def widget(model, on_key=None, on_field=None, parent=None):
     for s in model["sections"]:
         section_w(s, lay)
     lay.addStretch(1)
-    foot = QtWidgets.QLabel(model["footer"])
-    foot.setWordWrap(True)
-    lay.addWidget(foot)
     return root

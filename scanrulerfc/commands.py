@@ -179,16 +179,147 @@ def switch_workspace(ws):
         mw = _gui().getMainWindow()
         from PySide import QtWidgets  # FreeCAD's shim, Qt5 or Qt6
 
-        for wid in W.TOOLBARS:
-            for name in toolbar_names(wid):
-                tb = mw.findChild(QtWidgets.QToolBar, name)
-                if tb is not None:
-                    tb.setVisible(wid == ws)
+        apply_toolbars(mw)
+        _apply_later(mw)
         _restyle_switcher(mw, QtWidgets)
     except ImportError:
         pass
     _to_panel("workspace", ws)
     return ws
+
+
+# --- the workspace toolbars, kept switched -------------------------------------
+# On FreeCAD 1.1 (macOS) writing the saved visibility and hiding the toolbar
+# once was not enough: the toolbar row stayed the same in every workspace,
+# because FreeCAD's ToolBarManager shows its toolbars again after the
+# switch (its restore, a workbench (re)activation). So the switch is
+# applied three ways: at once, again after FreeCAD's restore has run
+# (REAPPLY_MS), and whenever one of another workspace's toolbars comes back
+# while ScanRuler is the active workbench (each toolbar's visibilityChanged).
+# The decisions are pure (toolbar_plan, rehide); only apply_toolbars touches Qt.
+
+REAPPLY_MS = (250, 700)
+WORKBENCH_NAME = "ScanRulerWorkbench"
+
+
+def _toolbar_owners():
+    return {name: wid for wid in W.TOOLBARS for name in toolbar_names(wid)}
+
+
+def toolbar_owner(name, title=None):
+    """The workspace a QToolBar belongs to, by its object name, or by its
+    title should FreeCAD have named it otherwise; None for any other."""
+    owners = _toolbar_owners()
+    return owners.get(name) or owners.get(title)
+
+
+def toolbar_plan(ws, present, active=True):
+    """{toolbar: visible} for the workspace toolbars among `present` ((object
+    name, title) pairs): the workspace's shown, the others hidden. Nothing
+    while ScanRuler is not the active workbench: FreeCAD hides them all then,
+    and showing one would put it in another workbench."""
+    if not active:
+        return {}
+    out = {}
+    for name, title in present:
+        owner = toolbar_owner(name, title)
+        if owner is not None:
+            out[name] = owner == ws
+    return out
+
+
+def rehide(name, title, visible, ws, active):
+    """True when a toolbar that just showed belongs to another workspace and
+    must be hidden again."""
+    owner = toolbar_owner(name, title)
+    return bool(visible and active and owner is not None and owner != ws)
+
+
+def scanruler_active():
+    """True when ScanRuler is FreeCAD's active workbench (True when it
+    cannot tell: the switch came from one of its keys)."""
+    try:
+        wb = _gui().activeWorkbench()
+    except Exception:  # noqa: BLE001 — no FreeCADGui here
+        return True
+    if wb is None:
+        return False
+    try:
+        return wb.name() == WORKBENCH_NAME
+    except Exception:  # noqa: BLE001 — an older binding: the class name is the registered name
+        return type(wb).__name__ == WORKBENCH_NAME
+
+
+def apply_toolbars(mw):
+    """Show and hide the workspace toolbars as toolbar_plan says, and watch
+    each so FreeCAD cannot bring another workspace's back."""
+    from PySide import QtWidgets
+
+    bars = [tb for tb in mw.findChildren(QtWidgets.QToolBar) if toolbar_owner(tb.objectName(), tb.windowTitle())]
+    plan = toolbar_plan(_state["workspace"], [(tb.objectName(), tb.windowTitle()) for tb in bars], scanruler_active())
+    for tb in bars:
+        _watch(tb)
+        want = plan.get(tb.objectName())
+        if want is not None and tb.isVisible() != want:
+            tb.setVisible(want)
+    _watch_workbench(mw)
+
+
+def _apply_later(mw):
+    from PySide import QtCore
+
+    for ms in REAPPLY_MS:
+        QtCore.QTimer.singleShot(ms, lambda m=mw: _safe_apply(m))
+
+
+def _safe_apply(mw):
+    try:
+        apply_toolbars(mw)
+    except RuntimeError:  # the window is going away
+        pass
+
+
+def _watch(tb):
+    if tb.property("scanruler_watched"):
+        return
+    tb.setProperty("scanruler_watched", True)
+
+    def changed(visible, tb=tb):
+        if rehide(tb.objectName(), tb.windowTitle(), visible, _state["workspace"], scanruler_active()):
+            from PySide import QtCore
+
+            QtCore.QTimer.singleShot(0, lambda: _safe_hide(tb))
+
+    tb.visibilityChanged.connect(changed)
+
+
+def _safe_hide(tb):
+    try:
+        if rehide(tb.objectName(), tb.windowTitle(), tb.isVisible(), _state["workspace"], scanruler_active()):
+            tb.setVisible(False)
+    except RuntimeError:  # deleted
+        pass
+
+
+def _watch_workbench(mw):
+    """Re-apply after FreeCAD (re)activates a workbench: its toolbar setup
+    runs after the workbench's own Activated."""
+    if mw.property("scanruler_wb_watched"):
+        return
+    mw.setProperty("scanruler_wb_watched", True)
+    from PySide import QtCore
+
+    def activated(name=None):
+        if name in (None, WORKBENCH_NAME):
+            _apply_later(mw)
+
+    try:
+        mw.workbenchActivated.connect(activated)
+    except AttributeError:  # the signal is Gui::MainWindow's, not on the QMainWindow wrapper
+        try:
+            QtCore.QObject.connect(mw, QtCore.SIGNAL("workbenchActivated(QString)"), activated)
+        except Exception:  # noqa: BLE001 — the timers and visibilityChanged still hold the switch
+            pass
 
 
 TOOLBAR_PREFS = "User parameter:BaseApp/MainWindow/Toolbars"
@@ -204,9 +335,8 @@ def _remember_toolbars(ws):
         import FreeCAD
 
         p = FreeCAD.ParamGet(TOOLBAR_PREFS)
-        for wid in W.TOOLBARS:
-            for name in toolbar_names(wid):
-                p.SetBool(name, wid == ws)
+        for name, owner in _toolbar_owners().items():
+            p.SetBool(name, owner == ws)
     except Exception:  # noqa: BLE001 — no FreeCAD (tests) or no parameter: Qt's hide still stands
         pass
 
@@ -310,14 +440,118 @@ class ViewCommand(_Base):
 
     def Activated(self, checked=None):
         on = bool(checked) if checked is not None else not _state["view"].get(self.spec["key"], False)
-        _state["view"][self.spec["key"]] = on
         native = self.spec.get("native")
-        if native:
+        if native == CLIP_COMMAND:
+            on = toggle_section()
+            for a in _actions(self.spec["command"]):
+                a.setChecked(on)
+        elif native:
             try:
                 _gui().runCommand(native)
-            except Exception as e:  # the clipping plane is FreeCAD's; say why it did not open
+            except Exception as e:  # noqa: BLE001 — FreeCAD's command; say why it did not run
                 _say(f"ScanRuler: {native}: {e}")
+        _state["view"][self.spec["key"]] = on
         return _to_panel("view", self.spec["key"], on)
+
+
+# --- Section view: FreeCAD's clipping plane, toggled -----------------------------
+# Std_ToggleClipPlane only opens FreeCAD's Clipping dialog (a dock named
+# "Clipping" in the left dock area); pressed again it does nothing, and the
+# new dock made the main window taller each time. So the key looks for that
+# dock: a visible one is closed through its dialog's reject() (which removes
+# the clip planes and deletes the dock, as its own Close button does), else
+# the command opens one. The window's size is taken before and put back
+# after FreeCAD's layout has settled (KEEP_SIZE_MS); if the window still
+# cannot shrink, the Clipping dock is tabbed onto the dock it stacked under,
+# in the same dock area, so their minimum heights stop adding up.
+
+CLIP_COMMAND = "Std_ToggleClipPlane"
+CLIP_DOCK = "Clipping"
+KEEP_SIZE_MS = (0, 150, 400)
+
+
+def section_action(docks):
+    """"close" when one of the (object name, visible) docks is a visible
+    Clipping dock, else "open"."""
+    return "close" if any(n == CLIP_DOCK and v for n, v in docks) else "open"
+
+
+def size_to_restore(before, after, maximized):
+    """The (width, height) to put the window back to, or None: none when it
+    is maximised or full screen (the screen sets its size) or unchanged."""
+    if maximized or before is None or tuple(before) == tuple(after):
+        return None
+    return tuple(before)
+
+
+def toggle_section():
+    """Open or close FreeCAD's clipping plane; True when it is now open."""
+    try:
+        from PySide import QtWidgets
+
+        mw = _gui().getMainWindow()
+    except ImportError:  # no window: the command alone
+        try:
+            _gui().runCommand(CLIP_COMMAND)
+        except Exception as e:  # noqa: BLE001
+            _say(f"ScanRuler: {CLIP_COMMAND}: {e}")
+        return True
+    docks = [d for d in mw.findChildren(QtWidgets.QDockWidget) if d.objectName() == CLIP_DOCK]
+    action = section_action([(d.objectName(), d.isVisible()) for d in docks])
+    before = (mw.width(), mw.height())
+    maxed = mw.isMaximized() or mw.isFullScreen()
+    if action == "close":
+        for d in docks:
+            if d.isVisible():
+                w = d.widget()
+                if w is not None and hasattr(w, "reject"):
+                    w.reject()  # Gui::Dialog::Clipping::reject: planes off, dock deleted
+                else:
+                    d.close()
+                    d.deleteLater()
+    else:
+        try:
+            _gui().runCommand(CLIP_COMMAND)
+        except Exception as e:  # noqa: BLE001
+            _say(f"ScanRuler: {CLIP_COMMAND}: {e}")
+            return False
+    _keep_size(mw, before, maxed)
+    return action == "open"
+
+
+def _keep_size(mw, before, maxed):
+    from PySide import QtCore
+
+    for i, ms in enumerate(KEEP_SIZE_MS):
+        QtCore.QTimer.singleShot(ms, lambda m=mw, last=i == len(KEEP_SIZE_MS) - 1: _restore_size(m, before, maxed, last))
+
+
+def _restore_size(mw, before, maxed, last):
+    try:
+        want = size_to_restore(before, (mw.width(), mw.height()), maxed)
+        if want is None:
+            return
+        mw.resize(*want)
+        if last and size_to_restore(before, (mw.width(), mw.height()), maxed) is not None:
+            _tab_clipping(mw)
+            mw.resize(*want)
+    except RuntimeError:  # the window is going away
+        pass
+
+
+def _tab_clipping(mw):
+    """Tab the Clipping dock onto another visible dock of its own area."""
+    from PySide import QtWidgets
+
+    clip = next((d for d in mw.findChildren(QtWidgets.QDockWidget) if d.objectName() == CLIP_DOCK and d.isVisible()), None)
+    if clip is None or clip.isFloating():
+        return
+    area = mw.dockWidgetArea(clip)
+    for d in mw.findChildren(QtWidgets.QDockWidget):
+        if d is not clip and d.isVisible() and not d.isFloating() and mw.dockWidgetArea(d) == area:
+            mw.tabifyDockWidget(d, clip)
+            clip.raise_()
+            return
 
 
 class ViewGroupCommand:

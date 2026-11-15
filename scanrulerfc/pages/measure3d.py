@@ -14,8 +14,8 @@
 # scanstate's session dict and the panel's own state (`ui`: the box that is
 # open, the export choices) and imports no Qt, so the tests check it
 # headless. `widget(model)` is the thin Qt view drawn from it, behind lazy
-# imports. The footer carries the credit, where the original's status strip
-# carried "§ IMPRINT".
+# imports. The model's footer carries the credit, where the original's status
+# strip carried "§ IMPRINT"; the dock draws it once, at its foot.
 
 from .. import legend as L
 from .. import workspaces as W
@@ -264,95 +264,8 @@ def build(st, ui=None, units="mm"):
 
 # --- the Qt view --------------------------------------------------------------
 
-def widget(model, on_key=None, parent=None):
-    """A QWidget drawn from the model: caps headers with an (i) key that
-    shows the original's text, the slot, rows, fields and keys, and the
-    credit at the foot. on_key(section_id, key_id) for every key pressed."""
-    from PySide import QtCore, QtGui, QtWidgets
+def widget(model, on_key=None, on_field=None, parent=None):
+    """The page drawn by the one view every page shares (kit.widget)."""
+    from . import kit as K
 
-    from . import fonts
-
-    fam = fonts.load()
-    root = QtWidgets.QWidget(parent)
-    lay = QtWidgets.QVBoxLayout(root)
-
-    def header(s, box):
-        if not s["header"]:
-            return
-        row = QtWidgets.QHBoxLayout()
-        cap = QtWidgets.QLabel(s["caption"])
-        f = cap.font()
-        if fam.get("Barlow Semi Condensed"):
-            f.setFamily(fam["Barlow Semi Condensed"])
-        f.setLetterSpacing(fonts.absolute_spacing(QtGui), 1.2)
-        f.setBold(True)
-        cap.setFont(f)
-        row.addWidget(cap)
-        if s["info"]:
-            dot = QtWidgets.QToolButton()
-            dot.setText("i")
-            dot.setFixedSize(14, 14)
-            text = "<p><b>%s</b></p>" % s["info"] + "".join("<p>%s</p>" % p for p in s["info_text"])
-            dot.setToolTip(text)
-            dot.clicked.connect(lambda _=False, t=text, d=dot: QtWidgets.QToolTip.showText(d.mapToGlobal(QtCore.QPoint(0, 14)), t, d))
-            row.addWidget(dot)
-        row.addStretch(1)
-        if s.get("count"):
-            row.addWidget(QtWidgets.QLabel(str(s["count"])))
-        box.addLayout(row)
-
-    def keys(s, box):
-        grid = QtWidgets.QGridLayout()
-        per = s.get("grid") or 1
-        for i, k in enumerate(s["keys"]):
-            b = QtWidgets.QPushButton(k["label"])
-            b.setToolTip(k["tip"])
-            b.setEnabled(k["enabled"])
-            b.setCheckable(k["pressed"])
-            b.setChecked(k["pressed"])
-            if on_key:
-                b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
-            grid.addWidget(b, i // per, i % per)
-        box.addLayout(grid)
-
-    def section(s, box):
-        if not s["visible"]:
-            return
-        header(s, box)
-        if s.get("slot"):
-            sl = s["slot"]
-            row = QtWidgets.QHBoxLayout()
-            row.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])))
-            b = QtWidgets.QPushButton(sl["button"]["label"])
-            if on_key:
-                b.clicked.connect(lambda _=False: on_key(s["id"], "open-scan"))
-            row.addWidget(b)
-            box.addLayout(row)
-        for r in s["rows"]:
-            reading = r.get("reading") or r.get("value") or ""
-            box.addWidget(QtWidgets.QLabel("<span style='color:%s'>●</span> %s  <b>%s</b>" % (r.get("color", "#8b9099"), r["name"], reading)))
-        for fd in s["fields"]:
-            row = QtWidgets.QHBoxLayout()
-            row.addWidget(QtWidgets.QLabel(fd["label"]))
-            cb = QtWidgets.QComboBox()
-            for o in fd["options"]:
-                cb.addItem(o["label"], o["value"])
-            cb.setCurrentIndex(max(0, [o["value"] for o in fd["options"]].index(fd["value"]) if fd["value"] in [o["value"] for o in fd["options"]] else 0))
-            cb.setEnabled(fd["enabled"])
-            row.addWidget(cb)
-            box.addLayout(row)
-        keys(s, box)
-        if s.get("hint"):
-            h = QtWidgets.QLabel(s["hint"])
-            h.setWordWrap(True)
-            box.addWidget(h)
-        for c in s.get("children", []):
-            section(c, box)
-
-    for s in model["sections"]:
-        section(s, lay)
-    lay.addStretch(1)
-    foot = QtWidgets.QLabel(model["footer"])
-    foot.setWordWrap(True)
-    lay.addWidget(foot)
-    return root
+    return K.widget(model, on_key, on_field, parent)

@@ -3,6 +3,17 @@
 
 ## Unreleased
 
+- GUI pass, round 4 (FreeCAD 1.1.3, macOS). The workspace toolbars swap
+  live: the switch is applied to the toolbars themselves, again after
+  FreeCAD's own restore and workbench activation, and a toolbar of another
+  workspace that FreeCAD shows again is hidden. Section View toggles: a
+  second press closes FreeCAD's Clipping dock (its own Close), and the
+  main window keeps its size. Panel buttons in Title Case and each section
+  a group box with a Title Case title; the credit once, at the panel's
+  foot. Mesh Tools' keys are off without a scan and say "Open a scan
+  first.", as 3D Measure's are. Reverse engineer's sketch plane, notes and
+  features still to come are left off the page instead of saying they are
+  coming. Triangle limit is a whole number.
 - The workbench as FreeCAD's design guide asks, from the GUI pass on
   FreeCAD 1.1.3: command names, menus and toolbar titles in Title Case,
   every tooltip its own full sentence. A workspace switch shows its panel

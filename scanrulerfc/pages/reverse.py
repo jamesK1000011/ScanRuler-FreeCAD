@@ -11,9 +11,9 @@
 # original's next free name, "▷ Play" reverse_build. The FEATURES, BODIES
 # and PARAMETERS lists are read from reverse_feature_list,
 # reverse_body_names and reverse_parameter_list. Keys whose engine step is
-# still to come (workspaces.REVERSE_LATER) stay inactive
-# and say they are coming with the engine port; so do the sketch plane and
-# the notes. The keys' labels and titles are workspaces._REVERSE, which the
+# still to come (workspaces.REVERSE_LATER), the sketch plane and the notes
+# are left off the page until they work, rather than shown as placeholders
+# (GUI pass, round 4). The keys' labels and titles are workspaces._REVERSE, which the
 # workspace tests hold against the TSX.
 
 from .. import workspaces as W
@@ -23,7 +23,6 @@ from .infotext_pages import INFO
 TITLE = "Reverse Engineer"
 WORKSPACE = "reverse"
 PAGE = "reverse"
-PENDING = "coming with the engine port"
 KERNEL_LINE = "FreeCAD {freecad} · OCCT {occt}"
 
 ORDER = (("1", "model", "Model", "Reverse engineering"), ("2", "parameters", "Parameters", None),
@@ -137,10 +136,10 @@ def build(st, ui=None, units="mm", read=None):
                          for p in (params or {}).get("parameters") or []]
             s["keys"] = [K.key("parameter-add", "+ Add", True, "Add a parameter")]
         elif sid == "create_feature":
-            s["fields"] = [K.select("sketch-plane-select", "Sketch on", [("", "Choose a plane…")], "", False)]
-            s["hint"] = f"Sketch on: {PENDING}"
-            s["keys"] = [dict(K.key(i, lab, i in READY_KINDS, tip if i in READY_KINDS else f"{tip} — {PENDING}"), command="ScanRuler_Re" + i[0].upper() + i[1:])
-                         for i, lab, tip, _ic in W._REVERSE]
+            # Only the features this port builds: the sketch plane and the
+            # kinds still to come are left out, not shown as placeholders.
+            s["keys"] = [dict(K.key(i, lab, True, tip), command="ScanRuler_Re" + i[0].upper() + i[1:])
+                         for i, lab, tip, _ic in W._REVERSE if i in READY_KINDS]
             s["grid"] = 4
         elif sid == "features":
             rows = (feats or {}).get("features") or []
@@ -154,7 +153,7 @@ def build(st, ui=None, units="mm", read=None):
             s["rows"] = [{"id": b["id"], "name": b["name"], "reading": _body_reading(b), "visible": b.get("visible", True),
                           **({"color": b["style"]["color"]} if (b.get("style") or {}).get("color") else {})} for b in rows]
         elif sid == "notes":
-            s["hint"] = PENDING
+            s["visible"] = False  # its notes come with the engine port: hidden until then
         out.append(s)
     return K.page(TITLE, WORKSPACE, out)
 
