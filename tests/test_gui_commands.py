@@ -142,7 +142,10 @@ class Commands(unittest.TestCase):
         self.assertFalse(C.build()["ScanRuler_ViewSplit"].IsActive())
 
     def test_reverse_keys_wait_for_their_engine(self):
-        self.assertFalse(C.build()["ScanRuler_ReExtrude"].IsActive())
+        # Kinds this port builds stand for reverse_feature_add; the rest wait.
+        self.assertTrue(C.build()["ScanRuler_ReExtrude"].IsActive())
+        self.assertFalse(C.build()["ScanRuler_ReLoft"].IsActive())
+        self.assertFalse(C.build()["ScanRuler_ReImport"].IsActive())
         self.assertTrue(C.build()["ScanRuler_WsReverse"].IsActive())
 
     def test_load_takes_fcstd_and_scanruler(self):

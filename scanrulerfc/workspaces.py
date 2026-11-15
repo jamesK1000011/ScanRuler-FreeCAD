@@ -108,6 +108,10 @@ _REVERSE = (  # ReversePanel.tsx feature keys, in order: (id, label, title, icon
     ("thicken", "Thicken", "Give a sheet or surface a wall thickness", "shell"),
 )
 
+# The keys whose engine step is still to come: Import STEP
+# (reverse_import_step) and the kinds reverse/build.py LATER names.
+REVERSE_LATER = ("import", "sheet", "split", "loft", "sweep", "surface", "network", "trim", "thicken")
+
 
 def _cap(s):
     return s[0].upper() + s[1:]
@@ -153,11 +157,13 @@ TOOLBARS = {
     "mesh": (
         ("Tools", [_k("ScanRuler_" + c, lab, tip, ic, tool, key="mesh:" + i) for i, c, lab, tip, ic, tool in _MESH]),
     ),
-    # Reverse engineer ports ScanRuler's own feature engine, designed apart:
-    # its keys are here so the workspace looks as it does, and stand inactive
-    # until that engine lands (tool None).
+    # Reverse engineer: ScanRuler's own feature engine, ported
+    # (scanrulerfc/reverse/). A key stands for reverse_feature_add when this
+    # port builds its kind; the rest stand inactive (tool None) until their
+    # build step lands (REVERSE_LATER).
     "reverse": (
-        ("Create feature", [_k("ScanRuler_Re" + _cap(i), lab, tip, ic, None, key="reverse:" + i) for i, lab, tip, ic in _REVERSE]),
+        ("Create feature", [_k("ScanRuler_Re" + _cap(i), lab, tip, ic, None if i in REVERSE_LATER else "reverse_feature_add", key="reverse:" + i)
+                            for i, lab, tip, ic in _REVERSE]),
     ),
 }
 
@@ -225,6 +231,7 @@ AREAS = {
     "thickness_": "Wall Thickness",
     "flat_": "2D Measure",
     "mesh_": "Mesh Tools",
+    "reverse_": "Reverse engineer",
 }
 # "Scan" is not a tab (the view bar's first group and every page's Model
 # slot): a scan_ tool leaves the workspace where it is.
@@ -287,8 +294,13 @@ def icon_names():
 
 def command_for(tool, args=None):
     """The key a tool run lights (design 7.1 COMMANDS): a running key first,
-    then any key standing for the tool; element_fit by its kind."""
+    then any key standing for the tool; element_fit by its kind,
+    reverse_feature_add by its feature's kind."""
     args = args or {}
+    if tool == "reverse_feature_add":
+        from .reverse.handlers import command_for as reverse_command
+
+        return reverse_command(tool, args)
     best = None
     for k in keys():
         if k["tool"] != tool:

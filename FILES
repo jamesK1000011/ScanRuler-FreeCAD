@@ -23,6 +23,7 @@ scanrulerfc/agentlink/fam_manual.py
 scanrulerfc/agentlink/fam_meshtools.py
 scanrulerfc/agentlink/fam_noise.py
 scanrulerfc/agentlink/fam_pack.py
+scanrulerfc/agentlink/fam_reverse.py
 scanrulerfc/agentlink/fam_scan.py
 scanrulerfc/agentlink/fam_sections.py
 scanrulerfc/agentlink/fam_snapshot.py
@@ -86,6 +87,7 @@ scanrulerfc/handlers/manual.py
 scanrulerfc/handlers/meshtools.py
 scanrulerfc/handlers/noise.py
 scanrulerfc/handlers/pack.py
+scanrulerfc/handlers/reverse.py
 scanrulerfc/handlers/scan.py
 scanrulerfc/handlers/sections.py
 scanrulerfc/handlers/snapshot.py
@@ -258,7 +260,6 @@ scanrulerfc/reverse/stations.py
 scanrulerfc/reverse/steps.py
 scanrulerfc/reverse/surface_fit.py
 scanrulerfc/reverse/sweep_route.py
-scanrulerfc/reverse/tools.json
 scanrulerfc/reverse/topo.py
 scanrulerfc/reverse/units.py
 scanrulerfc/reverse/vec.py

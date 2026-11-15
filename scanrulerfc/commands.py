@@ -264,7 +264,8 @@ def load(path):
     """A .FCStd opens as the FreeCAD document it is; a .scanruler project, so
     the original's users bring their work across, is read through the tools
     (project_import: the scan, elements and sections it can), and the panel
-    is told what came across."""
+    is told what came across. Its Reverse engineer part opens in the
+    document's container (reverse/doc.py)."""
     if path.lower().endswith(".fcstd"):
         import FreeCAD
 
@@ -280,7 +281,8 @@ def load(path):
             return None
         left = got["notLoaded"] + [f"{x['tool']}: {x['message']}" for x in got["errors"]]
         _say(f"ScanRuler: {got['project']} — scan {got['scan'] or 'not opened'}, {got['elements']} elements, "
-             f"{got['sections']} sections." + (" Not loaded: " + " ".join(left) if left else ""))
+             f"{got['sections']} sections" + (f", {got['reverse']['features']} Reverse engineer features" if got.get("reverse") else "") + "."
+             + (" Not loaded: " + " ".join(left) if left else ""))
         _hooks["ui"]("load-scanruler", got)
         return got
     raise ValueError(f"{os.path.basename(path)}: Load takes {' or '.join(W.LOAD_SUFFIXES)}.")

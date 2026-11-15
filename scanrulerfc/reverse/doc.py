@@ -270,11 +270,15 @@ def sync_bodies(container):
 def edit(container, verb, name, change):
     """One edit, one undo step: `change(part)` returns the part as it is to
     be (or None to leave it); PartJson written, the document recomputed,
-    the bodies matched. Returns the build's results."""
+    the bodies matched. Inside a transaction the caller opened (the
+    runner's, Agent Link's) the edit is part of that one; otherwise it opens
+    its own. Returns the build's results."""
     from .part_file import dumps
 
     doc = container.Document
-    doc.openTransaction(transaction_label(verb, name))
+    own = not getattr(doc, "HasPendingTransaction", False)
+    if own:
+        doc.openTransaction(transaction_label(verb, name))
     try:
         part = part_of(container.PartJson)
         new = change(part)
@@ -285,10 +289,35 @@ def edit(container, verb, name, change):
         sync_bodies(container)
         doc.recompute()
     except Exception:
-        doc.abortTransaction()
+        if own:
+            doc.abortTransaction()
         raise
-    doc.commitTransaction()
+    if own:
+        doc.commitTransaction()
     return json.loads(container.Results or "[]")
+
+
+def import_part(doc, part, members=None, name=None):
+    """A .scanruler project's Reverse engineer part (part_file.read_scanruler:
+    validated, its STEP texts' member in `members`) into doc's container,
+    made if missing: PartJson the part (migrated on read, part_of), the STEP
+    texts in StepFiles, one build. Returns the build's results."""
+    import os
+    import tempfile
+
+    c = find_container(doc) or make_container(doc)
+    data = (members or {}).get(part.get("stepFiles")) if isinstance(part.get("stepFiles"), str) else None
+
+    def change(_was):
+        if data:
+            folder = tempfile.mkdtemp(prefix="scanruler-reverse-")
+            path = os.path.join(folder, "reverse-steps.json")
+            with open(path, "wb") as f:
+                f.write(data if isinstance(data, (bytes, bytearray)) else str(data).encode("utf-8"))
+            c.StepFiles = path
+        return part
+
+    return edit(c, "load", name, change)
 
 
 def forget(container):
