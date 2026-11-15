@@ -118,6 +118,23 @@ def group_title(s):
 # the tree or slides out over the view, 300 px or less).
 NARROW = 320
 LONG_CHECK = 28
+# Dense, so a whole section fits without scrolling beside the tree: the
+# space between rows and groups, a page's margins, a group's inner margins.
+SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 4, 6, 4)
+
+
+def head_row(s):
+    """What the group's title row holds, in order: its title (Title Case),
+    then its count and (i) key at the right, all on the one row; [] when
+    there is nothing to show."""
+    out = ["title"] if s.get("header") else []
+    if s.get("info") or s.get("count") is not None:
+        out.append("stretch")
+        if s.get("count") is not None:
+            out.append("count")
+        if s.get("info"):
+            out.append("info")
+    return out
 
 
 def columns_for(width, per):
@@ -169,6 +186,8 @@ def widget(model, on_key=None, on_field=None, parent=None):
         raise RuntimeError("A ScanRuler page widget needs a QApplication (FreeCAD's GUI).")
     root = QtWidgets.QWidget(parent)
     lay = QtWidgets.QVBoxLayout(root)
+    lay.setSpacing(SPACING)
+    lay.setContentsMargins(MARGIN, MARGIN, MARGIN, MARGIN)
     # The page follows its panel's width (never wider): grids and rows
     # reflow on each resize (reflow), long labels wrap.
     root.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
@@ -185,15 +204,23 @@ def widget(model, on_key=None, on_field=None, parent=None):
         return dot
 
     def header(s, box):
-        """The group's (i) key and count, at the top of its box."""
-        if not (s.get("info") or s.get("count") is not None):
+        """The group's title row: its title, then its count and (i) key."""
+        parts = head_row(s)
+        if not parts:
             return
         row = QtWidgets.QHBoxLayout()
-        row.addStretch(1)
-        if s.get("count") is not None:
-            row.addWidget(QtWidgets.QLabel(str(s["count"])))
-        if s.get("info"):
-            row.addWidget(info_button(s["info"], s["info_text"]))
+        row.setSpacing(SPACING)
+        for part in parts:
+            if part == "title":
+                t = QtWidgets.QLabel("<b>%s</b>" % group_title(s))
+                t.setWordWrap(True)
+                row.addWidget(t, 1)
+            elif part == "stretch":
+                row.addStretch(1 if "title" not in parts else 0)
+            elif part == "count":
+                row.addWidget(QtWidgets.QLabel(str(s["count"])))
+            else:
+                row.addWidget(info_button(s["info"], s["info_text"]))
         box.addLayout(row)
 
     def emit(sid, fid, v):
@@ -303,9 +330,14 @@ def widget(model, on_key=None, on_field=None, parent=None):
         if not s["visible"]:
             return
         if s.get("header"):
-            group = QtWidgets.QGroupBox(group_title(s))
+            # The title on the group's own first row, with its (i) key (a
+            # group box's title cannot hold a key): no row of its own.
+            group = QtWidgets.QGroupBox()
+            group.setAccessibleName(group_title(s))
             box.addWidget(group)
             box = QtWidgets.QVBoxLayout(group)
+            box.setSpacing(SPACING)
+            box.setContentsMargins(*GROUP_MARGINS)
         header(s, box)
         for sl in s.get("slots") or ([s["slot"]] if s.get("slot") else []):
             if not isinstance(sl, dict):
