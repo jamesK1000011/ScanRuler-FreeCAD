@@ -91,41 +91,154 @@ class Pure(unittest.TestCase):
         self.assertEqual(out["parameters"][0]["value"], 4)
 
 
+class FakeObject:
+    """A document object as FreeCAD's recompute sees it: a write to a
+    property touches it unless the property is Output or NoRecompute, and
+    adding to or removing from its Group touches it."""
+
+    def __init__(self, doc, name):
+        d = self.__dict__
+        d.update(Document=doc, Name=name, Label=name, ViewObject=None, touched=True, quiet=set(), props=[], links=[])
+
+    @property
+    def PropertiesList(self):
+        return list(self.props)
+
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+        if name in self.props and name not in self.quiet:
+            self.__dict__["touched"] = True
+
+    def addProperty(self, kind, name, group="", doc="", mode=0):
+        self.props.append(name)
+        if kind == "App::PropertyLink":
+            self.links.append(name)
+        if mode & 24:  # Output, NoRecompute
+            self.quiet.add(name)
+        self.__dict__[name] = None
+
+    def setPropertyStatus(self, name, status):
+        if {"Output", "NoRecompute"} & set(status):
+            self.quiet.add(name)
+
+    def addExtension(self, name, proxy=None):
+        self.props.append("Group")
+        self.__dict__["Group"] = []
+
+    def addObject(self, o):
+        self.__dict__["Group"] = [*self.Group, o]
+        self.touch()
+
+    def removeObject(self, o):
+        self.__dict__["Group"] = [g for g in self.Group if g is not o]
+        self.touch()
+
+    def touch(self):
+        self.__dict__["touched"] = True
+
+    def purgeTouched(self):
+        self.__dict__["touched"] = False
+
+    def needs(self):
+        """What it depends on: its Group's members (FreeCAD puts a group
+        after its children) and the objects its links point at."""
+        return [*(getattr(self, "Group", None) or []), *(getattr(self, n) for n in self.links if getattr(self, n) is not None)]
+
+
+class FakeDocument:
+    """FreeCAD's recompute in small: every touched object and everything
+    depending on it, each run once, in no promised order."""
+
+    Name, HasPendingTransaction = "Fake", True
+
+    def __init__(self):
+        self.Objects, self.runs = [], []
+
+    def addObject(self, kind, name):
+        o = FakeObject(self, f"{name}{len(self.Objects):03d}")
+        self.Objects.append(o)
+        return o
+
+    def removeObject(self, name):
+        self.Objects = [o for o in self.Objects if o.Name != name]
+
+    def recompute(self):
+        run = {id(o): o for o in self.Objects if o.touched}
+        grew = True
+        while grew:
+            grew = False
+            for o in self.Objects:
+                if id(o) not in run and any(id(n) in run for n in o.needs()):
+                    run[id(o)] = o
+                    grew = True
+        for o in run.values():
+            o.purgeTouched()
+            self.runs.append(o.Name)
+            o.Proxy.execute(o)
+
+
 class OneBuildAnEdit(unittest.TestCase):
-    """A stand-in for FreeCAD's recompute: an object runs when touched, and
-    adding to its Group touches it — as matching the bodies does."""
+    """The edit against a stand-in for FreeCAD's recompute in which adding a
+    body touches the container through its Group, the container runs again
+    after its bodies, and the bodies' Source link points back at it."""
 
-    def test_matching_the_bodies_does_not_build_again(self):
-        class Doc:
-            HasPendingTransaction = True  # joined, as inside Agent Link's own
+    def setUp(self):
+        from unittest import mock
 
-            def recompute(self):
-                if box.touched:
-                    box.touched = False
-                    box.builds += 1
+        self.builds = []
+        bodies = {"want": [2]}
 
-        class Box:
-            PartJson, Results = dumps(D.empty_part()), "[]"
-            touched, builds = False, 0
-            Document = Doc()
+        class Built:
+            def briefs(self):
+                return [{"id": i, "name": f"Body {i}", "surface": False} for i in bodies["want"]]
 
-            def touch(self):
-                self.touched = True
+            def body(self, i):
+                return None
 
-            def purgeTouched(self):
-                self.touched = False
+        built = Built()
 
-            def addObject(self, o):
-                self.touched = True
+        def build(part, builder, ctx=None):
+            self.builds.append(len(part["features"]))
+            return {"results": [{"status": "ok"}], "bodies": [{"id": i, "surface": False} for i in bodies["want"]]}
 
-        box = Box()
-        real = D.sync_bodies
-        D.sync_bodies = lambda c: c.addObject(object())
-        try:
-            D.edit(box, "add", "Cube", lambda p: p)
-        finally:
-            D.sync_bodies = real
-        self.assertEqual(box.builds, 1)
+        part = type(sys)("Part")
+        part.makeCompound = lambda shapes: ("compound", len(shapes))
+        part.Shape = lambda: ("shape",)
+        for p in (mock.patch.dict(sys.modules, {"Part": part}), mock.patch.object(D, "build_part", build), mock.patch.object(D, "builder_of", lambda o: built)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.bodies = bodies
+        self.doc = FakeDocument()
+        self.c = D.make_container(self.doc)
+        self.doc.recompute()
+        self.builds.clear()
+
+    def edit(self, n):
+        return D.edit(self.c, "add", "Cube", lambda p: {**p, "features": [*cube_features(), *cube_features(side=5, at=20, sid=3, eid=4)][:2 * n], "nextFeatureId": 2 * n + 1})
+
+    def test_one_edit_is_one_build(self):
+        self.edit(1)
+        self.assertEqual(self.builds, [2])
+        self.assertEqual([b.BodyId for b in D.bodies_of(self.c)], [2])
+        self.assertIn(self.c.Name, self.doc.runs[-3:])  # it did run again, and kept its build
+        self.bodies["want"] = [4, 5]
+        self.edit(2)
+        self.assertEqual(self.builds, [2, 4])
+        self.assertEqual([b.BodyId for b in D.bodies_of(self.c)], [4, 5])
+        self.assertEqual(self.c.Status, "ok")
+        self.assertFalse(self.c.touched)
+
+    def test_outside_an_edit_a_recompute_builds(self):
+        self.edit(1)
+        self.c.touch()
+        self.doc.recompute()
+        self.assertEqual(self.builds, [2, 2])
+
+    def test_the_builds_answers_do_not_touch_the_container(self):
+        self.edit(1)
+        self.assertLessEqual({"Results", "Status"}, self.c.quiet)
+        self.c.Results = "[]"
+        self.assertFalse(self.c.touched)
 
 
 @unittest.skipUnless(HAVE_FC, "needs FreeCAD")
