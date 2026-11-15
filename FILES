@@ -9,6 +9,7 @@ scanrulerfc/alignment.py
 scanrulerfc/autoalign.py
 scanrulerfc/catalog_core.py
 scanrulerfc/chainsegment.py
+scanrulerfc/colormap.py
 scanrulerfc/construct.py
 scanrulerfc/curvature.py
 scanrulerfc/data/keymaps/bambustudio.json
@@ -50,6 +51,7 @@ scanrulerfc/guides/measure-scan.md
 scanrulerfc/guides/mesh-tools.md
 scanrulerfc/height_surface.py
 scanrulerfc/heightmap_core.py
+scanrulerfc/legend.py
 scanrulerfc/linalg.py
 scanrulerfc/manual_core.py
 scanrulerfc/mesh_core.py
@@ -70,6 +72,11 @@ scanrulerfc/section_core.py
 scanrulerfc/segment.py
 scanrulerfc/shadow_core.py
 scanrulerfc/shapes.py
+scanrulerfc/snapshot/__init__.py
+scanrulerfc/snapshot/card.py
+scanrulerfc/snapshot/handlers.py
+scanrulerfc/snapshot/marks.py
+scanrulerfc/snapshot/store.py
 scanrulerfc/symmetry.py
 scanrulerfc/thread_core.py
 scanrulerfc/wall_thickness.py
@@ -80,6 +87,7 @@ tests/synth.py
 tests/test_autoalign.py
 tests/test_catalog.py
 tests/test_cloud_unlink.py
+tests/test_colormap.py
 tests/test_deviation.py
 tests/test_deviation_maths.py
 tests/test_dfm_wall.py
@@ -93,6 +101,7 @@ tests/test_flat_objects.py
 tests/test_flat_sheet.py
 tests/test_heightmap.py
 tests/test_integration.py
+tests/test_legend.py
 tests/test_manual.py
 tests/test_measuring_core.py
 tests/test_measuring_tools.py
@@ -108,6 +117,7 @@ tests/test_redteam_fits.py
 tests/test_repeat.py
 tests/test_scan.py
 tests/test_sections.py
+tests/test_snapshot.py
 tests/test_thickness.py
 tests/test_thickness_maths.py
 tests/test_thread.py
