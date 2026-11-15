@@ -144,7 +144,7 @@ KERNEL_OPS = {
     "face": "face", "extrude": "extrude", "revolve": "revolve", "screw": "screw", "sheet": "sheet", "surfaceThrough": "surface_through",
     "sweep": "sweep", "loft": "loft", "loftFold": None, "pattern": "pattern", "split": "split", "distanceToPoint": "distance_to_point",
     "tracedHistory": "traced_history", "distanceBetween": "distance_between", "crossing": None, "sheetNormals": None, "splitFaces": None,
-    "sewFaces": None, "sheetPieces": None, "sewSheet": None, "sewPatches": None, "box": "box", "halfSpace": "half_space", "fuse": "fuse",
+    "sewFaces": None, "sheetPieces": None, "sewSheet": None, "sewPatches": "sew_patches", "box": "box", "halfSpace": "half_space", "fuse": "fuse",
     "fuseAll": "fuse_all", "keepingSplits": "keeping_splits", "fuzzyBooleans": "fuzzy_booleans", "coarseFuzz": "coarse_fuzz",
     "fuseTracked": "fuse_tracked", "cutTracked": "cut_tracked", "commonTracked": "common_tracked", "filletTracked": "fillet_tracked",
     "filletRadii": "fillet_radii", "filletVariable": "fillet_variable", "chamferTracked": "chamfer_tracked", "chamferAngled": "chamfer_angled",
@@ -161,7 +161,7 @@ KERNEL_OPS = {
     "fromBrep": "from_brep", "copy": "copy", "release": "release",
 }
 # The build step that brings each op KERNEL_OPS leaves out (design §7.1).
-LATER_STEP = {"loftFold": 10, "crossing": 11, "sheetNormals": 11, "splitFaces": 10, "sewFaces": 11, "sheetPieces": 11, "sewSheet": 11, "sewPatches": 11,
+LATER_STEP = {"loftFold": 10, "crossing": 11, "sheetNormals": 11, "splitFaces": 10, "sewFaces": 11, "sheetPieces": 11, "sewSheet": 11,
               "collapsingRounds": 13, "faceOffsetLimits": 13, "thickenTracked": 10, "voids": 13, "measuredVolume": 13, "exportStepMended": 10,
               "readBackEdges": 10, "readBackParts": 10, "verifyStep": 10, "oddEdges": 13, "shortEdges": 13, "smallConics": 10, "narrowFaces": 13,
               "sectionPieces": 13, "probe": 13, "readStepNames": 10}
@@ -653,7 +653,10 @@ class Occt:
     def sewAndSolidify(self, faces, tolerance=1e-6):
         P = _part()
         sewn = self.sew(faces, tolerance)
-        return P.Solid(P.Shell(sewn.Faces))
+        try:
+            return P.Solid(P.Shell(sewn.Faces))
+        except Exception:  # noqa: BLE001 — they do not close: the sewn shell, as OCCT's sewing leaves it
+            return sewn.Shells[0] if len(sewn.Shells) == 1 else sewn
 
     def healSolid(self, shape, tolerance=1e-6):
         s = shape.copy()
@@ -1142,13 +1145,37 @@ class Kernel:
         def go():
             if rows < 2 or cols < 2 or len(points) != rows * cols * 3:
                 raise KernelError("the surface grid is malformed.")
-            grid = [[points[i * 3], points[i * 3 + 1], points[i * 3 + 2]] for i in range(rows * cols)]
+            grid = [[float(points[i * 3]), float(points[i * 3 + 1]), float(points[i * 3 + 2])] for i in range(rows * cols)]
             f = self.occt.bsplineSurface(grid, rows, cols)
             if self.occt.isNull(f):
                 raise KernelError("the surface could not be made through the grid.")
             return f
 
         return run("Making the surface", go)
+
+    def sew_patches(self, faces, tolerance, closed):
+        """Faces that meet edge to edge sewn into one shell — a solid where
+        `closed` asks for one and they close, healed to the tolerance — and
+        never unified: each face stays the face it came as."""
+
+        def go():
+            o = self.occt
+            if not faces:
+                raise KernelError("no faces to sew.")
+            if not closed:
+                return o.sew(list(faces), tolerance)
+            sewn = o.sewAndSolidify(list(faces), tolerance)
+            if o.getShapeType(sewn) != "solid":
+                return sewn
+            try:
+                healed = o.healSolid(sewn, tolerance)
+                if not o.isNull(healed) and o.getShapeType(healed) == "solid":
+                    return healed
+            except Exception:  # noqa: BLE001 — the sewn solid as it is
+                pass
+            return sewn
+
+        return run("Sewing the patches", go)
 
     def sweep(self, profile, path):
         def go():
@@ -1208,7 +1235,7 @@ class Kernel:
         return run("Splitting", lambda: self.occt.getSubShapes(self.occt.split(shape, list(tools)), "solid"))
 
     def distance_to_point(self, shape, p):
-        return run("Measuring the distance", lambda: self.occt.distanceBetween(self.occt.makeVertex(*p), shape))
+        return run("Measuring the distance", lambda: self.occt.distanceBetween(self.occt.makeVertex(float(p[0]), float(p[1]), float(p[2])), shape))
 
     def traced_history(self, before, after):
         return run("Tracing the faces", lambda: traced_history(self.occt, before if isinstance(before, (list, tuple)) else [before], after))

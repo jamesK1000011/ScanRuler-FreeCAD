@@ -74,6 +74,11 @@ class CallMap(unittest.TestCase):
                 self.assertTrue(hasattr(K.Kernel, py), f"{name} -> {py}")
         self.assertEqual(set(K.LATER_STEP), {n for n, p in K.KERNEL_OPS.items() if p is None})
 
+    def test_the_patch_network_finds_its_ops(self):
+        # network_body.py calls the kernel by these names.
+        for name in ("surface_through", "surface_area", "release", "distance_to_point", "copy", "sew_patches", "is_closed_solid", "edges", "face_points", "extent"):
+            self.assertTrue(callable(getattr(K.Kernel, name, None)), name)
+
     def test_topo_reads_bodies_through_the_kernel(self):
         self.assertTrue(callable(K.Kernel.describe_faces) and callable(K.Kernel.describe_edges))
 
@@ -293,6 +298,23 @@ class Operations(unittest.TestCase):
         holed = self.k.cut(b, tool)
         bore = next(f["hash"] for f in self.k.faces(holed) if f["kind"] == "cylinder")
         self.assertAlmostEqual(self.k.volume(self.k.delete_faces(holed, [bore])), 1000, places=4)
+
+    def test_sew_patches(self):
+        b = self.box(10, 10, 10)
+        faces = self.k.faces_of(b)
+        solid = self.k.sew_patches(faces, 1e-6, True)
+        self.assertTrue(self.k.is_closed_solid(solid))
+        self.assertAlmostEqual(self.k.volume(solid), 1000, places=5)
+        open_ = self.k.sew_patches(faces[:5], 1e-6, True)
+        self.assertFalse(self.k.is_closed_solid(open_))
+        self.assertEqual(self.k.face_count(self.k.sew_patches(faces[:5], 1e-6, False)), 5)
+
+    def test_surface_through_a_grid(self):
+        pts = [c for r in range(3) for q in range(3) for c in (q * 5.0, r * 5.0, 0.0)]
+        f = self.k.surface_through(pts, 3, 3)
+        self.assertAlmostEqual(self.k.surface_area(f), 100, places=4)
+        self.assertAlmostEqual(self.k.distance_to_point(f, [5, 5, 2]), 2, places=6)
+        self.assertEqual(len(self.k.face_points(f)), 1)
 
     def test_fingerprints_of_a_box(self):
         from scanrulerfc.reverse.topo import read_topology
