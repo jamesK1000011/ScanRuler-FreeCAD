@@ -1,3 +1,4 @@
+# Ported from ScanRuler by CNC Kitchen (Stefan Hermann): plugins/reverse/core/kernel.ts (a stand-in for the ReKernel the Builder calls)
 # SPDX-License-Identifier: AGPL-3.0-only
 # A stand-in for the kernel (scanrulerfc/reverse/kernel.py) that knows boxes
 # and nothing else, so the Builder's own decisions — the guard and its
