@@ -30,7 +30,7 @@
 
 import math
 
-from .buildtypes import SPLIT_SAMPLES, SURFACE_TRIANGLES, StepFailed, diagonal_of, halton, mesh_deflection
+from .buildtypes import SPLIT_SAMPLES, SURFACE_TRIANGLES, StepFailed, diagonal_of, halton, mesh_deflection, plain
 from .loops import rectangle_loop
 from .vec import add_scaled, cross, dot, length, normalize, sub
 
@@ -190,7 +190,7 @@ class SheetPlays:
             if made.get("fit"):
                 body["fit"] = made["fit"]
             self.bodies[step["id"]] = body
-            results.append({"id": step["id"], "status": "ok", "surface": made["report"]})
+            results.append({"id": step["id"], "status": "ok", "surface": plain(made["report"])})
             return True
         if kind == "trim":
             self.play_trim(step, results)
@@ -198,12 +198,12 @@ class SheetPlays:
         if kind == "network":
             made = self.network_of(step)
             if "message" in made:
-                results.append({"id": step["id"], "status": "failed", "message": made["message"], "network": made["report"]})
+                results.append({"id": step["id"], "status": "failed", "message": made["message"], "network": plain(made["report"])})
                 return True
             self.bodies[step["id"]] = {"name": step["name"], "shape": made["shape"], "origins": {h: step["id"] for h in k.face_hashes(made["shape"])},
                                        "surface": not made["report"]["closed"], "patches": made["patches"]}
             refused = [c for c in made["report"]["cells"] if "refused" in c]
-            out = {"id": step["id"], "status": "ok", "network": made["report"]}
+            out = {"id": step["id"], "status": "ok", "network": plain(made["report"])}
             if refused:
                 out["note"] = f"{len(refused)} cell{'' if len(refused) == 1 else 's'} not filled: {'; '.join(c['refused'] for c in refused)}."
             results.append(out)
@@ -689,7 +689,7 @@ class SheetPlays:
                     best, maker = float(hit.distance[0]), i
             own[f["hash"]] = maker
         self.bodies[step["id"]] = {"name": step["name"], "shape": shape, "origins": own, "surface": made["surface"]}
-        results.append({"id": step["id"], "status": "ok", "trim": made["report"]})
+        results.append({"id": step["id"], "status": "ok", "trim": plain(made["report"])})
 
     # ---- network
     def network_reading(self, step):

@@ -1,6 +1,27 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # Changelog
 
+## Unreleased
+
+- Reverse engineer, build steps 10 and 11, ported from ScanRuler by Stefan
+  Hermann (CNC Kitchen): Sheet, Loft (a smooth loft whose skin crosses
+  itself is refused, naming its sections), Sweep, Thicken (the wall along
+  the sheet's edge said), Split (keep the largest, the smallest, what lies
+  on the scan, or what lies between sheets; a fitted sheet short of the
+  body is carried on to reach it), Fit surface (freeform, plane,
+  cylinder), Trim and patch network bodies. Left out, refusing in words: a
+  split within its sheets' regions, splitting or combining a sheet, and
+  the fold check before a thicken (the kernel's own refusal stands).
+- The scan's sections and measured elements are references of a Reverse
+  engineer part: a sketch on a section's or a measured plane, a cut or a
+  revolve by them; the split, the surface, the trim and the network read
+  the scan open in the session that edits the document.
+- `reverse_import_step`: a STEP file brought in as bodies of their own, the
+  text kept with the part in the container.
+- Trim to scan keeps a hollow's inner wall, as the original does: FreeCAD's
+  mesh difference dropped a sealed shell the break never meets, or handed
+  it back as a piece of its own.
+
 ## 0.4.0 — 2026-11-15
 
 - The Reverse engineer engine, ported from ScanRuler by Stefan Hermann

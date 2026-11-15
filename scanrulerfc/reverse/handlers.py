@@ -37,7 +37,7 @@ LATER = {
     "reverse_body_selected_faces": 13, "reverse_body_face_triangles": 13, "reverse_body_compare_in_deviation": 13, "reverse_plane_describe": 13,
     "reverse_section_fit": 13, "reverse_section_outline": 13, "reverse_section_stack": 13, "reverse_thread_read": 13, "reverse_scan_tube_trace": 13,
     "reverse_network_create": 11, "reverse_network_edit": 11, "reverse_network_read": 11, "reverse_network_suggest_creases": 11,
-    "reverse_import_step": 10, "reverse_export_step": 10, "reverse_export_stl": 10, "reverse_import_scanruler": 12,
+    "reverse_export_step": 10, "reverse_export_stl": 10, "reverse_import_scanruler": 12,
 }
 
 # Echo (design §4.2): what Agent Link's activity line, workbench switch and
@@ -82,10 +82,22 @@ class MemoryStore:
     """The part in memory, built on the builder given: for tests, and for
     a build with no document."""
 
-    def __init__(self, builder, part=None):
+    def __init__(self, builder, part=None, ctx=None):
         self.builder = builder
         self._part = part or D.empty_part()
+        self._ctx = ctx
         self._last = {"results": [], "bodies": [], "steps": {}, "parameters": []}
+
+    def context(self):
+        from . import scan_context
+
+        return self._ctx or scan_context.empty()
+
+    def add_step_file(self, key, text):
+        files = getattr(self.builder, "step_files", None)
+        if files is None:
+            files = self.builder.step_files = {}
+        files[key] = text
 
     def part(self):
         return copy.deepcopy(self._part)
@@ -97,7 +109,7 @@ class MemoryStore:
         return self.rebuild()
 
     def rebuild(self):
-        self._last = D.build_part(self._part, self.builder)
+        self._last = D.build_part(self._part, self.builder, self._ctx)
         return self._last
 
     def last(self):
@@ -113,9 +125,12 @@ class DocStore:
         self.session = session
 
     def container(self, make=False):
+        from . import scan_context
+
         doc = getattr(self.session, "doc", None)
         if doc is None:
             raise Refusal("unavailable", "No FreeCAD document is open: the Reverse engineer builds its bodies in one.")
+        scan_context.bind(doc, self.session)
         c = D.find_container(doc)
         if c is None and make:
             c = D.make_container(doc)
@@ -137,6 +152,14 @@ class DocStore:
 
     def rebuild(self):
         return self.commit("build", None, lambda p: None)
+
+    def context(self):
+        from . import scan_context
+
+        return scan_context.of_session(self.session)
+
+    def add_step_file(self, key, text):
+        D.put_step_file(self.container(make=True), key, text)
 
     def last(self):
         c = self.container()
@@ -275,9 +298,10 @@ def make_feature(store, part, given):
         if "frame" not in f and isinstance(f.get("plane"), dict):
             from .resolve import resolve_plane_frame
 
-            frame = resolve_plane_frame(f["plane"], {"sections": [], "elements": [], "modelCenter": [0, 0, 0]})
+            ctx = store.context() if hasattr(store, "context") else {"sections": [], "elements": [], "modelCenter": [0, 0, 0]}
+            frame = resolve_plane_frame(f["plane"], ctx)
             if frame is None:
-                _invalid("The plane this sketch is on is not found — a world plane ({kind: world, axis, offset}) needs no scan.")
+                _invalid("The plane this sketch is on is not found: a section's or a measured plane's needs it on the scan open now (section_list, element_list); a world plane ({kind: world, axis, offset}) needs no scan.")
             f["frame"] = frame
         f.setdefault("sketch", {"entities": [], "constraints": [], "nextId": 1})
     elif kind in ("extrude", "revolve"):
@@ -695,6 +719,53 @@ def handlers(session=None, store=None):
         commit("set", b["name"], change)
         return body_names({})
 
+    def import_step(a):
+        """reFeatureCommands importStep: a STEP file brought in as bodies of
+        their own — a body for every solid, in the file's frame; an Import
+        feature at the rollback bar, the text kept with the part."""
+        from .features import step_file_key
+
+        path = a.get("path")
+        if not isinstance(path, str) or not path.strip():
+            _invalid("Give path: the STEP file to bring in.")
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError as e:
+            raise Refusal("not_found", f"{path} cannot be read ({e.strerror or e}).") from e
+        base = os.path.basename(path)
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = data.decode("latin-1")
+        if not text[:256].lstrip().startswith("ISO-10303-21") or not text[:256].lstrip()[len("ISO-10303-21"):].lstrip().startswith(";"):
+            _invalid(f"{base} is not a STEP file — it does not begin as one (ISO-10303-21).")
+        import re
+
+        name = a.get("name") if isinstance(a.get("name"), str) and a["name"].strip() else re.sub(r"\.(step|stp)$", "", base, flags=re.I)
+        part = st.part()
+        require_free_name(part, name, None, [])
+        key = step_file_key(text)
+        made = []
+
+        def change(p):
+            st.add_step_file(key, text)
+            named, counters = name_for(p.get("nextOfKind") or {}, "import")
+            f = {"id": p["nextFeatureId"], "kind": "import", "name": name or named, "file": {"key": key, "name": base, "size": len(text)}, "visible": True}
+            feats = p["features"]
+            at = len(feats) if p.get("rolledTo") is None else p["rolledTo"]
+            feats.insert(at, f)
+            if p.get("rolledTo") is not None:
+                p["rolledTo"] += 1
+            p["nextFeatureId"] = f["id"] + 1
+            p["nextOfKind"] = counters
+            made.append(f["id"])
+            return p
+
+        out = commit("import", name, change)
+        rows = {r["id"]: r for r in out["results"]}
+        return {"added": [{"id": i, **(rows.get(i) or {"status": "rolledBack"})} for i in made], "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
+
     return {
         "reverse_feature_add": feature_add, "reverse_feature_update": feature_update, "reverse_feature_remove": feature_remove, "reverse_feature_move": feature_move,
         "reverse_feature_suppress": feature_suppress, "reverse_feature_rollback": feature_rollback, "reverse_feature_clear": feature_clear,
@@ -702,7 +773,7 @@ def handlers(session=None, store=None):
         "reverse_parameter_add": parameter_add, "reverse_parameter_set": parameter_set, "reverse_parameter_rename": parameter_rename,
         "reverse_parameter_remove": parameter_remove, "reverse_parameter_list": parameter_list,
         "reverse_body_describe": body_describe, "reverse_body_names": body_names, "reverse_body_check": body_check, "reverse_body_set": body_set,
-        "reverse_body_clearance": body_clearance,
+        "reverse_body_clearance": body_clearance, "reverse_import_step": import_step,
     }
 
 

@@ -222,6 +222,7 @@ scanrulerfc/reverse/__init__.py
 scanrulerfc/reverse/_js.py
 scanrulerfc/reverse/autoconstrain.py
 scanrulerfc/reverse/build.py
+scanrulerfc/reverse/build_sheets.py
 scanrulerfc/reverse/buildtypes.py
 scanrulerfc/reverse/chain_outline.py
 scanrulerfc/reverse/corners.py
@@ -233,6 +234,7 @@ scanrulerfc/reverse/frames.py
 scanrulerfc/reverse/handlers.py
 scanrulerfc/reverse/kernel.py
 scanrulerfc/reverse/kernel_thread.py
+scanrulerfc/reverse/loft_fold.py
 scanrulerfc/reverse/loops.py
 scanrulerfc/reverse/move.py
 scanrulerfc/reverse/network.py
@@ -251,6 +253,7 @@ scanrulerfc/reverse/part_file.py
 scanrulerfc/reverse/profiles.py
 scanrulerfc/reverse/regions.py
 scanrulerfc/reverse/resolve.py
+scanrulerfc/reverse/scan_context.py
 scanrulerfc/reverse/scan_path.py
 scanrulerfc/reverse/sketch.py
 scanrulerfc/reverse/sketch_spline.py
@@ -337,6 +340,7 @@ tests/test_reverse_doc.py
 tests/test_reverse_expression.py
 tests/test_reverse_features.py
 tests/test_reverse_handlers.py
+tests/test_reverse_import_step.py
 tests/test_reverse_kernel.py
 tests/test_reverse_kernel_builds.py
 tests/test_reverse_network_body.py
@@ -353,6 +357,8 @@ tests/test_reverse_parity.py
 tests/test_reverse_part_file.py
 tests/test_reverse_regions.py
 tests/test_reverse_resolve.py
+tests/test_reverse_scan_builds.py
+tests/test_reverse_scan_context.py
 tests/test_reverse_sketch_shapes.py
 tests/test_reverse_solver.py
 tests/test_reverse_sparse.py
