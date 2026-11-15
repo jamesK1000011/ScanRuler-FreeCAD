@@ -118,15 +118,20 @@ class Toolbars(unittest.TestCase):
                  "plugins/mesh-tools/ui/MeshPanel.tsx", "plugins/mesh-tools/app/useMeshPlugin.tsx",
                  "plugins/reverse/ui/ReversePanel.tsx", "plugins/reverse/app/useReversePlugin.tsx"]
         corpus = " ".join(T.norm(T.read(f)) for f in files)
-        for k in W.keys() + W.view_keys() + [p for p in W.PROJECT if not p.get("native")] + [W.SETTINGS]:
+        for k in W.keys() + W.view_keys():
             with self.subTest(k["command"]):
                 self.assertIn(k["label"], corpus)
                 if k["tip_from"] == "title":
                     self.assertIn(T.norm(k["tip"]), corpus)
                 elif k["tip_from"] == "label":
-                    self.assertEqual(k["tip"], k["label"])
+                    # The original has no title: the port's says what it does.
+                    self.assertEqual(k["tip"], W.TIPS[k["command"]])
+        # The project keys, Open Scan, Settings, Snapshot and About say what
+        # they do in FreeCAD (they act on the ScanRuler project, FreeCAD's
+        # preferences hold the theme), not the browser app's words.
         self.assertEqual({k["command"] for k in W.all_commands().values() if k.get("tip_from") == "moved"},
-                         {"ScanRuler_Save", "ScanRuler_Snapshot", "ScanRuler_About"})
+                         {"ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load", "ScanRuler_OpenScan", "ScanRuler_Settings",
+                          "ScanRuler_Snapshot", "ScanRuler_About"})
 
 
 @NEED

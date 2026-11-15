@@ -162,7 +162,27 @@ class Dock:
         self.timer.timeout.connect(self.tick)
         self.timer.start()
         C.set_ui(self.handle)
+        _dock["live"] = self
         self.refresh(force=True)
+
+    def reveal(self):
+        """Bring this widget into view where it already stands: the tab that
+        holds it turned to, the dock that holds it shown. True if it shows."""
+        from PySide import QtWidgets
+
+        w = self.widget
+        p = w.parentWidget()
+        while p is not None:
+            if isinstance(p, QtWidgets.QTabWidget):
+                for i in range(p.count()):
+                    page = p.widget(i)
+                    if page is w or page.isAncestorOf(w):
+                        p.setCurrentIndex(i)
+            elif isinstance(p, QtWidgets.QDockWidget):
+                p.show()
+                p.raise_()
+            p = p.parentWidget()
+        return w.isVisible()
 
     def _state(self):
         from . import scanstate as S
@@ -244,6 +264,41 @@ def register_tab(hooks):
 _dock = {}
 
 
+def live():
+    """The Dock the workbench's keys go to (the last one made), or None."""
+    return _dock.get("live")
+
+
+def open_panel(mw=None):
+    """The ScanRuler page in view before a key or workspace switch reaches
+    it. Under Agent Link its panel's ScanRuler tab: the panel opened where
+    Agent Link opens it, if it is not yet (its tab is made with it, and
+    the keys go to it from then on). Alone, or if that tab cannot show, the
+    ScanRuler dock of its own. Before, a switch with Agent Link loaded but
+    its panel closed went to no panel at all and showed nothing. Nothing
+    without a QApplication (FreeCADCmd, tests)."""
+    from PySide import QtWidgets
+
+    if QtWidgets.QApplication.instance() is None:
+        return None
+    import scanrulerfc
+
+    if scanrulerfc._hosted:
+        try:
+            importlib.import_module("agentlink.panel").show()
+        except Exception:  # noqa: BLE001 — no Agent Link panel here: the dock of its own
+            pass
+    d = live()
+    if d is not None:
+        try:
+            if d.reveal():
+                return d
+        except RuntimeError:  # its widget was deleted with a closed panel
+            _dock.pop("live", None)
+    show_dock(mw)
+    return live()
+
+
 def show_dock(mw=None):
     """The dock of its own, tabbed beside the Combo View (no Agent Link)."""
     from PySide import QtCore, QtWidgets
@@ -254,6 +309,9 @@ def show_dock(mw=None):
         mw = FreeCADGui.getMainWindow()
     if "dock" in _dock:
         _dock["dock"].show()
+        _dock["dock"].raise_()
+        C.set_ui(_dock["model"].handle)  # the keys come back to it from a closed panel's tab
+        _dock["live"] = _dock["model"]
         return _dock["dock"]
     dw = QtWidgets.QDockWidget(DOCK_TITLE, mw)
     dw.setObjectName(DOCK_OBJECT)

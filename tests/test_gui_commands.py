@@ -120,6 +120,8 @@ class Commands(unittest.TestCase):
     @stubbed
     def test_run_keys_go_to_the_runner(self, gui):
         calls = []
+        open_, C.scan_is_open = C.scan_is_open, lambda: True  # a scan is open: the keys run
+        self.addCleanup(setattr, C, "scan_is_open", open_)
         C.set_runner(lambda tool, args: calls.append((tool, args)) or "ok")
         self.assertTrue(C.has_runner())
         self.assertEqual(C.build()["ScanRuler_AutoAlign"].Activated(), "ok")
@@ -179,14 +181,21 @@ class InitGui(unittest.TestCase):
         self.assertEqual(wb.ToolTip, "ScanRuler by Stefan Hermann (CNC Kitchen), ported to FreeCAD")
         wb.Initialize()
         names = [n for n, _ in wb.toolbars]
-        self.assertEqual(names[:2], ["ScanRuler workspaces", "ScanRuler project"])
-        self.assertEqual(names[-1], "ScanRuler view")
+        self.assertEqual(names[0], "ScanRuler Workspaces")
+        self.assertEqual(names[-1], "ScanRuler View")
         for ws, bars in W.TOOLBARS.items():
             for title, _ in bars:
                 self.assertIn(W.toolbar_name(ws, title), names)
-        self.assertEqual(dict(wb.toolbars)["ScanRuler project"], ["Std_Undo", "Std_Redo", "ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load"])
-        self.assertEqual(dict(wb.toolbars)["ScanRuler workspaces"], [w["command"] for w in W.WORKSPACES])
-        self.assertEqual(wb.menus[0][0], ["ScanRuler", "Workspace"])
+        # No second Undo, Redo, New, Save and Open beside FreeCAD's: the
+        # project's are in the ScanRuler menu.
+        on_bars = {c for _n, cmds in wb.toolbars for c in cmds}
+        for c in ("Std_Undo", "Std_Redo", "ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load"):
+            self.assertNotIn(c, on_bars)
+        self.assertEqual(dict(wb.toolbars)["ScanRuler Workspaces"], [w["command"] for w in W.WORKSPACES])
+        self.assertEqual(wb.menus[0], (["ScanRuler"], ["ScanRuler_OpenScan", "Separator", "ScanRuler_New", "ScanRuler_Save",
+                                                       "ScanRuler_Load", "Separator"]))
+        self.assertEqual(wb.menus[1][0], ["ScanRuler", "Workspace"])
+        self.assertIn(["ScanRuler", "Reverse Engineer"], [p for p, _ in wb.menus])
         self.assertEqual(wb.menus[-1][1][-3:], ["ScanRuler_Snapshot", "ScanRuler_Settings", "ScanRuler_About"])
         self.assertTrue(set(W.all_commands()) <= set(gui.commands))
         wb.Activated()  # no window: switches the workspace headless

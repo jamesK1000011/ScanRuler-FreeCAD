@@ -11,15 +11,19 @@ Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 202
 
 It is a **ScanRuler workbench** of its own, laid out as the original: the
 workspace tabs (3D Measure, Surface Deviation, Wall Thickness, 2D Measure,
-Mesh Tools, Reverse engineer) as the "ScanRuler workspaces" toolbar, each
-workspace's keys as its toolbars, New / Save / Load in "ScanRuler project",
-the view bar in the bottom toolbar area, the ScanRuler panel beside the
-Combo View and the status strip (READY, element and dimension counts,
-"ScanRuler · CNC Kitchen"). Colour maps start on `jet`, as the original's
-do. Save writes the FreeCAD document; Load opens a `.FCStd` or a
-`.scanruler` project from the original (its scan, fitted elements and
-sections, and its Reverse engineer part, which needs FreeCAD's Part
-kernel). It needs no other add-on.
+Mesh Tools, Reverse Engineer) as the "ScanRuler Workspaces" toolbar, each
+workspace's keys as its toolbars (only the open workspace's show), the view
+bar in the bottom toolbar area, the ScanRuler panel beside the Combo View
+(under Agent Link, its panel's ScanRuler tab) and the status strip (READY,
+element and dimension counts, "ScanRuler · CNC Kitchen"). Names follow
+FreeCAD's design guide (Title Case). The ScanRuler menu holds Open Scan…,
+the project's New Project, Save Project and Open Project… (FreeCAD's own
+toolbars keep undo, redo, New, Open and Save), Settings… and About. A key
+that cannot run yet says why in the status bar. Colour maps start on `jet`,
+as the original's do. Save Project writes the FreeCAD document; Open
+Project… opens a `.FCStd` or a `.scanruler` project from the original (its
+scan, fitted elements and sections, and its Reverse engineer part, which
+needs FreeCAD's Part kernel). It needs no other add-on.
 
 It also adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:
