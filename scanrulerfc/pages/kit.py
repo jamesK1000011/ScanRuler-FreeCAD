@@ -106,7 +106,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
     field_id, value)."""
     import math
 
-    from PySide import QtCore, QtWidgets
+    from PySide import QtCore, QtGui, QtWidgets
 
     from . import fonts
 
@@ -134,7 +134,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
         f = cap.font()
         if fam.get("Barlow Semi Condensed"):
             f.setFamily(fam["Barlow Semi Condensed"])
-        f.setLetterSpacing(f.AbsoluteSpacing, 1.2)
+        f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.2)
         f.setBold(True)
         cap.setFont(f)
         row.addWidget(cap)
