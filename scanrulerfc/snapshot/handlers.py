@@ -9,6 +9,7 @@
 # without it they read the add-on's own store. A picture rides as "_png",
 # the way Agent Link hands a picture to the agent.
 
+from ..errors import ToolError
 from .marks import composite, pins_of
 from .store import STORE, file_name
 
@@ -16,11 +17,9 @@ WAIT_DEFAULT = 120
 WAIT_MAX = 600
 
 
-class SnapshotError(Exception):
-    def __init__(self, code, message):
-        super().__init__(message)
-        self.code = code
-        self.message = message
+class SnapshotError(ToolError):
+    """A refusal of the snapshot tools: the add-on's ToolError, so the
+    runner and Agent Link's family layer pass it on with its code."""
 
 
 def _store(ctx):

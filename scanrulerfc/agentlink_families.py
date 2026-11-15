@@ -17,8 +17,9 @@ import importlib
 import sys
 
 import scanrulerfc
+from scanrulerfc import workspaces as _W
 
-NAMES = ["fam_scan", "fam_elements", "fam_align", "fam_dimensions", "fam_sections", "fam_meshtools", "fam_flat", "fam_deviation", "fam_thickness", "fam_noise", "fam_thread", "fam_wear", "fam_catalog", "fam_manual", "fam_pack", "fam_fitcomp", "fam_cad"]
+NAMES = ["fam_scan", "fam_elements", "fam_align", "fam_dimensions", "fam_sections", "fam_meshtools", "fam_flat", "fam_deviation", "fam_thickness", "fam_noise", "fam_thread", "fam_wear", "fam_catalog", "fam_manual", "fam_pack", "fam_fitcomp", "fam_cad", "fam_snapshot"]
 
 # Shown wherever these tools load (Agent Link's panel and tool groups): whose
 # work they are and under which licence.
@@ -39,6 +40,21 @@ def _family(n):
 
 
 FAMILIES = [f for f in (_family(n) for n in NAMES) if f is not None]
+
+# --- the live echo in the window (design 7.1), from the workbench's tables --
+WB = "ScanRulerWorkbench"
+# The workbench to bring up for a tool, by prefix. wear_, catalog_, pack_,
+# fit_scan_ and manual_ switch nothing.
+WORKBENCHES = {p: WB for p in ("scan_", "element_", "dimension_", "align_", "section_", "deviation_", "thickness_", "flat_", "mesh_", "report_get", "export_csv")}
+# The Activity list's area, by prefix: the workspace tabs' names.
+AREAS = dict(_W.AREAS)
+# The key a tool lights, for every tool a key stands for; command_for(tool,
+# args) for the ones whose key hangs on an argument (element_fit's kind).
+COMMANDS = {k["tool"]: _W.command_for(k["tool"]) for k in _W.keys() + [_W.SNAPSHOT] if k.get("tool")}
+command_for = _W.command_for
+# Read-only tools that still show something.
+SHOWN = ("element_list", "report_get", "deviation_stats", "deviation_hotspots", "thickness_stats", "scan_info", "scan_query",
+         "scan_nearest", "mesh_inspect", "section_list", "flat_objects")
 
 
 def _hook(name, call):
@@ -145,16 +161,42 @@ def _thread_reader():
 
 def _register():
     # ScanRuler's assembly manual for whoever owns a Manual tab (Workshop
-    # Documents asks hooks.service("manual_maker")), and the add-on told it
-    # runs under Agent Link (its own dock stays away).
+    # Documents asks hooks.service("manual_maker")), the line that tells the
+    # agent of a new screenshot (hooks.service("notice")), and the add-on
+    # told it runs under Agent Link (its own dock stays away).
     scanrulerfc._hosted = True
     from agentlink import hooks
 
     from .manual_maker import ManualMaker
+    from .snapshot.handlers import notice
 
     if hasattr(hooks, "provide"):
         hooks.provide("manual_maker", ManualMaker())
+        hooks.provide("notice", notice)
 
 
-for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("services", _register)):
+def _tab():
+    # The dock as the "ScanRuler" tab of Agent Link's panel.
+    from agentlink import hooks
+
+    from . import dock
+
+    dock.register_tab(hooks)
+
+
+def _echo():
+    # The echo's tables for these tools: an Agent Link that reads them from
+    # the families has them through declare(); the keys a tool lights go in
+    # its command table where nothing of Agent Link's has the name.
+    from agentlink import echo
+
+    echo.declare(sys.modules[__name__])
+    table = getattr(echo, "COMMAND", None)
+    if isinstance(table, dict):
+        for tool, cmd in COMMANDS.items():
+            if cmd:
+                table.setdefault(tool, cmd)
+
+
+for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("services", _register), ("panel tab", _tab), ("echo", _echo)):
     _hook(_name, _call)

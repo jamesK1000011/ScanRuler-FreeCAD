@@ -8,80 +8,21 @@
 # Like the other mesh_* tools they work on the edited copy (made by the first
 # edit) and keep the arrays before each change for mesh_undo; the wrap and
 # the trimmed piece are made beside the mesh, as in ScanRuler. The session's
-# Mesh Tools state is the one handlers/meshtools.py keeps (fam_meshtools.py
-# before the decoupling); its helpers are taken from there.
+# Mesh Tools state is the one handlers/meshtools.py keeps; its helpers are
+# taken from there, and that module lists these tools in its family.
 
 import numpy as np
 
 from .. import mesh_core as M
 from .. import scanstate as S
+from ..errors import ToolError
+from ..handlers.meshtools import mesh_out, mt_state, push_undo, region_vertices, working
 from . import boolean as BO
 from . import densify as DE
 from . import shell as SH
 from . import solids as SO
 from . import trim as TR
 from . import wrap as WR
-
-try:
-    from ..errors import ToolError
-except ImportError:
-    try:
-        from agentlink.protocol import ToolError
-    except ImportError:
-        class ToolError(Exception):
-            """A refusal: code (invalid_input, not_found, invalid_state,
-            unavailable, failed) and message, as Agent Link's tool-data
-            format reads one."""
-
-            def __init__(self, code, message):
-                super().__init__(message)
-                self.code, self.message = code, message
-
-try:
-    from ..handlers.meshtools import mesh_out, mt_state, push_undo, region_vertices, working
-except ImportError:
-    try:
-        from ..fam_meshtools import mesh_out, mt_state, push_undo, region_vertices, working
-    except ImportError:
-        UNDO_DEPTH = 20
-
-        def mt_state(session):
-            st = S.state(session)
-            mine = st.setdefault("meshToolsState", {"base": None, "copy": None, "edits": [], "pending": [], "reduced": None, "undo": []})
-            if st["scan"] is not mine["base"] and not any(u["scan"] is st["scan"] for u in mine["undo"]):
-                mine.update({"base": st["scan"], "copy": None, "edits": [], "pending": [], "reduced": None, "undo": []})
-            return mine
-
-        def working(session):
-            scan = S.state(session)["scan"]
-            if scan is None:
-                raise ToolError("invalid_state", "No scan open: scan_open { path } opens one.")
-            ms = mt_state(session)
-            if ms["copy"] is not None:
-                return ms["copy"][0], ms["copy"][1], "edited copy"
-            return scan.V, scan.F, "scan"
-
-        def push_undo(session, label):
-            st, ms = S.state(session), mt_state(session)
-            ms["undo"].append({"label": label, "scan": st["scan"], "copy": ms["copy"], "edits": list(ms["edits"]), "pending": list(ms["pending"]), "reduced": ms["reduced"]})
-            del ms["undo"][:-UNDO_DEPTH]
-
-        def mesh_out(session):
-            V, F, which = working(session)
-            ms = mt_state(session)
-            d = M.describe(V, F)
-            vol = d["volume"]
-            return {"working": which, **d, "volume": None if vol is None else round(vol, 3), "edits": list(ms["pending"] if ms["copy"] is not None else ms["edits"])}
-
-        def region_vertices(session, region):
-            V, F, which = working(session)
-            try:
-                vs = M.select_vertices(V, F, region)
-            except M.MeshError as e:
-                raise ToolError("invalid_input", str(e))
-            if len(vs) == 0:
-                raise ToolError("invalid_input", f"The region holds no vertex of the {which}.")
-            return vs
 
 
 def r(v, nd=4):
