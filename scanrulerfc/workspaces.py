@@ -186,7 +186,7 @@ PROJECT = (
 )
 SETTINGS = _k("ScanRuler_Settings", "Settings", "Theme, mouse controls and other settings", "settings")
 # The original's camera key: "Screenshot this tab (⌥⇧S / Alt+Shift+S)".
-SNAPSHOT = _k("ScanRuler_Snapshot", "Snapshot", "Screenshot the 3D view", "camera", "snapshot_latest", tip_from="moved")
+SNAPSHOT = _k("ScanRuler_Snapshot", "Snapshot", "Screenshot the 3D view", "camera", "scan_snapshot_latest", tip_from="moved")
 ABOUT = _k("ScanRuler_About", "About ScanRuler", WORKBENCH_TIP, "wsMeasure", tip_from="moved")
 LOAD_SUFFIXES = (".FCStd", ".scanruler")
 
@@ -232,8 +232,9 @@ AREAS = {
     "flat_": "2D Measure",
     "mesh_": "Mesh Tools",
     "reverse_": "Reverse engineer",
+    "scan_snapshot_": "Snapshot",
 }
-# "Scan" is not a tab (the view bar's first group and every page's Model
+# "Scan" and "Snapshot" are not tabs (the view bar's first group and every page's Model
 # slot): a scan_ tool leaves the workspace where it is.
 _BY_LABEL = {w["label"]: w["id"] for w in WORKSPACES}
 

@@ -367,6 +367,7 @@ tests/test_snapshot.py
 tests/test_thickness.py
 tests/test_thickness_maths.py
 tests/test_thread.py
+tests/test_tool_names.py
 tests/test_upstream_011.py
 tests/test_volume_maths.py
 tests/test_wear.py

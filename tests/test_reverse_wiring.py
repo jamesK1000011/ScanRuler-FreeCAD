@@ -48,6 +48,21 @@ reverse_parameter_list reverse_parameter_add reverse_parameter_set reverse_param
 reverse_body_names reverse_body_describe reverse_body_check reverse_body_clearance reverse_body_set""".split())
 
 
+# Renamed since: Agent Link's core has snapshot_list / snapshot_latest.
+RENAMED = {f"snapshot_{x}": f"scan_snapshot_{x}" for x in ("list", "latest", "wait")}
+
+
+def _renamed(entries):
+    """The base's entries under today's names, their text naming them so."""
+    out = {}
+    for k, v in entries.items():
+        text = json.dumps(v)
+        for a, b in RENAMED.items():
+            text = text.replace(a, b)
+        out[RENAMED.get(k, k)] = json.loads(text)
+    return out
+
+
 def _declared():
     with open(os.path.join(ROOT, "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
         return json.load(f)["entries"]
@@ -58,7 +73,7 @@ def _base_entries():
         out = subprocess.run(["git", "-C", ROOT, "show", f"{BASE}:scanrulerfc/data/tools.json"], capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None
-    return json.loads(out.stdout)["entries"] if out.returncode == 0 else None
+    return _renamed(json.loads(out.stdout)["entries"]) if out.returncode == 0 else None
 
 
 class Registry(unittest.TestCase):
@@ -72,6 +87,7 @@ class Registry(unittest.TestCase):
         self.assertFalse(set(ADDED) & set(RH.LATER))
 
     def test_tool_dump_differs_from_before_only_by_the_reverse_tools(self):
+        # (and the snapshot tools' rename, RENAMED)
         base = _base_entries()
         if base is None:
             self.skipTest(f"{BASE} is not in this clone")
@@ -81,10 +97,13 @@ class Registry(unittest.TestCase):
         self.assertEqual(sorted(k for k in base if base[k] != now[k]), [])
 
     def test_a_refusal_is_the_add_ons(self):
-        from scanrulerfc.errors import ToolError
+        # Imported here: other tests load scanrulerfc afresh.
+        from scanrulerfc import errors
+        from scanrulerfc import runner as R
+        from scanrulerfc.reverse import handlers as fresh
 
-        self.assertTrue(issubclass(RH.Refusal, ToolError))
-        ok, got = runner.local(ctx=runner.Context(None))("reverse_feature_list", {})
+        self.assertTrue(issubclass(fresh.Refusal, errors.ToolError))
+        ok, got = R.local(ctx=R.Context(None))("reverse_feature_list", {})
         self.assertFalse(ok)
         self.assertEqual(got["error"]["code"], "unavailable")
 

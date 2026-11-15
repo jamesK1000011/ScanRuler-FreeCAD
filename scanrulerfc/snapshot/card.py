@@ -19,7 +19,7 @@ CREDIT = "ScanRuler by Stefan Hermann (CNC Kitchen), ported to FreeCAD"
 SHORTCUT = "Alt+Shift+S"
 BUTTON_TIP = "Screenshot FreeCAD (⌥⇧S / Alt+Shift+S)"
 NOTE_PLACEHOLDER = "What to look at — “the Patent panel’s numerals are off”"
-TOLD_HINT = "The agent is told about it with its next answer, and can look with snapshot_latest."
+TOLD_HINT = "The agent is told about it with its next answer, and can look with scan_snapshot_latest."
 SAVE_LABEL = "Save shots beside the project"
 
 _cls = {}

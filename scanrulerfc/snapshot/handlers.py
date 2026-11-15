@@ -36,13 +36,13 @@ def about(s, index):
     return out
 
 
-def snapshot_list(ctx, args=None):
+def scan_snapshot_list(ctx, args=None):
     """The shots, newest first, without pictures."""
     st = _store(ctx)
     return {"shots": [about(s, i) for i, s in enumerate(st.shots)]}
 
 
-def snapshot_latest(ctx, args=None):
+def scan_snapshot_latest(ctx, args=None):
     """The newest shot (or `index` 1, 2…, or `id`) as a picture with its
     marks (`original: true` without), its time, workspace, note, pins and
     saved path."""
@@ -67,9 +67,9 @@ def snapshot_latest(ctx, args=None):
             "file": file_name(s, marked), "_png": png}
 
 
-def snapshot_wait(ctx, args=None):
+def scan_snapshot_wait(ctx, args=None):
     """Wait (120 s by default, 600 at most) for the next shot or finished
-    mark-up, then answer what snapshot_list says of it."""
+    mark-up, then answer what scan_snapshot_list says of it."""
     args = args or {}
     t = args.get("timeout", args.get("timeoutSeconds", WAIT_DEFAULT))
     try:
@@ -80,7 +80,7 @@ def snapshot_wait(ctx, args=None):
     got = _store(ctx).wait_next(t)
     if got is None:
         return {"came": False, "note": f"No screenshot in {t:g} s."}
-    return {"came": True, **about(got, 0), "next": "snapshot_latest shows it."}
+    return {"came": True, **about(got, 0), "next": "scan_snapshot_latest shows it."}
 
 
 _told = {"stamp": None}
@@ -98,7 +98,7 @@ def notice(ctx=None):
     bits = [f"in {top.workspace}" if top.workspace else None, f'note: "{top.note}"' if top.note else None,
             f"{len(top.marks)} marks, {pins} pins" if top.marks else None]
     extra = "; ".join(b for b in bits if b)
-    return f"The person took a screenshot{f' ({extra})' if extra else ''} — snapshot_latest shows it."
+    return f"The person took a screenshot{f' ({extra})' if extra else ''} — scan_snapshot_latest shows it."
 
 
-HANDLERS = {"snapshot_list": snapshot_list, "snapshot_latest": snapshot_latest, "snapshot_wait": snapshot_wait}
+HANDLERS = {"scan_snapshot_list": scan_snapshot_list, "scan_snapshot_latest": scan_snapshot_latest, "scan_snapshot_wait": scan_snapshot_wait}
