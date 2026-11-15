@@ -1,4 +1,4 @@
-# Ported from ScanRuler by CNC Kitchen (Stefan Hermann): plugins/reverse/core/move.ts (the rigid move of bodies)
+# Ported from ScanRuler by CNC Kitchen (Stefan Hermann): plugins/reverse/core/move.ts (the rigid move of bodies, the gizmo's rings)
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # A move of bodies: a pivot, a translation and turns about X, then Y, then
@@ -55,3 +55,17 @@ def move_point(m, p):
 
 def move_dir(m, d):
     return [m[0] * d[0] + m[1] * d[1] + m[2] * d[2], m[4] * d[0] + m[5] * d[1] + m[6] * d[2], m[8] * d[0] + m[9] * d[1] + m[10] * d[2]]
+
+
+def ring_axes(rotate):
+    """ringAxes: the axis each ring of a Move's gizmo turns about — X
+    riding on the Y and Z turns, Y on the Z turn, Z fixed — so a drag of a
+    ring changes its own angle alone (rotation_of turns X, then Y, then Z)."""
+    z = _rot_z(rotate[2] * RAD)
+    zy = _mul3(z, _rot_y(rotate[1] * RAD))
+    return [_apply3(zy, [1, 0, 0]), _apply3(z, [0, 1, 0]), [0, 0, 1]]
+
+
+def moved_pivot(p):
+    """movedPivot: where the gizmo stands, the pivot carried with the bodies."""
+    return [p["pivot"][k] + p["translate"][k] for k in range(3)]

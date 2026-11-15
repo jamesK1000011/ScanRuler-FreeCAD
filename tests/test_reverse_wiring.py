@@ -169,16 +169,29 @@ class Page(unittest.TestCase):
         on = [k["id"] for s in m["sections"] for k in s["keys"] if k["enabled"]]
         self.assertEqual(set(on), set(RV.READY_KINDS) | {"play", "parameter-add"})
         present = set(RH.tool_names())
+        from scanrulerfc.reverse.editor import EDITOR
+
+        self.addCleanup(EDITOR.close)
         for kid in on:
             calls.clear()
             if kid == "parameter-add":
                 got = DK.press(types.SimpleNamespace(call_for=lambda k, ui: RV.call_for(k, ui, read=read)), kid, {}, run=run)
+            elif kid in RV.READY_KINDS:
+                # A Create feature key opens the kind's box; its Create calls the tool.
+                self.assertIsNone(DK.press(RV, kid, {}, run=run), kid)
+                self.assertEqual((calls, EDITOR.record["kind"]), ([], kid))
+                got = DK.press(RV, "editor-create", {}, run=run)
+                self.assertFalse(EDITOR.open, kid)
             else:
                 got = DK.press(RV, kid, {}, run=run)
             self.assertIsNotNone(got, kid)
             self.assertEqual(len(calls), 1, kid)
             self.assertIn(calls[0][0], present, kid)
-        self.assertEqual(RV.call_for("fillet", {}), ("reverse_feature_add", {"feature": {"kind": "fillet"}}))
+        self.assertIsNone(RV.call_for("fillet", {}))
+        self.assertEqual(RV.call_for("editor-create", {})[0], "reverse_feature_add")
+        self.assertEqual(RV.call_for("editor-create", {})[1]["feature"]["kind"], "fillet")
+        self.assertIsNone(RV.call_for("editor-cancel", {}))
+        self.assertFalse(EDITOR.open)
         self.assertEqual(RV.call_for("play", {}), ("reverse_build", {}))
         self.assertEqual(RV.call_for("parameter-add", {}, read=read), ("reverse_parameter_add", {"name": "p2", "expression": "0"}))
         for kid in W.REVERSE_LATER:

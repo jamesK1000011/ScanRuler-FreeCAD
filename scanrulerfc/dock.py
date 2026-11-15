@@ -92,7 +92,11 @@ def press(page, key_id, page_ui, run=None):
     if res is None:  # no runner set: the command said so
         return None
     ok, out = res
-    return {"tool": tool, "args": args, "ok": ok, "answer": out}
+    got = {"tool": tool, "args": args, "ok": ok, "answer": out}
+    after = getattr(page, "after_press", None)
+    if after is not None:
+        after(key_id, got)  # a box that made its feature closes
+    return got
 
 
 def ui_action(key, args, ui, current):
@@ -205,12 +209,13 @@ class Dock:
         if not self.widget.isVisible():
             return
         st, _a, _d = self._state()
-        if poll(st) != self._seen:
+        if poll(st) != self._seen or reverse.editor_version() != getattr(self, "_box_seen", None):
             self.refresh()
 
     def refresh(self, force=False):
         st, agent, doc = self._state()
         seen = poll(st)
+        self._box_seen = reverse.editor_version()  # the feature box's numbers and ghost line
         follow = seen != self._seen and seen[1] is not None
         self._seen = seen
         dirty = doc.isTouched() if doc is not None and hasattr(doc, "isTouched") else None
@@ -232,7 +237,7 @@ class Dock:
         self.head.setText(" &nbsp; ".join(bits))
         statusbar.feed(st, error=self.error)
         page = PAGES[self.current]
-        self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key))
+        self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key, on_field=self.field))
         self.stack.setCurrentWidget(self.slots[self.current])
 
     def key(self, section_id, key_id):
@@ -244,8 +249,19 @@ class Dock:
             self.error = None if got["ok"] else got["answer"].get("error", {}).get("message")
         self.refresh(force=True)
 
+    def field(self, section_id, field_id, value):
+        """A field of the page changed: the page's on_field, where it has one."""
+        fn = getattr(PAGES[self.current], "on_field", None)
+        if fn is not None:
+            fn(section_id, field_id, value)
+            self.refresh(force=True)
+
     def handle(self, key, *args):
         self.current, self.ui = ui_action(key, args, self.ui, self.current)
+        if key.startswith("reverse:"):
+            kind = key.split(":", 1)[1]
+            if kind in reverse.READY_KINDS:
+                reverse.open_kind(kind, self.ui.get("reverse"))  # the toolbar's key opens the box, as the panel's does
         self.refresh(force=True)
         return True
 
