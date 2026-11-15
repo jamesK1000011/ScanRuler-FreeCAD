@@ -52,6 +52,14 @@ class StatusBar:
         bar.insertPermanentWidget(1, self.counts)
         bar.addPermanentWidget(self.credit)
         self._last = None
+        self.on = True
+
+    def set_shown(self, on):
+        """Shown only while ScanRuler is the workbench in front."""
+        self.on = bool(on)
+        self.state.setVisible(self.on)
+        self.credit.setVisible(self.on)
+        self.counts.setVisible(self.on and bool((self._last or {}).get("counts")))
 
     def show(self, m):
         if m == self._last:
@@ -59,7 +67,7 @@ class StatusBar:
         self._last = m
         self.state.setText("<span style='color:%s'>%s</span>%s" % (m["colour"], LAMP, m["state_text"][len(LAMP):]))
         self.counts.setText(m["counts"] or "")
-        self.counts.setVisible(bool(m["counts"]))
+        self.counts.setVisible(self.on and bool(m["counts"]))
         if m["message"]:
             self.bar.showMessage(m["message"])
 
@@ -82,6 +90,17 @@ def install(mw=None):
     if key not in _installed:
         _installed[key] = StatusBar(mw.statusBar())
     return _installed[key]
+
+
+def shown(on):
+    """The strip on every window shown (ScanRuler's workbench activated) or
+    hidden (another workbench in front: it stayed in Workshop Make's)."""
+    for bar in _installed.values():
+        try:
+            bar.set_shown(on)
+        except RuntimeError:  # the window is going away
+            pass
+    return bool(_installed)
 
 
 def feed(st, busy=False, error=None, percent=None, message=None):

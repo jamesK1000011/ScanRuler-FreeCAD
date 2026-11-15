@@ -101,7 +101,10 @@ def make_class(Gui):
             C.switch_workspace(C.current_workspace())
 
         def Deactivated(self):
-            pass
+            # The status strip is ScanRuler's: hidden in other workbenches.
+            from . import statusbar
+
+            statusbar.shown(False)
 
         def GetClassName(self):
             return "Gui::PythonWorkbench"
@@ -124,6 +127,7 @@ def _own_panel(Gui):
     try:
         mw = Gui.getMainWindow()
         statusbar.install(mw)
+        statusbar.shown(True)
         dock.show_dock(mw)
     except ImportError:  # no window (FreeCADCmd, tests): nothing to show
         pass

@@ -89,5 +89,36 @@ class Tab(unittest.TestCase):
         self.assertEqual(got, [])
 
 
+class StatusStrip(unittest.TestCase):
+    """ScanRuler's status strip shows only while ScanRuler is the workbench
+    in front: hidden as it deactivates (it stayed in Workshop Make's)."""
+
+    def test_hidden_with_another_workbench(self):
+        from scanrulerfc import statusbar, workbench
+
+        seen = []
+
+        class Bar:
+            def set_shown(self, on):
+                seen.append(on)
+
+        saved = dict(statusbar._installed)
+        statusbar._installed.clear()
+        statusbar._installed[1] = Bar()
+        try:
+            class Gui:
+                class Workbench:
+                    pass
+
+            wb = workbench.make_class(Gui)()
+            wb.Deactivated()
+            self.assertEqual(seen, [False])
+            statusbar.shown(True)
+            self.assertEqual(seen, [False, True])
+        finally:
+            statusbar._installed.clear()
+            statusbar._installed.update(saved)
+
+
 if __name__ == "__main__":
     unittest.main()
