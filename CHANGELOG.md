@@ -20,6 +20,9 @@
   engine port.
 - Load opens a `.scanruler` project's Reverse engineer part in the
   document's container; without FreeCAD it is named as not loaded.
+- The snapshot tools are `scan_snapshot_list`, `scan_snapshot_latest` and
+  `scan_snapshot_wait`: Agent Link's own `snapshot_list` and
+  `snapshot_latest` kept the old names and left these out.
 
 ## 0.3.0 — 2026-11-14
 

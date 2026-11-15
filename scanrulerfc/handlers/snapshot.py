@@ -15,5 +15,5 @@ def bind(session):
     return {n: functools.partial(H.HANDLERS[n], session) for n in NAMES}
 
 
-NAMES = ("snapshot_list", "snapshot_latest", "snapshot_wait")
+NAMES = ("scan_snapshot_list", "scan_snapshot_latest", "scan_snapshot_wait")
 HANDLERS = _bind.table(bind, NAMES)

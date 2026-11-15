@@ -7,8 +7,8 @@
 # note, Mark up, Save PNG, Copy and Discard. Up to 8 shots are kept in
 # memory, never in the project; with "Save shots beside the project" on (the
 # default) each is written, marks drawn in, to shots/ beside the document.
-# The agent reads them with snapshot_list, snapshot_latest and
-# snapshot_wait. Only the person takes a shot: no tool takes one.
+# The agent reads them with scan_snapshot_list, scan_snapshot_latest and
+# scan_snapshot_wait. Only the person takes a shot: no tool takes one.
 #
 # store.py and marks.py are plain Python; card.py is thin Qt over them and
 # imports Qt only when it is used.

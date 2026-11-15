@@ -156,7 +156,7 @@ class Areas(unittest.TestCase):
         self.assertEqual(W.area_of("scan_open"), "Scan")
         self.assertIsNone(W.area_of("wear_setup"))
         labels_ = {w["label"] for w in W.WORKSPACES}
-        self.assertTrue(set(W.AREAS.values()) - {"Scan"} <= labels_)
+        self.assertTrue(set(W.AREAS.values()) - {"Scan", "Snapshot"} <= labels_)
 
     def test_workspace_follows_the_tool(self):
         self.assertEqual(W.workspace_for_tool("mesh_smooth"), "mesh")

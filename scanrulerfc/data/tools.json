@@ -5497,7 +5497,7 @@
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/cad.py",
    "date": "2026-11-14"
   },
-  "snapshot_list": {
+  "scan_snapshot_list": {
    "group": "snapshot",
    "description": "The screenshots the person took with ScanRuler's camera key (Alt+Shift+S), newest first, without pictures: index, id, time, workspace, note, marks, numbered pins and where each was saved. Only the person takes a shot; none is kept in the project.",
    "inputSchema": {
@@ -5510,7 +5510,7 @@
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/snapshot.py",
    "date": "2026-11-14"
   },
-  "snapshot_latest": {
+  "scan_snapshot_latest": {
    "group": "snapshot",
    "description": "The newest screenshot (or index 1, 2… back, or id) as a picture with the person's marks drawn in (original: true for it as taken), with its time, workspace, note, pins and saved path. Refused when there is none: ask the person to press the camera key.",
    "inputSchema": {
@@ -5537,9 +5537,9 @@
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/snapshot.py",
    "date": "2026-11-14"
   },
-  "snapshot_wait": {
+  "scan_snapshot_wait": {
    "group": "snapshot",
-   "description": "Wait for the person's next screenshot or finished mark-up (120 s by default, 600 at most), then say what snapshot_list says of it; came: false when none came in time.",
+   "description": "Wait for the person's next screenshot or finished mark-up (120 s by default, 600 at most), then say what scan_snapshot_list says of it; came: false when none came in time.",
    "inputSchema": {
     "type": "object",
     "properties": {

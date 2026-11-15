@@ -6,7 +6,7 @@
 # The screenshots the person took, newest first, kept in memory only (never
 # in the project) until FreeCAD closes or they are discarded. An agent reads
 # them only when asked to look. Every change wakes whoever waits on the
-# store (snapshot_wait), through a threading.Event each.
+# store (scan_snapshot_wait), through a threading.Event each.
 
 import datetime as _dt
 import itertools

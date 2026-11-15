@@ -128,50 +128,50 @@ class TestHandlers(unittest.TestCase):
         self.ctx = {"shots": self.st}
 
     def test_empty(self):
-        self.assertEqual(H.snapshot_list(self.ctx, {}), {"shots": []})
+        self.assertEqual(H.scan_snapshot_list(self.ctx, {}), {"shots": []})
         with self.assertRaises(H.SnapshotError) as e:
-            H.snapshot_latest(self.ctx, {})
+            H.scan_snapshot_latest(self.ctx, {})
         self.assertEqual(e.exception.code, "not_found")
 
     def test_list_latest(self):
         a = self.st.add(shot(1))
         b = self.st.add(shot(2, note="the gap"))
-        rows = H.snapshot_list(self.ctx, {})["shots"]
+        rows = H.scan_snapshot_list(self.ctx, {})["shots"]
         self.assertEqual([r["id"] for r in rows], [b.id, a.id])
         self.assertEqual(rows[0]["note"], "the gap")
         self.assertIsNone(rows[1]["note"])
         self.assertNotIn("_png", rows[0])
-        got = H.snapshot_latest(self.ctx, {})
+        got = H.scan_snapshot_latest(self.ctx, {})
         self.assertEqual((got["id"], got["of"], got["picture"], got["_png"]), (b.id, 2, "as taken", b.png))
-        self.assertEqual(H.snapshot_latest(self.ctx, {"index": 1})["id"], a.id)
-        self.assertEqual(H.snapshot_latest(self.ctx, {"id": a.id})["index"], 1)
+        self.assertEqual(H.scan_snapshot_latest(self.ctx, {"index": 1})["id"], a.id)
+        self.assertEqual(H.scan_snapshot_latest(self.ctx, {"id": a.id})["index"], 1)
         with self.assertRaises(H.SnapshotError) as e:
-            H.snapshot_latest(self.ctx, {"index": 5})
+            H.scan_snapshot_latest(self.ctx, {"index": 5})
         self.assertEqual(e.exception.message, "There are 2 screenshots: index 0 to 1.")
         with self.assertRaises(H.SnapshotError):
-            H.snapshot_latest(self.ctx, {"id": "gone"})
+            H.scan_snapshot_latest(self.ctx, {"id": "gone"})
 
     def test_wait_times_out(self):
         t0 = time.monotonic()
-        out = H.snapshot_wait(self.ctx, {"timeout": 0.05})
+        out = H.scan_snapshot_wait(self.ctx, {"timeout": 0.05})
         self.assertFalse(out["came"])
         self.assertLess(time.monotonic() - t0, 2)
 
     def test_wait_wakes_on_shot(self):
         res = {}
-        th = threading.Thread(target=lambda: res.update(H.snapshot_wait(self.ctx, {"timeout": 5})))
+        th = threading.Thread(target=lambda: res.update(H.scan_snapshot_wait(self.ctx, {"timeout": 5})))
         th.start()
         time.sleep(0.05)
         s = self.st.add(shot())
         th.join(3)
         self.assertTrue(res["came"])
         self.assertEqual(res["id"], s.id)
-        self.assertEqual(res["next"], "snapshot_latest shows it.")
+        self.assertEqual(res["next"], "scan_snapshot_latest shows it.")
 
     def test_wait_holds_while_marking_up(self):
         s = self.st.add(shot())
         res = {}
-        th = threading.Thread(target=lambda: res.update(H.snapshot_wait(self.ctx, {"timeout": 5})))
+        th = threading.Thread(target=lambda: res.update(H.scan_snapshot_wait(self.ctx, {"timeout": 5})))
         th.start()
         time.sleep(0.05)
         self.st.set_editing(s.id)
@@ -188,11 +188,11 @@ class TestHandlers(unittest.TestCase):
         self.assertIsNone(H.notice(self.ctx))
         self.st.add(shot(note="x"))
         line = H.notice(self.ctx)
-        self.assertIn("snapshot_latest shows it", line)
+        self.assertIn("scan_snapshot_latest shows it", line)
         self.assertIsNone(H.notice(self.ctx))
 
     def test_no_tool_takes_a_shot(self):
-        self.assertEqual(sorted(H.HANDLERS), ["snapshot_latest", "snapshot_list", "snapshot_wait"])
+        self.assertEqual(sorted(H.HANDLERS), ["scan_snapshot_latest", "scan_snapshot_list", "scan_snapshot_wait"])
 
 
 def _qt():

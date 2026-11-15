@@ -48,6 +48,9 @@ WB = "ScanRulerWorkbench"
 # fit_scan_ and manual_ switch nothing.
 WORKBENCHES = {p: WB for p in ("scan_", "element_", "dimension_", "align_", "section_", "deviation_", "thickness_", "flat_", "mesh_", "report_get", "export_csv")}
 WORKBENCHES.update(_R.ECHO["WORKBENCHES"])
+# The snapshot tools only read the person's shots: no bench comes up for
+# them, though they start scan_ (an empty bench switches nothing).
+WORKBENCHES["scan_snapshot_"] = ""
 # The Activity list's area, by prefix: the workspace tabs' names.
 AREAS = dict(_W.AREAS)
 # The key a tool lights, for every tool a key stands for; command_for(tool,

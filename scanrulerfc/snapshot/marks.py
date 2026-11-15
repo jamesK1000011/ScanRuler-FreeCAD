@@ -135,7 +135,7 @@ class MarkUp:
         return cls(d.get("marks", ()), d.get("note", ""), d.get("tool", "pin"), d.get("colour", COLOURS[0]))
 
     def done(self, store, shot_id):
-        """Keep the marks and note with the shot (which wakes snapshot_wait)."""
+        """Keep the marks and note with the shot (which wakes scan_snapshot_wait)."""
         store.set_marks(shot_id, self.marks)
         store.note(shot_id, self.note)
         if store.editing == shot_id:

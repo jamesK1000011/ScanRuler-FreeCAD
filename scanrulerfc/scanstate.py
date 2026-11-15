@@ -149,7 +149,7 @@ def touched(session, tool):
     call counts, not only the ones that change the document (data/tools.json
     "changes"): a fit, an alignment or a map changes what the panels show
     without touching the document. The snapshot tools only read the shots."""
-    if tool.startswith("snapshot_") or getattr(session, "family_state", None) is None:
+    if tool.startswith("scan_snapshot_") or getattr(session, "family_state", None) is None:
         return  # a session that keeps no state (a catalog-only caller): nothing to show
     st = state(session)
     st["version"] = next(_TICKS)

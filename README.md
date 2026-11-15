@@ -121,8 +121,8 @@ moved on.
 - **Library pack** (`pack`): `pack_setup`, `pack_plan` (upstream licences
   checked), `pack_write` (a zip, every file scrubbed of personal details).
 - **Snapshot** (`snapshot`): the camera key (Alt+Shift+S) takes a picture
-  of the window for the person to mark up and note; `snapshot_list`,
-  `snapshot_latest` and `snapshot_wait` let the agent read them. Only the
+  of the window for the person to mark up and note; `scan_snapshot_list`,
+  `scan_snapshot_latest` and `scan_snapshot_wait` let the agent read them. Only the
   person takes a shot.
 - **Reverse engineer** (`reverse`, a deferred group: listed only when a
   session asks for it): the Reverse engineer engine of ScanRuler by Stefan

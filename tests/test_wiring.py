@@ -38,7 +38,7 @@ except ImportError:
     HAVE_AL = False
 
 BASE = "4bb0eff"
-SNAPSHOT = ("snapshot_list", "snapshot_latest", "snapshot_wait")
+SNAPSHOT = ("scan_snapshot_list", "scan_snapshot_latest", "scan_snapshot_wait")
 MESH_ADDED = ("mesh_densify", "mesh_boolean", "mesh_shell", "mesh_wrap", "mesh_apply_wrap", "mesh_trim")
 
 
@@ -128,7 +128,7 @@ class InputChecks(Fresh):
         self.assertEqual(self.err("scan_info", {"verbose": True}), ("invalid_input", "input.verbose: not a known field — the fields here: none"))
         self.assertEqual(self.err("element_fit", {"at": {"point": [0, 0, 10]}}), ("invalid_input", "input.kind: required."))
         self.assertEqual(self.err("scan_open", {"units": "furlong"}), ("invalid_input", "input.units: one of mm, cm, m, in — not 'furlong'."))
-        self.assertEqual(self.err("snapshot_latest", {"index": 1.5}), ("invalid_input", "input.index: a whole number, not a number."))
+        self.assertEqual(self.err("scan_snapshot_latest", {"index": 1.5}), ("invalid_input", "input.index: a whole number, not a number."))
         self.assertEqual(self.err("mesh_wrap", {}), ("invalid_input", "input.gap: required."))
 
     def test_taken_in_another_dress(self):
@@ -149,7 +149,7 @@ class Version(Fresh):
         self.assertEqual(DK.workspace_of(st, "mesh"), "elements")
         self.assertFalse(run("element_fit", {"kind": "plane", "at": {"vertex": 10 ** 9}})[0])
         self.assertEqual(DK.poll(st), (v1, "element_fit"))  # a refusal moves nothing
-        self.assertTrue(run("snapshot_list", {})[0])
+        self.assertTrue(run("scan_snapshot_list", {})[0])
         self.assertEqual(DK.poll(st), (v1, "element_fit"))  # nor reading the shots
         self.assertTrue(run("thickness_settings", {})[0])
         self.assertEqual(DK.workspace_of(st, "elements"), "thickness")
@@ -187,14 +187,14 @@ class Snapshot(Fresh):
         keep = list(STORE.shots)
         del STORE.shots[:]
         try:
-            self.assertEqual(run("snapshot_list", {}), (True, {"shots": []}))
-            ok, out = run("snapshot_latest", {})
+            self.assertEqual(run("scan_snapshot_list", {}), (True, {"shots": []}))
+            ok, out = run("scan_snapshot_latest", {})
             self.assertEqual((ok, out["error"]["code"]), (False, "not_found"))
-            ok, out = run("snapshot_wait", {"timeout": 0})
+            ok, out = run("scan_snapshot_wait", {"timeout": 0})
             self.assertEqual((ok, out["came"]), (True, False))
             STORE.save = False
             STORE.add(Shot(b"\x89PNG fake", 100, 50, "Wall Thickness", note="this edge"))
-            ok, out = run("snapshot_latest", {})
+            ok, out = run("scan_snapshot_latest", {})
             self.assertTrue(ok, out)
             self.assertEqual((out["workspace"], out["note"], out["of"]), ("Wall Thickness", "this edge", 1))
             self.assertNotIn("_png", out)  # the picture rides beside an agent's answer, not in JSON
