@@ -9,14 +9,29 @@ Licensed AGPL-3.0-only, the same as ScanRuler.
 
 Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of Agent Link for FreeCAD installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
 
-It adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
+It is a **ScanRuler workbench** of its own, laid out as the original: the
+workspace tabs (3D Measure, Surface Deviation, Wall Thickness, 2D Measure,
+Mesh Tools, Reverse engineer) as the "ScanRuler workspaces" toolbar, each
+workspace's keys as its toolbars, New / Save / Load in "ScanRuler project",
+the view bar in the bottom toolbar area, the ScanRuler panel beside the
+Combo View and the status strip (READY, element and dimension counts,
+"ScanRuler · CNC Kitchen"). Colour maps start on `jet`, as the original's
+do. Save writes the FreeCAD document; Load opens a `.FCStd` or a
+`.scanruler` project from the original (its scan, fitted elements and
+sections; reverse engineer data waits for that engine's port). The
+Reverse engineer workspace is a stub until then. It needs no other add-on.
+
+It also adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:
 it loads any package on the path that holds an `agentlink_families` module
 (here `scanrulerfc.agentlink_families`). Put this folder in FreeCAD's `Mod`
 folder next to Agent Link, or on `PYTHONPATH`. Agent Link is a separate
 add-on under its own licence and never imports this one by name. Against an
 older Agent Link, hooks it lacks (pictures, wall readers, guides) are
-skipped and the tools still load.
+skipped and the tools still load. Under Agent Link the panel is the
+"ScanRuler" tab of Agent Link's panel, the workbench's keys run as the
+agent's calls do, and the panel follows the agent to the workspace of the
+last tool it ran.
 
 The tool names are ScanRuler's own (`scan_open`, `element_fit`,
 `deviation_align` …), so ScanRuler's guides read the same here.
@@ -50,7 +65,11 @@ error (an open scan reads `unsure` there instead).
   `mesh_fill_holes`, `mesh_smooth`, `mesh_offset`, `mesh_reduce` (FreeCAD's
   `Mesh.decimate`, measured as ScanRuler measures it), `mesh_apply_reduced`,
   `mesh_discard`, `mesh_use_edited`, `mesh_discard_edited`, `mesh_undo`,
-  `mesh_export`, `mesh_parts`. Edits go on a copy until `mesh_use_edited`.
+  `mesh_densify`, `mesh_boolean` (with solids: elements or document
+  objects; needs FreeCAD), `mesh_trim` (a repair piece cut to the scanned
+  break; needs FreeCAD), `mesh_shell`, `mesh_wrap`, `mesh_apply_wrap`,
+  `mesh_export` (the edited copy, the reduced mesh, the trimmed piece or the
+  wrap), `mesh_parts`. Edits go on a copy until `mesh_use_edited`.
   These are ScanRuler's scan-grade edits; Agent Link's `meshobj_*` tools are
   FreeCAD's own mesh operations on document meshes. The two meet in the
   document: `mesh_export { to: "document" }` puts the edited scan there, and
@@ -101,6 +120,10 @@ moved on.
   sheets and themes wait for a GUI.
 - **Library pack** (`pack`): `pack_setup`, `pack_plan` (upstream licences
   checked), `pack_write` (a zip, every file scrubbed of personal details).
+- **Snapshot** (`snapshot`): the camera key (Alt+Shift+S) takes a picture
+  of the window for the person to mark up and note; `snapshot_list`,
+  `snapshot_latest` and `snapshot_wait` let the agent read them. Only the
+  person takes a shot.
 - **More model formats**: glTF/GLB, Collada, VRML 2 and 3DS open as the scan
   or the reference through Agent Link's readers. FBX does not: export it as
   glTF.
@@ -117,6 +140,7 @@ board).
 
 `python -m unittest discover -s tests` with Agent Link
 (github.com/jamesK1000011/AgentLink-FreeCAD) and this folder on `PYTHONPATH`.
-The tests that need FreeCAD skip without it. CI (`.github/workflows/ci.yml`)
+The tests that need FreeCAD skip without it; the ones that need Agent Link
+skip without it, and the rest run alone. CI (`.github/workflows/ci.yml`)
 runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
 out beside it.
