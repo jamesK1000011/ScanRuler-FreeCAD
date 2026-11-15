@@ -7,8 +7,14 @@ https://github.com/CNCKitchen/ScanRuler. Its measuring, fitting,
 alignment, deviation, wall-thickness, section, mesh-cleaning and 2D
 measuring, and its plugins ported here (scanner noise, thread match, wear
 repair, print fit, parts catalog, assembly manual, library pack), were
-designed and written there. Here they are translated from
-TypeScript to Python on top of FreeCAD.
+designed and written there, as were its window's layout, its workspace
+panels, key labels and tooltips, its colour maps and its snapshot and
+mark-up: the workbench here follows them. The workbench's icons are drawn
+from ScanRuler's own key pictures; no CNC Kitchen logo is used. Here they
+are translated from TypeScript to Python on top of FreeCAD. Credit for
+them goes to Stefan Hermann (CNC Kitchen), and the workbench says so in
+words wherever ScanRuler's work loads: the panel's foot, the status
+strip, the workbench tooltip and About ScanRuler.
 
 ScanRuler is licensed under the GNU Affero General Public License,
 version 3 only, and so is this port: see LICENSE. Each ported file names
