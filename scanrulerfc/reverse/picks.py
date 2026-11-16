@@ -38,8 +38,21 @@ def picks_line(record):
     word = field[:-1]
     return f"{n} {word}{'' if n == 1 else 's'} picked"
 # How far from an edge a click still takes it, mm (the polyline's sag and a
-# click's spread on the screen).
+# click's spread on the screen) — at least; the view widens it to
+# EDGE_REACH_PX pixels at the click (edge_reach), so a click on or just
+# beside an edge takes the edge, not the face it lands on, at any zoom.
 EDGE_REACH_MM = 2.0
+EDGE_REACH_PX = 8
+
+
+def edge_reach(mm_per_px=None):
+    """How far from an edge a click takes it, mm: EDGE_REACH_PX pixels at
+    the click's zoom, never under EDGE_REACH_MM."""
+    try:
+        px = float(mm_per_px) * EDGE_REACH_PX
+    except (TypeError, ValueError):
+        return EDGE_REACH_MM
+    return max(EDGE_REACH_MM, px) if math.isfinite(px) else EDGE_REACH_MM
 
 
 def _seg_dist(p, a, b):
@@ -63,15 +76,17 @@ def nearest_edge(edges, p, reach=EDGE_REACH_MM):
     return at
 
 
-def pick_on_body(builder, body_id, p, what):
+def pick_on_body(builder, body_id, p, what, reach=None):
     """The fingerprint of the edge or the face ("edges" or "faces") of a
-    built body nearest a point clicked on it, or None."""
+    built body nearest a point clicked on it, or None. An edge is taken
+    within reach (mm; EDGE_REACH_MM by default) of the point, whichever
+    face the click landed on."""
     body = builder.body_by_id(body_id)
     if body is None:
         return None
     topo = builder.topology(body, 1)
     if what == "edges":
-        n = nearest_edge(topo["edges"], p)
+        n = nearest_edge(topo["edges"], p, EDGE_REACH_MM if reach is None else reach)
         return topo["edges"][n]["fingerprint"] if n is not None else None
     k = builder.kernel
     faces = k.faces_of(body["shape"])

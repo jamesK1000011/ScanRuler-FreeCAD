@@ -445,7 +445,7 @@ class BodyView(StandInView):
     def getObjectInfo(self, pos):  # noqa: N802
         x, y = pos
         obj = "ScanRulerReverse" if x < 400 else "ReverseBody"
-        return {"Document": "D", "Object": obj, "Component": "Edge1", "x": x - 400.0, "y": y - 300.0, "z": 10.0}
+        return {"Document": "D", "Object": obj, "Component": getattr(self, "component", "Edge1"), "x": x - 400.0, "y": y - 300.0, "z": 10.0}
 
 
 class FilletPicks(unittest.TestCase):
@@ -536,11 +536,33 @@ class FilletPicks(unittest.TestCase):
 
     def test_a_click_on_the_container_s_compound_finds_the_body(self):
         self.ed.record = {**self.ed.record, "body": 2}
-        self.ov.click(398, 300)  # the container is hit at (-2, 0, 10): no edge there
+        self.ov.click(388, 300)  # the container is hit at (-12, 0, 10): no edge within 8 px
         self.assertEqual(self.ed.record["edges"], [])
         self.assertTrue(self.warned and self.warned[-1].startswith("fillet pick: no edge of body 2"))
         self.assertTrue(self.ov.click(398 + 5, 300))
         self.assertEqual(self.ed.record["edges"], [self.FRONT])
+
+    def test_a_click_on_the_face_beside_an_edge_takes_the_edge(self):
+        # The live run: the view's pick found the top face a hair inside the
+        # edge (Face2, not Edge1). Within EDGE_REACH_PX pixels of the edge
+        # the edge wins, whatever the zoom (here 1 mm a pixel: 4 mm off,
+        # twice EDGE_REACH_MM).
+        self.assertAlmostEqual(V.mm_per_pixel(self.view, [3, 4, 10], _Vec), 1.0, places=6)
+        self.view.component = "Face2"
+        self.assertTrue(self.ov.click(403, 304))
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+        self.assertEqual(self.warned, [])
+        # Past 8 px from every edge: the face's middle picks nothing.
+        self.assertFalse(self.ov.click(405, 290))
+        self.assertIn("within 8.00 mm", self.warned[-1])
+
+    def test_the_reach_is_pixels_at_the_zoom_never_under_two_mm(self):
+        from scanrulerfc.reverse import picks as K
+
+        self.assertEqual(K.edge_reach(1.0), 8.0)
+        self.assertEqual(K.edge_reach(0.01), K.EDGE_REACH_MM)
+        self.assertEqual(K.edge_reach(None), K.EDGE_REACH_MM)
+        self.assertEqual(K.edge_reach(float("nan")), K.EDGE_REACH_MM)
 
     def test_a_miss_says_why(self):
         self.ov.env["body_at"] = lambda d, p: None

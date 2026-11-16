@@ -1007,7 +1007,18 @@ class Overlay:
                 body = self.env.get("body_at", lambda d, p: None)(hit["doc"], point)
         store = self.env.get("store", lambda: None)()
         builder = store.builder if store is not None else None
-        changed = ed.click_part(point, body, builder, self.env.get("features", lambda: [])())
+        reach = None
+        if picks and PICKS[kind] == "edges":
+            # A click on or just beside an edge takes the edge, though the
+            # view's pick found the face beside it: EDGE_REACH_PX pixels at
+            # this zoom.
+            from .reverse.picks import edge_reach
+
+            try:
+                reach = edge_reach(mm_per_pixel(self.view, point, self.vector))
+            except Exception:  # noqa: BLE001 — no projection here: the reach in mm
+                reach = edge_reach(None)
+        changed = ed.click_part(point, body, builder, self.env.get("features", lambda: [])(), reach=reach)
         if changed and picks:
             self.draw_picks()
         if picks and not changed:
@@ -1016,7 +1027,8 @@ class Overlay:
             elif builder is None:
                 warn(f"{kind} pick: no build to find the {PICKS[kind][:-1]} in (no Reverse engineer container).")
             else:
-                warn(f"{kind} pick: no {PICKS[kind][:-1]} of body {body} near ({', '.join(f'{c:.2f}' for c in point)}) — clicked {hit['object']}.{hit['element'] or '?'}.")
+                near = f" within {reach:.2f} mm" if reach is not None else ""
+                warn(f"{kind} pick: no {PICKS[kind][:-1]} of body {body}{near} of ({', '.join(f'{c:.2f}' for c in point)}) — clicked {hit['object']}.{hit['element'] or '?'}.")
         return changed
 
     def commit_field(self, text):

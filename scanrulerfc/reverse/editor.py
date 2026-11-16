@@ -237,9 +237,10 @@ class Editor:
 
         return self.open and (self.record["kind"] in PICKS or (self.record["kind"] == "extrude" and not self.record.get("face")))
 
-    def click_part(self, point, body_id=None, builder=None, features=()):
+    def click_part(self, point, body_id=None, builder=None, features=(), reach=None):
         """A click on the part at `point`: on a body (body_id) for a feature
-        that picks there, the edge or face under it toggled; for an
+        that picks there, the edge or face under it toggled (an edge within
+        reach mm of the point wins over the face it landed on); for an
         extrude, its end put through the point. True if the box changed."""
         from . import picks as K
 
@@ -249,7 +250,7 @@ class Editor:
         nxt = None
         field = K.PICKS.get(r["kind"])
         if field and body_id is not None and builder is not None:
-            fp = K.pick_on_body(builder, body_id, point, field)
+            fp = K.pick_on_body(builder, body_id, point, field, reach if field == "edges" else None)
             nxt = K.toggled(r, body_id, fp) if fp is not None else None
         elif r["kind"] == "extrude":
             nxt = K.extent_clicked(r, features, point)
