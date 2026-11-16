@@ -415,6 +415,10 @@ def make_tab(panel):
     d = Dock(panel)
     d.widget._scanruler_dock = d  # kept alive with its widget
     d.widget.fill = d.refresh  # the panel calls fill() each time the tab comes up
+    # The page's foot credits Stefan Hermann (CNC Kitchen) itself, so Agent
+    # Link hides its own credit line while this tab is in front (one credit,
+    # not two). Said here too for an Agent Link that reads it off the widget.
+    d.widget.own_credit = True
     return d.widget
 
 
@@ -432,10 +436,16 @@ def register_tab(hooks):
     if not hosted_tab_wanted(hooks):
         return
     if not any(t.get("title") == TAB_TITLE for t in hooks.TABS):
-        try:  # the tab only while ScanRuler is the workbench in front
-            hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER, workbench=WORKBENCH)
-        except TypeError:  # an Agent Link before tabs per workbench
-            hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER)
+        # The tab only while ScanRuler is the workbench in front, and with
+        # own_credit: its page carries Stefan Hermann's (CNC Kitchen) credit
+        # line, so Agent Link hides its own while the tab is up. Older Agent
+        # Links take fewer arguments.
+        for kw in ({"workbench": WORKBENCH, "own_credit": True}, {"workbench": WORKBENCH}, {}):
+            try:
+                hooks.register_tab(TAB_TITLE, make_tab, TAB_ORDER, **kw)
+                return
+            except TypeError:
+                continue
 
 
 _dock = {}

@@ -494,6 +494,36 @@ class Dock(unittest.TestCase):
         DK.register_tab(Hooks)
         self.assertEqual([(t["title"], t["factory"], t["order"]) for t in Hooks.TABS], [("ScanRuler", DK.make_tab, 70)])
 
+    def test_registers_with_its_own_credit(self):
+        class Hooks:
+            TABS = []
+            shown_in = {}
+
+            @classmethod
+            def register_tab(cls, title, factory, order=50, workbench=None, own_credit=False):
+                cls.TABS.append({"title": title, "order": order, **({"own_credit": True} if own_credit else {})})
+                cls.shown_in[title] = workbench
+
+        DK.register_tab(Hooks)
+        DK.register_tab(Hooks)
+        self.assertEqual(Hooks.TABS, [{"title": "ScanRuler", "order": 70, "own_credit": True}])
+        self.assertEqual(Hooks.shown_in["ScanRuler"], DK.WORKBENCH)
+
+    def test_agent_link_before_own_credit(self):
+        class Hooks:
+            TABS = []
+
+            @classmethod
+            def register_tab(cls, title, factory, order=50, workbench=None):
+                cls.TABS.append({"title": title, "workbench": workbench})
+
+        DK.register_tab(Hooks)
+        self.assertEqual(Hooks.TABS, [{"title": "ScanRuler", "workbench": DK.WORKBENCH}])
+
+    def test_credit_kept(self):
+        import scanrulerfc
+        self.assertIn("Stefan Hermann (CNC Kitchen)", scanrulerfc.CREDIT)
+
     def test_with_agent_link(self):
         try:
             from agentlink import hooks
@@ -503,6 +533,9 @@ class Dock(unittest.TestCase):
         try:
             DK.register_tab(hooks)
             self.assertEqual(sum(t["title"] == "ScanRuler" for t in hooks.TABS), 1)
+            tab = next(t for t in hooks.TABS if t["title"] == "ScanRuler")
+            if "own_credit" in hooks.register_tab.__code__.co_varnames:
+                self.assertTrue(tab.get("own_credit"))
         finally:
             hooks.restore(saved)
 

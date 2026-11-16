@@ -44,7 +44,15 @@ class OlderAgentLink(unittest.TestCase):
     def _with_old_render(self, body):
         saved = sys.modules.get("agentlink.render")
         saved_attr = getattr(agentlink, "render", None)
-        for k in [m for m in sys.modules if m.startswith("scanrulerfc")]:
+        # ScanRuler's modules are imported afresh under the old render, then
+        # the ones every other test module already holds are put back: left
+        # purged, later tests' lazy imports met new copies of modules whose
+        # state the test modules had set on the old ones.
+        ours = {k: v for k, v in sys.modules.items() if k.startswith("scanrulerfc")}
+        from agentlink import hooks  # what the fresh copies register goes too
+
+        registered = hooks.saved() if hasattr(hooks, "saved") else None
+        for k in ours:
             del sys.modules[k]
         old = types.ModuleType("agentlink.render")  # a render with no register_layer
         sys.modules["agentlink.render"] = old
@@ -60,6 +68,9 @@ class OlderAgentLink(unittest.TestCase):
                 agentlink.render = saved_attr
             for k in [m for m in sys.modules if m.startswith("scanrulerfc")]:
                 del sys.modules[k]
+            sys.modules.update(ours)
+            if registered is not None:
+                hooks.restore(registered)
 
     def test_extension_failure_does_not_take_agent_link_down(self):
         try:

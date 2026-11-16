@@ -9,6 +9,18 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- The ScanRuler tab of Agent Link's panel is registered with
+  `own_credit=True` (and its page widget says `own_credit`), as Agent
+  Link's hooks.md describes: the page's foot already credits Stefan Hermann
+  (CNC Kitchen), so Agent Link hides its own credit line while the tab is
+  in front. An older Agent Link without the argument still gets the tab.
+- Tests: the older-Agent-Link check puts ScanRuler's modules and Agent
+  Link's registrations back as they were after importing fresh copies
+  (left purged, nine later tests in the reverse editor, split view and
+  wiring met module copies their stand-ins were not set on), and the
+  shared-file check skips the Agent Link and Workshop checkouts CI places
+  inside this repository.
+
 ## 0.5.0 — 2026-11-16
 
 - scan_segment finds the faces of a sparse, CAD-style mesh. ScanRuler's
