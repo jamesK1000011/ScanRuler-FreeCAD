@@ -90,6 +90,40 @@ def compute_thickness(surface, positions, normals, method="ray", cone_rays=0, co
     return np.where(np.isfinite(best), best, np.nan)
 
 
+def sample_points(n, cap):
+    """The vertices measured when a scan has more than cap: cap of them,
+    spread evenly through the vertex order; None to measure every one."""
+    if not cap or n <= cap:
+        return None
+    return np.unique(np.linspace(0, n - 1, int(cap)).round().astype(np.int64))
+
+
+def fill_from_neighbours(n, idx, values, F, rounds=64):
+    """A reading at every vertex from readings at idx: each vertex not
+    measured takes the thinnest reading among its measured (or already
+    filled) neighbours, ring by ring outward — never a thicker wall than
+    one beside it; NaN where its neighbours have none."""
+    out = np.full(n, np.nan)
+    known = np.zeros(n, dtype=bool)
+    out[idx] = values
+    known[idx] = True
+    F = np.asarray(F, dtype=np.int64)
+    e = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    e0 = np.concatenate([e[:, 0], e[:, 1]])
+    e1 = np.concatenate([e[:, 1], e[:, 0]])
+    for _ in range(rounds):
+        src = known[e0] & ~known[e1]
+        if not src.any():
+            break
+        cand = np.full(n, np.inf)
+        np.fmin.at(cand, e1[src], out[e0[src]])
+        newly = np.zeros(n, dtype=bool)
+        newly[e1[src]] = True
+        out[newly] = np.where(np.isfinite(cand[newly]), cand[newly], np.nan)
+        known |= newly
+    return out
+
+
 def thickness_stats(values, limit):
     v = np.asarray(values, dtype=float)
     with np.errstate(invalid="ignore"):
@@ -136,6 +170,7 @@ def thickness_report(scan_name, stats, settings):
             f"  sigma           {stats['sigma']:.4f} mm",
             f"  under {stats['limit']:g} mm      {pct:.1f} %  ({stats['belowLimit']} points)",
             f"  measured        {stats['measured']} of {stats['total']} scan points",
+            *([f"  sampled         {settings['sampled']['points']} of {settings['sampled']['of']} scan points measured (maxPoints); the rest read off their neighbours"] if settings.get("sampled") else []),
             "",
             f"  colour scale         {settings['low']:g} … {settings['high']:g} mm",
             "",

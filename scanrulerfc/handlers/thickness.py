@@ -19,6 +19,8 @@ from ..wall_thickness import (
     DEFAULT_NORMAL_DEVIATION_DEG,
     compute_thickness,
     default_max_thickness,
+    fill_from_neighbours,
+    sample_points,
     suggest_thickness_scale,
     thickness_report,
     thickness_stats,
@@ -27,6 +29,9 @@ from . import _bind
 
 KEY = "thickness"
 THIN_SPOTS = 8
+# Scans with more vertices than this are measured at this many, spread
+# evenly, the rest read off their neighbours (maxPoints; 0 for every vertex).
+MAX_POINTS = 300_000
 
 
 def obj(props, required=()):
@@ -48,13 +53,15 @@ def tstate(session):
             "scaleAuto": True,
             "bands": None,
             "limit": 1.0,
+            "maxPoints": MAX_POINTS,
             "values": None,
+            "sample": None,
             "scan": None,
             "V": None,
         }
     t = st[KEY]
     if t["scan"] is not None and (t["scan"] is not st["scan"] or t["V"] is not st["scan"].V):
-        t.update(values=None, scan=None, V=None)
+        t.update(values=None, sample=None, scan=None, V=None)
     return t
 
 
@@ -65,15 +72,19 @@ def r3(v):
 def describe(t):
     v = t["values"]
     stats = None
+    sample = t.get("sample")
     if v is not None:
-        s = thickness_stats(v, t["limit"])
+        s = thickness_stats(v if sample is None else v[sample], t["limit"])
         stats = {k: (round(x, 4) if isinstance(x, float) else x) for k, x in s.items()}
         stats["belowLimitPct"] = round(100 * s["belowLimit"] / s["measured"], 1) if s["measured"] else 0
-    return {
+    out = {
         "status": "ready" if v is not None else "none",
         "stats": stats,
-        "settings": {k: t[k] for k in ("method", "maxThickness", "coneRays", "coneAngleDeg", "normalDeviationDeg", "low", "high", "bands", "limit")},
+        "settings": {k: t[k] for k in ("method", "maxThickness", "coneRays", "coneAngleDeg", "normalDeviationDeg", "low", "high", "bands", "limit", "maxPoints")},
     }
+    if v is not None and sample is not None:
+        out["sampled"] = {"points": int(len(sample)), "of": int(len(v)), "note": "the statistics are over the points measured; the others take the thinnest reading among their neighbours"}
+    return out
 
 
 def apply_search(t, a):
@@ -86,6 +97,8 @@ def apply_search(t, a):
         t["coneRays"] = int(a["coneRays"])
     if "coneAngleDeg" in a:
         t["coneAngleDeg"] = min(89, max(0, a["coneAngleDeg"]))
+    if "maxPoints" in a:
+        t["maxPoints"] = max(0, int(a["maxPoints"]))
     if "normalDeviationDeg" in a:
         n = a["normalDeviationDeg"]
         t["normalDeviationDeg"] = None if n is None else min(90, max(0, n))
@@ -130,10 +143,13 @@ def bind(session):
             t["maxThickness"] = default_max_thickness(diag)
         surface = NominalSurface(scan.V, scan.F)
         nd = t["normalDeviationDeg"]
+        n = len(scan.V)
+        sample = sample_points(n, t["maxPoints"])
+        normals = vertex_normals(scan.V, scan.F)
         v = compute_thickness(
             surface,
-            scan.V,
-            vertex_normals(scan.V, scan.F),
+            scan.V if sample is None else scan.V[sample],
+            normals if sample is None else normals[sample],
             method=t["method"],
             cone_rays=t["coneRays"],
             cone_angle=math.radians(t["coneAngleDeg"]),
@@ -142,13 +158,17 @@ def bind(session):
             epsilon=max(1e-6, diag * 1e-5),
         )
         if not np.isfinite(v).any():
-            t.update(values=None, scan=None, V=None)
+            t.update(values=None, sample=None, scan=None, V=None)
             raise ToolError("failed", f"No wall found within {t['maxThickness']} mm anywhere: raise maxThickness, or the scan is a single open sheet.")
-        t.update(values=v, scan=scan, V=scan.V)
+        measured = v
+        if sample is not None:
+            v = fill_from_neighbours(n, sample, measured, scan.F)
+        t.update(values=v, sample=sample, scan=scan, V=scan.V)
         if t["scaleAuto"]:
-            t["low"], t["high"] = suggest_thickness_scale(v)
-        stats = thickness_stats(v, t["limit"])
-        return {"thickness": describe(t), "thinSpots": thin_spots(scan, v, t["limit"]), "report": thickness_report(scan.name, stats, {**t})}
+            t["low"], t["high"] = suggest_thickness_scale(measured)
+        stats = thickness_stats(measured, t["limit"])
+        sampled = None if sample is None else {"points": int(len(sample)), "of": n}
+        return {"thickness": describe(t), "thinSpots": thin_spots(scan, v, t["limit"]), "report": thickness_report(scan.name, stats, {**t, "sampled": sampled})}
 
     def settings(a):
         t = tstate(session)

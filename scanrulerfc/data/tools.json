@@ -201,7 +201,7 @@
   },
   "scan_segment": {
    "group": "scan",
-   "description": "The scan's planar regions, found all at once: grown from the flattest places outward within maxDeg (15°) and maxRms (0.05 mm), those smaller than minArea given back. Returns found, considered, claimed and the regions, largest first, at most limit (20): id, normal, point, sigma, area (mm²), box, vertices, neighbours { id, deg }. mark: a region's id, or several, leaves their points marked for element_fit_marked { marked: true }. Changes nothing.",
+   "description": "The scan's planar regions, found all at once: grown from the flattest places outward within maxDeg (15°) and maxRms (0.05 mm), those smaller than minArea given back (ScanRuler's vertex method). On a sparse mesh — CAD-style tessellation, a cylinder's cap a fan of triangles with vertices only on its rim — that finds nothing, and the triangles are grouped instead (the faces method): triangles in one plane are a plane, a smooth strip of faces square to one axis whose corners lie on a cylinder within maxRms is a cylinder. method: auto (the default: vertices, then faces only when that found nothing and the mesh is sparse), vertices or faces. Returns found, method (which ran) and why (when faces ran under auto), considered, claimed and the regions, largest first, at most limit (20): id, kind (plane: normal and point; cylinder: axis, point on the axis at the strip's middle, radius, length, bore), sigma, area (mm²), box, vertices, neighbours { id, deg }. mark: a region's id, or several, leaves their points marked for element_fit_marked { marked: true }. Heavy on a big scan: may answer as a job. Changes nothing.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {
@@ -235,7 +235,7 @@
       "type": "object"
      },
      "kind": {
-      "description": "What to find; plane, the default and for now the only one.",
+      "description": "What to find; plane, the default and for now the only one asked for (the faces method also reports the cylinders it finds).",
       "enum": [
        "plane"
       ]
@@ -280,6 +280,15 @@
       "exclusiveMinimum": 0,
       "type": "number"
      },
+     "method": {
+      "description": "auto (the default): ScanRuler's vertex growing, and the triangle grouping only when that finds nothing on a sparse mesh; vertices: ScanRuler's alone; faces: the triangle grouping alone (a CAD mesh whose flats the vertex method misses beside finely tessellated curves).",
+      "enum": [
+       "auto",
+       "vertices",
+       "faces"
+      ],
+      "type": "string"
+     },
      "minArea": {
       "description": "mm²; by default a square 2 % of the scan's diagonal on a side.",
       "minimum": 0,
@@ -291,7 +300,8 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/scan.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16",
+   "heavy": true
   },
   "scan_fit_surface": {
    "group": "scan",
@@ -4069,7 +4079,7 @@
   },
   "deviation_measure": {
    "group": "deviation",
-   "description": "Measure the deviation map again under the alignment in hand — after a change of facing limit, say. deviation_align measures it already. Refuses (invalid_state) when there is no alignment, including when the part was moved since it was made (align_clear, align_datum, align_auto, align_symmetry, scan_scale drop it): run deviation_align again. Returns the map's statistics (min, max, mean, RMS, sigma, percentiles; withinTolerancePct over every scan point, withinToleranceOfMeasuredPct, measuredPct, points matched) and warnings when under 80 % of the points have a reading. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing).",
+   "description": "Measure the deviation map again under the alignment in hand — after a change of facing limit, say. deviation_align measures it already. Refuses (invalid_state) when there is no alignment, including when the part was moved since it was made (align_clear, align_datum, align_auto, align_symmetry, scan_scale drop it): run deviation_align again. Returns the map's statistics (min, max, mean, RMS, sigma, percentiles; withinTolerancePct over every scan point, withinToleranceOfMeasuredPct, measuredPct, points matched) and warnings when under 80 % of the points have a reading. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing). Heavy: on a big scan it answers as a job.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {},
@@ -4078,11 +4088,12 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16",
+   "heavy": true
   },
   "deviation_set_target": {
    "group": "deviation",
-   "description": "Map how far the scan strays from one of its own fitted elements — a plane, cylinder, sphere or torus — instead of from a reference part; null goes back to the reference. side is the material side, read off the scan when the element is chosen (outward: the element's outer side; inward: a bore or shell) — give it to override. facingDeg limits which surface counts to what faces the element within that many degrees (60 by default), null for any. Returns the map's statistics.",
+   "description": "Map how far the scan strays from one of its own fitted elements — a plane, cylinder, sphere or torus — instead of from a reference part; null goes back to the reference. side is the material side, read off the scan when the element is chosen (outward: the element's outer side; inward: a bore or shell) — give it to override. facingDeg limits which surface counts to what faces the element within that many degrees (60 by default), null for any. Returns the map's statistics. Heavy: on a big scan it answers as a job.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {
@@ -4130,7 +4141,8 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16",
+   "heavy": true
   },
   "deviation_settings": {
    "group": "deviation",
@@ -4228,7 +4240,7 @@
   },
   "deviation_volume": {
    "group": "deviation",
-   "description": "The scan and the reference part compared as solids, on a grid of small cells: each cell inside one and not the other is an error, touching cells a region. excess is material the reference has and the part has not, missing the other way round, unsure where the scan does not say (never an error). Needs deviation_align. Returns totals (mm³ and % of the reference) and the regions largest first, each with kind, volume, maxDepth, thickness, shape (layer or lump), centroid, deepest, box, evidence and confidence. Trap: nothing thinner than smallestSeen (two cells) is seen. Changes nothing.",
+   "description": "The scan and the reference part compared as solids, on a grid of small cells: each cell inside one and not the other is an error, touching cells a region. excess is material the reference has and the part has not, missing the other way round, unsure where the scan does not say (never an error). Needs deviation_align. Returns totals (mm³ and % of the reference) and the regions largest first, each with kind, volume, maxDepth, thickness, shape (layer or lump), centroid, deepest, box, evidence and confidence. Trap: nothing thinner than smallestSeen (two cells) is seen. Changes nothing. Heavy: on a big scan it answers as a job.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {
@@ -4290,7 +4302,8 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/deviation.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16",
+   "heavy": true
   },
   "deviation_export": {
    "group": "deviation",
@@ -4327,7 +4340,7 @@
   },
   "thickness_measure": {
    "group": "thickness",
-   "description": "Measure the wall thickness at every point of the scan, with the search settings given or those in hand. Returns the statistics (min, max, mean, sigma, share under the thin-wall limit, points measured), the settings, the thin spots (points under the limit gathered into patches, thinnest first by how far under) and the plain-text report. Trap: thin readings along open rims are rays escaping, not thin walls.",
+   "description": "Measure the wall thickness at every point of the scan, with the search settings given or those in hand. A scan of more than maxPoints vertices (300,000 by default; 0 for all) is measured at that many, spread evenly, the others taking the thinnest reading among their neighbours: the answer's thickness.sampled says how many were measured. Returns the statistics (min, max, mean, sigma, share under the thin-wall limit, points measured — over the points measured), the settings, the thin spots (points under the limit gathered into patches, thinnest first by how far under) and the plain-text report. Heavy: on a big scan it answers as a job. Trap: thin readings along open rims are rays escaping, not thin walls.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {
@@ -4338,6 +4351,11 @@
      },
      "coneRays": {
       "maximum": 256,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "maxPoints": {
+      "description": "Most vertices measured; a bigger scan is sampled evenly to this many and the rest read off their neighbours. 300000 by default, 0 for every vertex.",
       "minimum": 0,
       "type": "integer"
      },
@@ -4373,11 +4391,12 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/thickness.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16",
+   "heavy": true
   },
   "thickness_settings": {
    "group": "thickness",
-   "description": "The search settings (method, maxThickness, coneRays, coneAngleDeg, normalDeviationDeg — they take effect at the next thickness_measure) and the reading: low and high, the ends of the colour scale, mm; bands; limit, the thin-wall limit the statistics count under, mm. Returns the thickness state.",
+   "description": "The search settings (method, maxThickness, coneRays, coneAngleDeg, normalDeviationDeg, maxPoints — they take effect at the next thickness_measure) and the reading: low and high, the ends of the colour scale, mm; bands; limit, the thin-wall limit the statistics count under, mm. Returns the thickness state.",
    "inputSchema": {
     "additionalProperties": false,
     "properties": {
@@ -4414,6 +4433,11 @@
       "minimum": 0,
       "type": "number"
      },
+     "maxPoints": {
+      "description": "Most vertices measured; a bigger scan is sampled evenly to this many and the rest read off their neighbours. 300000 by default, 0 for every vertex.",
+      "minimum": 0,
+      "type": "integer"
+     },
      "maxThickness": {
       "description": "The thickest wall searched for, mm.",
       "exclusiveMinimum": 0,
@@ -4446,7 +4470,7 @@
    },
    "changes": false,
    "source": "ScanRuler by Stefan Hermann (CNC Kitchen), ported: scanrulerfc/handlers/thickness.py",
-   "date": "2026-11-14"
+   "date": "2026-11-16"
   },
   "scan_noise": {
    "group": "scan-noise",
