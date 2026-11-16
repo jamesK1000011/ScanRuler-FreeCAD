@@ -124,8 +124,10 @@ LONG_CHECK = 28
 # Dense, so a whole section fits without scrolling beside the tree: the
 # space between rows and groups, a page's margins, a group's inner margins
 # (left, top, right, bottom: the header as far from the card's top edge as
-# the rows are from its sides).
-SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 6, 6, 4)
+# the rows are from its sides; no taller than the 6/4/6/4 cards were).
+SPACING, MARGIN, GROUP_MARGINS = 4, 4, (4, 4, 4, 4)
+# The dynamic property that marks a section card (a QFrame) for the sheet.
+CARD = "card"
 
 
 PAGE = "ScanRulerPage"
@@ -208,13 +210,13 @@ def reflow(width, grids, rows, down, across, fields=()):
 
 
 def section_object_name(section_id):
-    """The Qt object name of a section's group box."""
+    """The Qt object name of a section's card (a QFrame)."""
     return f"ScanRulerSection_{section_id}"
 
 
 def widget(model, on_key=None, on_field=None, parent=None):
     """A QWidget drawn from any page model (every page's, 3D Measure's too):
-    a group box per section titled as FreeCAD titles them, with an (i) key,
+    a card (QFrame) per section titled as FreeCAD titles them, with an (i) key,
     slots, rows, fields of every kind, keys in their grid and hints. The
     credit is the dock's footer, once (dock.Dock), not each page's.
     on_key(section_id, key_id); on_field(section_id, field_id, value)."""
@@ -375,8 +377,12 @@ def widget(model, on_key=None, on_field=None, parent=None):
         if s.get("header"):
             # The title on the group's own first row, with its (i) key (a
             # group box's title cannot hold a key): no row of its own.
-            group = QtWidgets.QGroupBox()
+            # A plain QFrame, not a QGroupBox: under FreeCAD's theme sheets a
+            # group box reserves its title band (margin-top / padding-top and
+            # ::title) even with no title, 20 px above the header on the Mac.
+            group = QtWidgets.QFrame()
             group.setObjectName(section_object_name(s["id"]))  # the dock finds a box just opened by it
+            group.setProperty(CARD, True)  # the card rule in the page's sheet (theme.sheet)
             group.setAccessibleName(group_title(s))
             box.addWidget(group)
             box = QtWidgets.QVBoxLayout(group)

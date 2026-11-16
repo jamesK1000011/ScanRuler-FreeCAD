@@ -64,7 +64,7 @@ class ThemePaints(unittest.TestCase):
                     bg = props.get("background", "")
                     if bg.startswith("#"):
                         self.assertIn('primary="true"]:enabled', sel)
-                    if sel in ("#P QLabel", "#P QCheckBox", "#P QPushButton", "#P QGroupBox"):
+                    if sel in ("#P QLabel", "#P QCheckBox", "#P QPushButton", '#P QFrame[card="true"]'):
                         self.assertNotIn("color", props, sel)
                 self.assertFalse(any(k.endswith(" QPushButton") for k in r), "enabled keys left to the theme")
                 self.assertNotIn("QCheckBox", css)
@@ -73,14 +73,14 @@ class ThemePaints(unittest.TestCase):
     def test_card_is_translucent_and_reads_on_light_and_dark(self):
         for seen in SEENS:
             r = rules(css_for(seen))
-            card = find(r, " QGroupBox")
+            card = find(r, ' QFrame[card="true"]')
             self.assertTrue(card["background"].startswith("rgba("), card)
             self.assertIn(T.BORDER, card["border"])
         # Unknown: one neutral overlay and border, visible on both ends.
         r = rules(css_for(None))
         for t in THEMES.values():
             win = t["window"]
-            card = T.over(find(r, " QGroupBox")["background"], win)
+            card = T.over(find(r, ' QFrame[card="true"]')["background"], win)
             border = T.over(T.BORDER, card)
             self.assertNotEqual(card, win)
             self.assertGreater(T.contrast(border, card), 1.1, win)
