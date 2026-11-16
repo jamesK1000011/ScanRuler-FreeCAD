@@ -39,6 +39,7 @@ def touching(fn, session, tool):
 
     @functools.wraps(fn)
     def run(*a):
+        S.before(session)  # a move made on the scan in FreeCAD, carried in first
         out = fn(*a)
         S.touched(session, tool)
         return out

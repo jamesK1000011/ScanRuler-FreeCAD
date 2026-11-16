@@ -722,6 +722,10 @@ def handlers(session=None, store=None):
             return p
 
         commit("set", b["name"], change)
+        if "visible" in a and hasattr(st, "container"):
+            c = st.container()
+            if c is not None:
+                D.show_bodies(c, [b["id"]], a["visible"])
         return body_names({})
 
     def import_step(a):

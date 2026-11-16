@@ -370,7 +370,23 @@ def sync_bodies(container):
         if view is not None:
             view.Proxy = 0
             view.ShapeColor = rgb((styles.get(str(b["id"])) or {}).get("color") or body_color(b["id"]))
+            if b["id"] in set(part.get("hiddenBodies") or []):
+                view.Visibility = False  # a body the part leaves out shows hidden
     return plan
+
+
+def show_bodies(container, ids, visible):
+    """The bodies of these ids shown or hidden by their own Visibility, as
+    the part's hiddenBodies says (reverse_body_set): FreeCAD's tree, space
+    bar and the view bar's Bodies key read and set the same property."""
+    want = {float(i) for i in ids}
+    n = 0
+    for o in bodies_of(container):
+        view = getattr(o, "ViewObject", None)
+        if float(o.BodyId) in want and view is not None:
+            view.Visibility = bool(visible)
+            n += 1
+    return n
 
 
 def edit(container, verb, name, change):

@@ -110,7 +110,7 @@ def _a(noun):
 TIPS = {
     "ScanRuler_AutoAlign": "Turn the scan square to its main planes and axes automatically.",
     "ScanRuler_AlignPart": "Align the scan to datums you pick: a plane, an axis, a point.",
-    "ScanRuler_MoveRotate": "Move or rotate the scan by numbers you type.",
+    "ScanRuler_MoveRotate": "Move or rotate the scan by numbers you type, in FreeCAD's Placement dialog; the elements move with it.",
     "ScanRuler_ScalePart": "Scale the scan to its true size from lengths you measured.",
     "ScanRuler_ElementPoint": "Place a point on the scan.",
     "ScanRuler_ElementLine": _FIT.format(_a("line")),
@@ -204,7 +204,10 @@ TOOLBARS = {
         ("Alignment", [
             _lk("ScanRuler_AutoAlign", "Auto-align", "alignSheet", "align_auto", True),
             _lk("ScanRuler_AlignPart", "Align part", "pickPoints", "align_datum"),
-            _lk("ScanRuler_MoveRotate", "Move / rotate by numbers", "rotateCcw"),
+            # FreeCAD's Placement dialog on the scan object: what it moves,
+            # the elements follow (docstate.pull_pose), which FreeCAD alone
+            # would not do.
+            {**_lk("ScanRuler_MoveRotate", "Move / rotate by numbers", "rotateCcw"), "native": "Std_Placement", "on": "scan"},
             _lk("ScanRuler_ScalePart", "Scale part", "dimLength", "scan_scale"),
         ]),
         ("Create element", [_lk("ScanRuler_Element" + _cap(k), lab, ic, "element_fit", args={"kind": k}) for k, lab, ic in _KINDS]
@@ -255,49 +258,61 @@ def toolbar_name(ws, title):
     return f"ScanRuler {title_case(workspace(ws)['label'])}: {title_case(title)}"
 
 
-# --- the project keys (TopBar.tsx's), in the ScanRuler menu ----------------
-# The original's top bar also has undo and redo; FreeCAD's own Edit menu and
-# toolbar carry those, and its File toolbar New, Open and Save, so these stay
-# off the toolbars and say they act on the ScanRuler project.
-PROJECT = (
-    _k("ScanRuler_New", "New project", "Start a new ScanRuler project in a new FreeCAD document (asks if there are unsaved changes)",
-       "newProject", tip_from="moved"),
-    # The original: "Save everything as one .scanruler file". The FreeCAD
-    # document is the project here.
-    _k("ScanRuler_Save", "Save project", "Save the ScanRuler project: its scan, elements and results go in the FreeCAD document (.FCStd)",
-       "save", tip_from="moved"),
-    _k("ScanRuler_Load", "Open project…", "Open a ScanRuler project (.scanruler) or a FreeCAD document (.FCStd) holding one",
-       "load", tip_from="moved"),
-)
+# --- the project keys (TopBar.tsx's) ------------------------------------------
+# The original's top bar has New, Save and Load (.scanruler), undo and redo.
+# FreeCAD's own File and Edit menus carry all of them here: ScanRuler's state
+# lives in the FreeCAD document (docstate.py), so FreeCAD's New, Open and
+# Save make, open and keep a ScanRuler project. What FreeCAD cannot do is
+# read the browser app's .scanruler files: that stays, as an import.
+IMPORT_PROJECT = _k("ScanRuler_ImportProject", "Import ScanRuler project…",
+                    "Bring a project saved by the ScanRuler browser app (.scanruler) into the FreeCAD document",
+                    "load", tip_from="moved")
+PROJECT = (IMPORT_PROJECT,)
 OPEN_SCAN = _k("ScanRuler_OpenScan", "Open scan…", "Open a scan (STL, PLY, OBJ, OFF or 3MF) to measure", "load",
                "scan_open", tip_from="moved")
-SETTINGS = _k("ScanRuler_Settings", "Settings…", "Open ScanRuler's settings; theme and mouse controls are FreeCAD's own preferences",
-              "settings", tip_from="moved")
+# Settings: a page of FreeCAD's Preferences (settings.py), no command of its own.
 # The original's camera key: "Screenshot this tab (⌥⇧S / Alt+Shift+S)".
 SNAPSHOT = _k("ScanRuler_Snapshot", "Snapshot", "Screenshot the 3D view", "camera", "scan_snapshot_latest", tip_from="moved")
 ABOUT = _k("ScanRuler_About", "About ScanRuler", "Show ScanRuler's version, licence and credits", "wsMeasure", tip_from="moved")
-LOAD_SUFFIXES = (".FCStd", ".scanruler")
+IMPORT_SUFFIX = ".scanruler"
 
 # --- the view bar (ViewBar.tsx and the plugins' keys), in bar order ----------
 # `ws`: the workspaces it shows in (None: all). `menu`: the ▴ menu's switches.
+# What FreeCAD already owns is FreeCAD's here, with no state of ScanRuler's
+# beside it: `acts` (role, property) — a key that shows and sets a document
+# object's own view property (viewprops.py): the scan's or the reference's
+# Mesh::Feature, the Reverse engineer bodies. Visibility shows or hides,
+# Transparency makes see-through, DisplayMode "Flat Lines" draws the
+# triangle edges. `native`: a key that runs FreeCAD's own command. `tool`
+# on a view key: it runs that agent tool (the elements are ScanRuler's
+# measurements, not document objects: their own shown flag). The rest are
+# Stefan Hermann's own view keys (Backfaces, Colours, Labels, Overlaps,
+# Tangent edges, Split view, Colour plot, On reference, Deviation).
 ALL = None
+
+
+def _acts(role, prop, k):
+    k["acts"] = (role, prop)
+    return k
+
+
 VIEW_BAR = (
-    {"group": "Scan", **_k("ScanRuler_ViewScan", "Scan", "Show or hide the scan (display options in the menu)", "scan"), "ws": ALL, "menu": [
-        _k("ScanRuler_ViewScanTransparent", "Transparent", "Make the scan see-through", "transparent"),
-        _k("ScanRuler_ViewScanMesh", "Mesh", "Show the scan’s triangle edges", "mesh"),
+    {"group": "Scan", **_acts("scan", "Visibility", _k("ScanRuler_ViewScan", "Scan", "Show or hide the scan (display options in the menu)", "scan")), "ws": ALL, "menu": [
+        _acts("scan", "Transparency", _k("ScanRuler_ViewScanTransparent", "Transparent", "Make the scan see-through", "transparent")),
+        _acts("scan", "DisplayMode", _k("ScanRuler_ViewScanMesh", "Mesh", "Show the scan’s triangle edges", "mesh")),
         _k("ScanRuler_ViewScanBackfaces", "Backfaces", "Colour back faces, to spot holes and flipped normals", "backfaces"),
         _k("ScanRuler_ViewScanColours", "Colours", "Show the scan’s captured colours, or plain", "scanColours"),
     ]},
-    {"group": "Reference", **_k("ScanRuler_ViewReference", "Reference", "Show or hide the reference", "model"), "ws": ("deviation",), "menu": [
-        _k("ScanRuler_ViewRefTransparent", "Transparent", "Draw the reference transparent while it is solid", "transparent"),
-        _k("ScanRuler_ViewRefMesh", "Mesh", "Show the reference’s triangle edges", "mesh"),
+    {"group": "Reference", **_acts("reference", "Visibility", _k("ScanRuler_ViewReference", "Reference", "Show or hide the reference", "model")), "ws": ("deviation",), "menu": [
+        _acts("reference", "Transparency", _k("ScanRuler_ViewRefTransparent", "Transparent", "Draw the reference transparent while it is solid", "transparent")),
+        _acts("reference", "DisplayMode", _k("ScanRuler_ViewRefMesh", "Mesh", "Show the reference’s triangle edges", "mesh")),
         _k("ScanRuler_ViewRefBackfaces", "Backfaces", "Colour the reference’s back faces", "backfaces"),
     ]},
-    {"group": "Elements", **_k("ScanRuler_ViewElements", "Elements", "Show or hide all elements, dimensions and sections", "elCylinder"), "ws": ("elements",), "menu": [
+    {"group": "Elements", **_k("ScanRuler_ViewElements", "Elements", "Show or hide all elements, dimensions and sections", "elCylinder", "element_set_visible"), "ws": ("elements",), "menu": [
         _k("ScanRuler_ViewLabels", "Labels", "Show name tags and readouts on the part", "labels"),
     ]},
-    {"group": "Bodies", **_k("ScanRuler_ViewBodies", "Bodies", "Show or hide all bodies", "combine"), "ws": ("reverse",), "menu": [
-        _k("ScanRuler_ViewBodiesTransparent", "Transparent", "See-through bodies", "transparent"),
+    {"group": "Bodies", **_acts("bodies", "Visibility", _k("ScanRuler_ViewBodies", "Bodies", "Show or hide all bodies", "combine")), "ws": ("reverse",), "menu": [
+        _acts("bodies", "Transparency", _k("ScanRuler_ViewBodiesTransparent", "Transparent", "See-through bodies", "transparent")),
         _k("ScanRuler_ViewOverlaps", "Overlaps", "Hatch where bodies overlap in red", "opIntersect"),
         _k("ScanRuler_ViewTangentEdges", "Tangent edges", "How edges between rounds and flats are drawn", "tangentEdges"),
     ]},
@@ -308,8 +323,8 @@ VIEW_BAR = (
     {"group": "Colour plot", **_k("ScanRuler_ViewColourPlot", "Colour plot", "Colour the scan by deviation (results are kept when off)", "colourPlot"), "ws": ("deviation",), "menu": []},
     {"group": "On reference", **_k("ScanRuler_ViewOnReference", "On reference", "Show the map on the reference instead", "colourPlot"), "ws": ("deviation",), "menu": []},
     {"group": "Deviation", **_k("ScanRuler_ViewCopyDeviation", "Deviation", "Colour the edited copy by how far it moved from the scan", "compare"), "ws": ("mesh",), "menu": []},
-    # The original's own cut view; FreeCAD's clipping plane, laid where
-    # ScanRuler lays it (design 2.8).
+    # The original's own cut view is FreeCAD's clipping plane: the key runs
+    # Std_ToggleClipPlane and nothing else (a second press closes its dialog).
     {"group": "Section", **_k("ScanRuler_ViewSection", "Section", "Cut the parts open at a plane to look inside", "sectionView"), "ws": ALL, "menu": [], "native": "Std_ToggleClipPlane"},
 )
 VIEW_TAIL = ("Std_ViewFitAll", "ScanRuler_Snapshot")
@@ -375,7 +390,7 @@ def all_commands():
     out = {}
     for w in WORKSPACES:
         out[w["command"]] = {"command": w["command"], "label": w["label"], "tip": w["tip"], "icon": w["icon"], "workspace": w["id"]}
-    for k in keys() + view_keys() + list(PROJECT) + [OPEN_SCAN, SETTINGS, SNAPSHOT, ABOUT]:
+    for k in keys() + view_keys() + list(PROJECT) + [OPEN_SCAN, SNAPSHOT, ABOUT]:
         out.setdefault(k["command"], k)
     return out
 

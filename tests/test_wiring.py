@@ -267,7 +267,7 @@ class ProjectImport(Fresh):
         self.assertIsNone(got["reverse"])
         self.assertEqual(len(got["notLoaded"]), 3)  # reverse, the line, the reference
 
-    def test_load_command_tells_the_panel(self):
+    def test_import_command_tells_the_panel(self):
         d = tempfile.mkdtemp()
         man = {"app": "ScanRuler", "schemaVersion": 1, "workspace": "elements", "deviation": {}, "thickness": {}, "flat": {}, "scan": None}
         path = _project(d, man)
@@ -275,7 +275,7 @@ class ProjectImport(Fresh):
         C.set_ui(lambda key, *a: seen.append((key,) + a))
         C.set_runner(lambda t, a: self.fail("no scan, no call"))
         try:
-            got = C.load(path)
+            got = C.import_project(path)
         finally:
             C.set_ui(None)
             C.set_runner(None)

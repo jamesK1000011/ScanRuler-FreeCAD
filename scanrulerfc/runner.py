@@ -190,6 +190,7 @@ def local(doc_fn=None, table=None, ctx=None):
                 return False, {"error": {"code": e.code, "message": e.message}}
         c = ctx if ctx is not None else context_for((doc_fn or _active_doc)())
         doc = c.doc
+        S.before(c)  # a move made on the scan in FreeCAD, carried in first
         if not changes(tool) or doc is None:
             ok, out = answer(lambda a: fn(c, a), args)
         else:

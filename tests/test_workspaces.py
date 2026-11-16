@@ -126,12 +126,11 @@ class Toolbars(unittest.TestCase):
                 elif k["tip_from"] == "label":
                     # The original has no title: the port's says what it does.
                     self.assertEqual(k["tip"], W.TIPS[k["command"]])
-        # The project keys, Open Scan, Settings, Snapshot and About say what
-        # they do in FreeCAD (they act on the ScanRuler project, FreeCAD's
-        # preferences hold the theme), not the browser app's words.
+        # Import, Open Scan, Snapshot and About say what they do in FreeCAD,
+        # not the browser app's words; New, Save, Load and Settings are
+        # FreeCAD's own.
         self.assertEqual({k["command"] for k in W.all_commands().values() if k.get("tip_from") == "moved"},
-                         {"ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load", "ScanRuler_OpenScan", "ScanRuler_Settings",
-                          "ScanRuler_Snapshot", "ScanRuler_About"})
+                         {"ScanRuler_ImportProject", "ScanRuler_OpenScan", "ScanRuler_Snapshot", "ScanRuler_About"})
 
 
 @NEED

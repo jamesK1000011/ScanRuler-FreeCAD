@@ -124,29 +124,45 @@ def _to_panel(key, *args):
     return _hooks["ui"](key, *args)
 
 
+def _scan_state():
+    """ScanRuler's state where the keys run: a dict, or None when it cannot
+    tell (under Agent Link before its panel is up)."""
+    from . import dock
+
+    d = dock.live()
+    if d is not None:
+        return d._state()[0]
+    import scanrulerfc
+
+    if scanrulerfc._hosted:
+        return None
+    import FreeCAD
+
+    doc = getattr(FreeCAD, "ActiveDocument", None)
+    if doc is None:
+        return {}
+    from . import runner as R
+    from . import scanstate as S
+
+    return S.state(R.context_for(doc))
+
+
 def scan_is_open():
     """True or False when it can tell whether a scan is open where the keys
     run, None when it cannot (under Agent Link before its panel is up)."""
     try:
-        from . import dock
+        st = _scan_state()
+        return None if st is None else st.get("scan") is not None
+    except Exception:  # noqa: BLE001 — unknown: say nothing rather than something wrong
+        return None
 
-        d = dock.live()
-        if d is not None:
-            return d._state()[0].get("scan") is not None
-        import scanrulerfc
 
-        if scanrulerfc._hosted:
-            return None
+def _active_doc():
+    try:
         import FreeCAD
 
-        doc = getattr(FreeCAD, "ActiveDocument", None)
-        if doc is None:
-            return False
-        from . import runner as R
-        from . import scanstate as S
-
-        return S.state(R.context_for(doc)).get("scan") is not None
-    except Exception:  # noqa: BLE001 — unknown: say nothing rather than something wrong
+        return getattr(FreeCAD, "ActiveDocument", None)
+    except ImportError:
         return None
 
 
@@ -430,6 +446,8 @@ class KeyCommand(_Base):
             _tell(NEED_SCAN)
             if s["run"]:
                 return None
+        if s.get("native"):
+            return run_native(s)
         if s["run"]:
             res = _hooks["runner"](s["tool"], dict(s["args"]))
             report(W.title_case(s["label"]), res)
@@ -437,15 +455,52 @@ class KeyCommand(_Base):
         return _to_panel(s["key"], dict(s["args"]))
 
 
+def native_key(key):
+    """The key spec of a panel key that runs a FreeCAD command, or None."""
+    return next((k for k in W.keys() if k["key"] == key and k.get("native")), None)
+
+
+def run_native(spec):
+    """FreeCAD's own command for a key (Move / rotate by numbers:
+    Std_Placement), with the object it acts on (`on`: a role, see
+    viewprops) selected first. What FreeCAD moves, ScanRuler reads back
+    before its next tool runs (docstate.pull_pose). True when it ran."""
+    native, role = spec["native"], spec.get("on")
+    if role:
+        from . import viewprops
+
+        objs = viewprops.objects(_active_doc(), role)
+        if not objs:
+            _tell(NEED_SCAN if role == "scan" else f"ScanRuler: there is no {role} in the document to act on.")
+            return False
+        try:
+            sel = _gui().Selection
+            sel.clearSelection()
+            for o in objs:
+                sel.addSelection(o)
+        except Exception as e:  # noqa: BLE001 — FreeCAD's command says what it lacks
+            _say(f"ScanRuler: could not select the {role}: {e}")
+    try:
+        _gui().runCommand(native)
+    except Exception as e:  # noqa: BLE001 — FreeCAD's command; say why it did not run
+        _tell(f"ScanRuler: {native}: {e}")
+        return False
+    return True
+
+
 class ViewCommand(_Base):
-    """A view bar switch: checkable, as the original's pressed keys."""
+    """A view bar switch: checkable, as the original's pressed keys. One
+    that `acts` on a document object reads and sets that object's own view
+    property (viewprops); Section is FreeCAD's clipping plane; Elements runs
+    element_set_visible. Only Stefan Hermann's own view keys keep a state
+    here (_state["view"])."""
 
     def __init__(self, spec):
         self.spec = spec
 
     def GetResources(self):
         r = super().GetResources()
-        r["Checkable"] = bool(_state["view"].get(self.spec["key"], self.spec["key"] in _VIEW_ON))
+        r["Checkable"] = bool(self.reading())
         return r
 
     def IsActive(self):
@@ -454,24 +509,59 @@ class ViewCommand(_Base):
         # nothing: a key that explains itself elsewhere stays active.
         return ws is None or self.spec.get("anywhere", False) or _state["workspace"] in ws
 
+    def reading(self):
+        """Whether the key shows pressed now."""
+        s = self.spec
+        if s.get("acts"):
+            from . import viewprops
+
+            try:
+                return bool(viewprops.is_on(viewprops.objects(_active_doc(), s["acts"][0]), s["acts"][1]))
+            except Exception:  # noqa: BLE001 — no document to read: not pressed
+                return False
+        if s.get("native") == CLIP_COMMAND:
+            return section_open()
+        if s.get("tool") == "element_set_visible":
+            try:
+                els = (_scan_state() or {}).get("elements") or []
+            except Exception:  # noqa: BLE001
+                els = []
+            return any(e.get("visible", True) for e in els) if els else True
+        return bool(_state["view"].get(s["key"], s["key"] in _VIEW_ON))
+
     def Activated(self, checked=None):
         # A click hands the action's new state. FreeCADGui.runCommand(name)
         # (Agent Link's cmd_run) hands 0 and leaves the action as it was, so
         # a state that matches what the key shows now is a press: it toggles.
-        was = bool(_state["view"].get(self.spec["key"], self.spec["key"] in _VIEW_ON))
+        s = self.spec
+        was = self.reading()
         on = not was if checked is None or bool(checked) == was else bool(checked)
-        native = self.spec.get("native")
-        if native == CLIP_COMMAND:
+        native = s.get("native")
+        if s.get("acts"):
+            from . import viewprops
+
+            role, prop = s["acts"]
+            got = viewprops.toggle(_active_doc(), role, prop, on)
+            if got is None:
+                _tell(NEED_SCAN if role == "scan" else f"ScanRuler: there is no {role} in the document to show.")
+                on = False
+            else:
+                on = got
+        elif native == CLIP_COMMAND:
             on = toggle_section()
-            set_checked(self.spec["command"], on)
         elif native:
             try:
                 _gui().runCommand(native)
             except Exception as e:  # noqa: BLE001 — FreeCAD's command; say why it did not run
                 _say(f"ScanRuler: {native}: {e}")
-        _state["view"][self.spec["key"]] = on
-        set_checked(self.spec["command"], on)
-        return _to_panel("view", self.spec["key"], on)
+        elif s.get("tool"):
+            res = _hooks["runner"](s["tool"], {"all": True, "visible": on})
+            if isinstance(res, tuple) and len(res) == 2 and not res[0]:
+                report(W.title_case(s["label"]), res)
+        else:
+            _state["view"][s["key"]] = on
+        set_checked(s["command"], on)
+        return _to_panel("view", s["key"], on)
 
 
 # --- Section view: FreeCAD's clipping plane, toggled -----------------------------
@@ -502,6 +592,18 @@ def size_to_restore(before, after, maximized):
     if maximized or before is None or tuple(before) == tuple(after):
         return None
     return tuple(before)
+
+
+def section_open():
+    """True while FreeCAD's Clipping dock is open: what the Section key
+    shows, read from FreeCAD, not kept."""
+    try:
+        from PySide import QtWidgets
+
+        mw = _gui().getMainWindow()
+        return section_action([(d.objectName(), d.isVisible()) for d in mw.findChildren(QtWidgets.QDockWidget)]) == "close"
+    except Exception:  # noqa: BLE001 — no window: not open
+        return False
 
 
 def toggle_section():
@@ -604,63 +706,45 @@ def group_tip(g):
     return W.sentence(f"{W.title_case(g['label'])} display options: " + ", ".join(m["label"].lower() for m in g["menu"]))
 
 
-class NewCommand(_Base):
-    spec = W.PROJECT[0]
+class ImportProjectCommand(_Base):
+    """Import ScanRuler Project…: a .scanruler from the browser app read into
+    the active FreeCAD document. New, Open and Save are FreeCAD's own: the
+    document holds ScanRuler's state (docstate.py)."""
 
-    def Activated(self, checked=None):
-        import FreeCAD
-
-        FreeCAD.newDocument()
-        _hooks["ui"]("new")
-
-
-class SaveCommand(_Base):
-    spec = W.PROJECT[1]
-
-    def Activated(self, checked=None):
-        _hooks["ui"]("save")  # the panel writes ScanRuler's state into the document first
-        _gui().runCommand("Std_Save")
-
-
-class LoadCommand(_Base):
-    spec = W.PROJECT[2]
+    spec = W.IMPORT_PROJECT
 
     def Activated(self, checked=None):
         from PySide import QtWidgets
 
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            _gui().getMainWindow(), "Open Project", "",
-            "Projects (*.FCStd *.scanruler);;FreeCAD document (*.FCStd);;ScanRuler project (*.scanruler)")
+            _gui().getMainWindow(), "Import ScanRuler Project", "", "ScanRuler project (*.scanruler)")
         if path:
-            return load(path)
+            return import_project(path)
 
 
-def load(path):
-    """A .FCStd opens as the FreeCAD document it is; a .scanruler project, so
-    the original's users bring their work across, is read through the tools
-    (project_import: the scan, elements and sections it can), and the panel
-    is told what came across. Its Reverse engineer part opens in the
-    document's container (reverse/doc.py)."""
-    if path.lower().endswith(".fcstd"):
-        import FreeCAD
+def import_project(path):
+    """A .scanruler project, so the original's users bring their work
+    across, read through the tools (project_import: the scan, elements and
+    sections it can) into the active document, and the panel told what came
+    across. Its Reverse engineer part opens in the document's container
+    (reverse/doc.py). A .FCStd is FreeCAD's to open (File ▸ Open)."""
+    if not path.lower().endswith(W.IMPORT_SUFFIX):
+        raise ValueError(f"{os.path.basename(path)}: Import ScanRuler Project takes a {W.IMPORT_SUFFIX} file; "
+                         "a FreeCAD document opens with File ▸ Open.")
+    from .errors import ToolError
+    from .project_import import load as load_project
 
-        return FreeCAD.openDocument(path)
-    if path.lower().endswith(".scanruler"):
-        from .errors import ToolError
-        from .project_import import load as load_project
-
-        try:
-            got = load_project(path, _hooks["runner"])
-        except ToolError as e:
-            _say(f"ScanRuler: {e.message}")
-            return None
-        left = got["notLoaded"] + [f"{x['tool']}: {x['message']}" for x in got["errors"]]
-        _say(f"ScanRuler: {got['project']} — scan {got['scan'] or 'not opened'}, {got['elements']} elements, "
-             f"{got['sections']} sections" + (f", {got['reverse']['features']} Reverse engineer features" if got.get("reverse") else "") + "."
-             + (" Not loaded: " + " ".join(left) if left else ""))
-        _hooks["ui"]("load-scanruler", got)
-        return got
-    raise ValueError(f"{os.path.basename(path)}: Load takes {' or '.join(W.LOAD_SUFFIXES)}.")
+    try:
+        got = load_project(path, _hooks["runner"])
+    except ToolError as e:
+        _say(f"ScanRuler: {e.message}")
+        return None
+    left = got["notLoaded"] + [f"{x['tool']}: {x['message']}" for x in got["errors"]]
+    _say(f"ScanRuler: {got['project']} — scan {got['scan'] or 'not opened'}, {got['elements']} elements, "
+         f"{got['sections']} sections" + (f", {got['reverse']['features']} Reverse engineer features" if got.get("reverse") else "") + "."
+         + (" Not loaded: " + " ".join(left) if left else ""))
+    _hooks["ui"]("load-scanruler", got)
+    return got
 
 
 SCAN_FILTER = ("Scans (*.stl *.ply *.obj *.off *.3mf *.glb *.gltf *.dae *.wrl *.3ds);;"
@@ -688,19 +772,6 @@ def open_scan(path):
     else:
         report("Open Scan", res)
     return res
-
-
-class SettingsCommand(_Base):
-    """ScanRuler's own settings dialog (settings.py). Not FreeCAD's
-    Preferences: showPreferences("ScanRuler") opened its General page, as
-    no page of that group is registered."""
-
-    spec = W.SETTINGS
-
-    def Activated(self, checked=None):
-        from . import settings
-
-        return settings.show(_main_window())
 
 
 class SnapshotCommand(KeyCommand):
@@ -762,7 +833,7 @@ def plain_menu_roles(names=None):
     except (ImportError, AttributeError):
         return 0
     n = 0
-    for name in names or (W.SETTINGS["command"], W.ABOUT["command"], W.OPEN_SCAN["command"]) + tuple(p["command"] for p in W.PROJECT):
+    for name in names or (W.ABOUT["command"], W.OPEN_SCAN["command"]) + tuple(p["command"] for p in W.PROJECT):
         for a in _actions(name):
             try:
                 a.setMenuRole(no_role)
@@ -774,8 +845,9 @@ def plain_menu_roles(names=None):
 
 # --- the registry ------------------------------------------------------------
 
-_VIEW_ON = {"ViewScan", "ViewElements", "ViewReference", "ViewBodies", "ViewScanBackfaces", "ViewScanColours",
-            "ViewRefBackfaces", "ViewLabels", "ViewColourPlot"}  # the original's defaults (`normal: true`, shown)
+# The original's defaults (`normal: true`, shown) for the keys that keep a
+# state of their own; the rest read FreeCAD (ViewCommand.reading).
+_VIEW_ON = {"ViewScanBackfaces", "ViewScanColours", "ViewRefBackfaces", "ViewLabels", "ViewColourPlot"}
 _OWNER = {k["command"]: wid for wid in W.TOOLBARS for k in W.keys(wid)}
 
 
@@ -796,9 +868,8 @@ def build():
             out[m["command"]] = ViewCommand(m)
         if g["menu"]:
             out[group_name(g)] = ViewGroupCommand(g)
-    out.update({"ScanRuler_New": NewCommand(), "ScanRuler_Save": SaveCommand(), "ScanRuler_Load": LoadCommand(),
-                "ScanRuler_OpenScan": OpenScanCommand(), "ScanRuler_Settings": SettingsCommand(), "ScanRuler_Snapshot": SnapshotCommand(),
-                "ScanRuler_About": AboutCommand()})
+    out.update({"ScanRuler_ImportProject": ImportProjectCommand(), "ScanRuler_OpenScan": OpenScanCommand(),
+                "ScanRuler_Snapshot": SnapshotCommand(), "ScanRuler_About": AboutCommand()})
     return out
 
 
