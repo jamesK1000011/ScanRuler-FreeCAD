@@ -122,8 +122,10 @@ NARROW = 320
 FIELD_NARROW = 400
 LONG_CHECK = 28
 # Dense, so a whole section fits without scrolling beside the tree: the
-# space between rows and groups, a page's margins, a group's inner margins.
-SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 4, 6, 4)
+# space between rows and groups, a page's margins, a group's inner margins
+# (left, top, right, bottom: the header as far from the card's top edge as
+# the rows are from its sides).
+SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 6, 6, 4)
 
 
 PAGE = "ScanRulerPage"
