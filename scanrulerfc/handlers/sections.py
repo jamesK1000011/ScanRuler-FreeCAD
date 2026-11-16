@@ -10,6 +10,7 @@
 # polylines on the section's sheet, fitted into lines and arcs, and written
 # as a sketch a PartDesign pad can stand on.
 
+import json
 import math
 
 import numpy as np
@@ -20,6 +21,14 @@ from ..chainsegment import arcs_of_chain, place_segments, profile_curves, segmen
 from ..errors import ToolError
 from ..geom2d import FitError
 from . import _bind
+
+
+def pad_next(body, sketch):
+    """section_to_sketch's next step with the labels as they came out. A
+    new Body takes FreeCAD's next free label ("Body002" where the document
+    already has objects named Body and Body001), so "Body" is a guess: found
+    live, where pd_pad { body: "Body" } after it was refused."""
+    return f"pd_pad {{ body: {json.dumps(body, ensure_ascii=False)}, sketch: {json.dumps(sketch, ensure_ascii=False)}, length }} stands it up."
 
 GET_LIMIT = 4000
 FIT_MAX_CHAINS = 12
@@ -464,7 +473,10 @@ def bind(session):
                 if o.TypeId == "PartDesign::Body" and (o.Label == a["body"] or o.Name == a["body"]):
                     body = o
             if body is None:
-                raise ToolError("not_found", f"There is no body {a['body']!r} in the document.")
+                have = [o.Label for o in doc.Objects if o.TypeId == "PartDesign::Body"]
+                raise ToolError("not_found", f"There is no PartDesign Body {a['body']!r} in the document — "
+                                + (f"the bodies are {', '.join(have)}" if have else "it has none")
+                                + ": name one of them, or leave body out and a new Body is made (the answer's body names it).")
         else:
             body = doc.addObject("PartDesign::Body", "Body")
         sk = body.newObject("Sketcher::SketchObject", "Sketch")
@@ -517,7 +529,10 @@ def bind(session):
             wires = [{"closed": w.isClosed(), "edges": len(w.Edges)} for w in sk.Shape.Wires]
         except Exception:
             pass
-        return {"sketch": sk.Label, "body": body.Label, "section": sec["id"], "frame": {"origin": v4(f["origin"]), "xAxis": v4(f["basisU"]), "yAxis": v4(f["basisV"]), "normal": v4(f["normal"])}, "fitted": fitted, "wires": wires, "next": "pd_pad { body, sketch, length } stands it up.", **said}
+        return {"sketch": sk.Label, "body": body.Label, "section": sec["id"], "frame": {"origin": v4(f["origin"]), "xAxis": v4(f["basisU"]), "yAxis": v4(f["basisV"]), "normal": v4(f["normal"])}, "fitted": fitted, "wires": wires,
+                # The labels as they came out: a new Body takes FreeCAD's next free label
+                # ("Body002" where two objects are named Body already), not "Body".
+                "next": pad_next(body.Label, sk.Label), **said}
 
     return {
         "section_cut": section_cut,

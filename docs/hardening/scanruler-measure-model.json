@@ -128,10 +128,11 @@
   "simulated": "Every number above was also read by running the add-on's own handlers in plain Python on a mesh of the same part built with numpy (boundary-vertex triangulation, then the add-on's densify). FreeCAD's mesher will place vertices differently: counts and areas marked 'about' move by a few per cent, the dimensions do not. The FreeCAD-only steps (meshing, scan_open { object }, the shadow, section_to_sketch, element_to_document, deviation_open_reference { body }, pack_write, manual_check, manual_render) were not run anywhere."
  },
  "conventions": {
-  "chunks": "Run in order, in chunks of 20; the comments in the patch notes mark seven natural chunks but any cut works — calls name elements, sections and bodies by the names they were given, never by an earlier answer's id.",
+  "chunks": "Run in order, in chunks of 20; the comments in the patch notes mark seven natural chunks but any cut works — calls name elements, sections and bodies by the names they were given, never by an earlier answer's id (one exception: <BODY>).",
   "<JOB>": "Only when a heavy read (scan_qa, scan_segment, scan_heightmap, section_fit, deviation_align, deviation_measure, deviation_set_target, deviation_hotspots, deviation_volume, deviation_export, thickness_measure, manual_check, manual_render) answers with status running instead of its result: the answer's job field fills <JOB> in job_status { job: \"<JOB>\", wait: 25 }. Inside a batch heavy reads run inline and no job id comes.",
   "frame": "All coordinates are the CAD frame of the block until the align_ calls of chunk 6; each of those says the box it should leave.",
   "builderCalls": "doc_new, part_primitive, part_boolean, part_transform, meshobj_from_shape, mesh_densify, mesh_use_edited and pd_pad belong to other families (arguments read from their schemas, not hardened here): if one answers differently, any way of getting a body Block, a body Worn and a mesh object labelled WornScan serves.",
+  "<BODY>": "section_to_sketch's answer field body (call 58) fills <BODY> in the pd_pad after it (call 59): a new Body takes FreeCAD's next free label (Body002 on the Mac), never a fixed one. The one call here that needs an earlier answer; to avoid it, make the Body first with pd_body_new { name } and give it to section_to_sketch as body.",
   "refusals": "A call whose expect starts REFUSED is meant to be refused: check the code and that the message says what to do next.",
   "files": "Relative paths go in the session's output folder."
  },
@@ -287,12 +288,12 @@
    "arguments": {
     "maxEdge": 1
    },
-   "expect": "edit densify: about 137,000 triangles, none with an edge over 1 mm; mesh.open 0; volume unchanged (about 45640)"
+   "expect": "edit densify: 130,000 to 230,000 triangles (137,000 on the numpy-built mesh, 219,600 from FreeCAD 1.1.3's mesher on the Mac), none with an edge over 1 mm; mesh.open 0; volume unchanged (about 45640)"
   },
   {
    "tool": "mesh_use_edited",
    "arguments": {},
-   "expect": "the edited mesh becomes the scan: triangles about 137,000"
+   "expect": "the edited mesh becomes the scan: triangles as mesh_densify answered"
   },
   {
    "tool": "scan_qa",
@@ -330,7 +331,7 @@
     "fields": "count",
     "mark": true
    },
-   "expect": "matched about 15,900 (returned thinned, step > 1); bounds z 20 to 20; meanNormal about [0, 0, 1]; marked.points equals matched"
+   "expect": "matched 15,000 to 24,000, every vertex of the top face (returned thinned, step > 1); bounds z 20 to 20; meanNormal about [0, 0, 1]; marked.points equals matched"
   },
   {
    "tool": "element_fit_marked",
@@ -464,7 +465,7 @@
     "method": "plane-symmetry",
     "name": "Mirror"
    },
-   "expect": "plane with normal [0, ±1, 0] through y 20 (the part's only mirror plane); symmetry.rms about 0, matched equals sampled (4000)"
+   "expect": "plane with normal [0, ±1, 0] through y 20, the part's only exact mirror plane, symmetry.rms about 0, matched equals sampled (4000) and no note — the numpy-built mesh answers this. On the Mac (FreeCAD's mesher) it answered the mid-height plane z 10 instead, rms 0 with 3,968 of 4,000 matched: the block mirrors there but for the pocket. Either is accepted by the tool's rule; with matched under sampled the answer now carries symmetry.note saying it is not a mirror of the whole part. To get the exact plane whatever the mesh, run it again with seed \"XZ\""
   },
   {
    "tool": "dimension_add",
@@ -725,16 +726,16 @@
     "section": "Mid",
     "name": "MidProfile"
    },
-   "expect": "a new Body with sketch MidProfile: fitted chain 0 { lines 4 }, chain 1 { circles 1 }; wires: 2, both closed; frame.origin [0, 0, 10], normal [0, 0, 1]; health ok (an under-constrained sketch is expected, not an error)"
+   "expect": "a new Body (body: its label, FreeCAD's next free one — \"Body002\" on the Mac — which fills <BODY>) with sketch MidProfile: fitted chain 0 { lines 4 }, chain 1 { circles 1 }; wires: 2, both closed; frame.origin [0, 0, 10], normal [0, 0, 1]; next is the pd_pad call with both labels; health ok (an under-constrained sketch is expected, not an error)"
   },
   {
    "tool": "pd_pad",
    "arguments": {
-    "body": "Body",
+    "body": "<BODY>",
     "sketch": "MidProfile",
     "length": 5
    },
-   "expect": "a pad: volume about 11434 (5 × (2400 − π·6²)); proves the sketch is a usable profile. Body is the label section_to_sketch answered: use that if it differs."
+   "expect": "a pad: volume about 11434 (5 × (2400 − π·6²)); proves the sketch is a usable profile. <BODY> is the body label section_to_sketch answered"
   },
   {
    "tool": "element_to_document",

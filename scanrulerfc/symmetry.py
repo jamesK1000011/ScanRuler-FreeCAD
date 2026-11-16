@@ -230,7 +230,33 @@ def find_symmetry(scan, vertices=None, seed=None):
         raise Refusal("failed", str(e))
     if not accepted(r):
         r["note"] = f"A loose match: the mirror image stands {r['rms']:.3f} mm off the scan (RMS) over {r['matched']} of {r['sampled']} samples — the part is not symmetric about this plane to within {SYMMETRY_MAX_RMS_MM} mm."
+    else:
+        note = partial_note(r)
+        if note:
+            r["note"] = note
     return r
+
+
+# The share of samples without a mirror image from which an accepted plane
+# is said to be a mirror of most of the part, not of all of it.
+PARTIAL_MIN_SHARE = 0.002
+
+
+def partial_note(r):
+    """A sentence for an accepted plane that is not a mirror of the whole
+    part, else None. The RMS is of the matched samples only, so a plane
+    with a feature on one side alone answers rms 0 like an exact one (found
+    on a block with a pocket in its top only: its mid-height plane, rms 0,
+    3,968 of 4,000 matched, taken before the part's one true mirror plane).
+    The counts were in the answer; what they mean was not."""
+    sampled, matched = int(r.get("sampled") or 0), int(r.get("matched") or 0)
+    missing = sampled - matched
+    if sampled <= 0 or missing <= 0 or missing / sampled < PARTIAL_MIN_SHARE:
+        return None
+    return (f"Not a mirror of the whole part: {missing} of {sampled} samples ({100.0 * missing / sampled:.1f} %) have no mirror image in the scan, and "
+            f"the RMS is of the other {matched} only — a feature on one side of this plane alone (a pocket, a boss, wear), or a scan too sparse "
+            "there. If the part should have an exact mirror plane, give the search where to start: seed \"XY\", \"XZ\" or \"YZ\", or a plane element, "
+            "and compare matched.")
 
 
 def pose_on_symmetry(axes, origin, plane):

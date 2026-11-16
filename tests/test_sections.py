@@ -79,6 +79,14 @@ class Shadow(unittest.TestCase):
         self.assertEqual(SH.shadow_loops(V, F, side, 0.1)[0], [])
 
 
+class Next(unittest.TestCase):
+    def test_the_pad_call_names_the_labels_that_came_out(self):
+        from scanrulerfc.handlers import sections as H
+
+        self.assertEqual(H.pad_next("Body002", "MidProfile"), 'pd_pad { body: "Body002", sketch: "MidProfile", length } stands it up.')
+        self.assertIn('"Gehäuse"', H.pad_next("Gehäuse", "Mid sketch"))
+
+
 class Slice(unittest.TestCase):
     """ScanRuler's tests/section.test.ts, sliceMesh."""
 
@@ -251,6 +259,9 @@ class Tools(unittest.TestCase):
         self.assertEqual([p["kind"] for p in pieces], ["line"] * 4)
         self.assertEqual(sorted(round(p["length"]) for p in pieces), [20, 20, 40, 40])
         sk = self.ok("section_to_sketch", {"section": sec["id"], "name": "Profile"})
+        # The next step names the Body and sketch as they came out (found
+        # live: a new Body was "Body002", and pd_pad { body: "Body" } refused).
+        self.assertEqual(sk["next"], f'pd_pad {{ body: "{sk["body"]}", sketch: "Profile", length }} stands it up.')
         self.assertEqual(sk["wires"], [{"closed": True, "edges": 4}])
         self.ok("pd_pad", {"body": sk["body"], "sketch": sk["sketch"], "length": 10})
         body = next(o for o in self.session.doc.Objects if o.Label == sk["body"])
