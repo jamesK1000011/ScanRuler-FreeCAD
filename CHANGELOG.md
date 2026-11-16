@@ -24,6 +24,10 @@ Addon Manager.
   bodies drop their link back to the container on open, so it recomputes
   clean without a save. The pick hints end with a full stop, and "Unsaved
   changes" has its own line in the header.
+- On a Retina Mac a click the navigation swallowed is put at the right
+  place in the 3D view (Qt's logical points scaled to Coin's device pixels
+  on both axes). A refused Split view press says why once and no longer
+  presses itself again through its action's signal (a RecursionError).
 - Surface Deviation's Split view, ported from ScanRuler by Stefan Hermann (CNC
   Kitchen): the key opens a two-pane 3D viewer with the scan on the left,
   coloured by its deviation map while Colour plot is on, and the reference on

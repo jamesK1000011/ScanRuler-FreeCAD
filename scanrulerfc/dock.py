@@ -329,34 +329,46 @@ def split_wrong_workspace(workspace):
     """Why the Split view does not open in this workspace, or None."""
     if workspace is None or workspace == SPLIT_WORKSPACE:
         return None
-    return (f"it compares the scan with the reference in {W.workspace(SPLIT_WORKSPACE)['label']}: "
-            f"switch to that workspace (the panel is on {W.workspace(workspace)['label']}), open a reference, then press it again.")
+    return f"Split view needs a scan and a reference in {W.workspace(SPLIT_WORKSPACE)['label']}."
+
+
+# Set while the Split view key is handled: a press that comes back from
+# inside it (the key let up through its action's signal) is dropped.
+_split_busy = {"on": False}
 
 
 def split_view_key(key, on, session_fn, workspace=None):
     """The Split view key (and Colour plot, which recolours an open split
     view): the split viewer opened, closed or refreshed. What went wrong, or
-    None. A key that could not open it is let up again."""
+    None. A key that could not open it is let up again, once, and the
+    reason said once per press."""
     from . import split_view
 
     colour_plot = lambda: C._state["view"].get("ViewColourPlot", True)  # noqa: E731
     if key == "ViewColourPlot":
         sv = split_view._live["split"]
         return sv.show() if sv is not None and sv.open else None
+    if _split_busy["on"]:
+        return None
+
     def let_up():
         C._state["view"]["ViewSplit"] = False
         try:
-            for a in C._actions("ScanRuler_ViewSplit"):
-                a.setChecked(False)
+            C.set_checked("ScanRuler_ViewSplit", False)
         except Exception:  # noqa: BLE001 — no window: the state is enough
             pass
 
-    why = split_wrong_workspace(workspace) if on else None
-    why = why or split_view.toggle(on, session_fn, colour_plot)
-    if why:
-        C._say(f"ScanRuler: Split view: {why}")  # the Report view, where a cmd_run's caller looks
-    if why and on:
-        let_up()
+    _split_busy["on"] = True
+    try:
+        why = split_wrong_workspace(workspace) if on else None
+        why = why or split_view.toggle(on, session_fn, colour_plot)
+        if why:
+            # The Report view, where a cmd_run's caller looks.
+            C._say(f"ScanRuler: {why}" if why.startswith("Split view") else f"ScanRuler: Split view: {why}")
+        if why and on:
+            let_up()
+    finally:
+        _split_busy["on"] = False
     if split_view._live["split"] is not None:
         split_view._live["split"].on_closed = let_up  # its tab closed: the next press opens it
     return why
