@@ -9,6 +9,28 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- The ScanRuler panel lets the theme paint it: under Studio Light and
+  FreeCAD Light the page and cards stayed near-black, because those themes
+  restyle by stylesheet while the Mac's QPalette stays dark, so any colour
+  read from the palette was the dark one. The panel's sheet
+  (scanrulerfc/theme.py) now sets no page background and no text colour:
+  the page is see-through over the theme's own painting (inner scroll areas
+  and the page stack transparent), labels and keys take the theme's text and
+  QPushButton style. Section cards are a translucent overlay with a
+  translucent mid-grey border (rgba(127,127,127,…)) that reads as a card on
+  light and dark alike. Light or dark is detected from what the theme
+  actually renders behind the panel (the nearest ancestor that paints an
+  opaque pixel of its own, QWidget.render without children), else from a
+  Dark/Light stylesheet name, else left unknown (the neutral overlay); the
+  palette is never used for it. Dark themes look as before: the card 6%
+  toward white, CNC Kitchen blue (#1877c0, Stefan Hermann's ScanRuler
+  accent) filling primary keys with white text, links lightened as far as
+  they need. Light and unknown: a blue outline on the theme's own primary
+  key, links in #1877c0 (darkened on a known light card only as far as
+  4.5:1 needs). Disabled keys and labels keep a translucent grey text and
+  border, plainly dimmer than an enabled key on both. The snapshot card's
+  credit is the theme's text faded (an opacity effect), no longer
+  palette(mid).
 - The ScanRuler panel follows FreeCAD Light and Studio Light: it no longer
   stays a near-black slab with grey key text that read as disabled. Its
   sheet held `palette(window)` and `palette(window-text)`, which Qt

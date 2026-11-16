@@ -277,7 +277,15 @@ def _classes():
                     self.copy_button = b
             lay.addLayout(row)
             credit = QtW.QLabel(CREDIT)
-            credit.setStyleSheet("color: palette(mid); font-size: 10px")
+            # The theme's text, faded (theme.mute): palette(mid) resolved
+            # against the app's palette, not a stylesheet theme's.
+            credit.setStyleSheet("font-size: 10px")
+            from .. import theme
+
+            try:
+                theme.mute(credit)
+            except Exception:  # noqa: BLE001 — a Qt without graphics effects
+                pass
             lay.addWidget(credit)
 
         def _keep_note(self):

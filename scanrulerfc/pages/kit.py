@@ -129,15 +129,17 @@ SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 4, 6, 4)
 PAGE = "ScanRulerPage"
 
 
-def page_qss(palette):
-    """The ScanRuler panel's stylesheet for a palette ({role: '#rrggbb'},
-    theme.ROLES): concrete colours worked out by theme.colours, so it
-    follows FreeCAD's theme (it stayed a near-black slab with grey key text
-    in FreeCAD Light and Studio Light); CNC Kitchen blue only on primary
-    keys and links. The dock sets and refreshes it through theme.follow."""
+def page_qss(seen=None):
+    """The ScanRuler panel's stylesheet for what was seen of the theme
+    ({dark: True/False/None, window: '#rrggbb' or None}, theme.detect): no
+    page background and no text colour, so FreeCAD's theme stylesheet paints
+    the page, labels and keys (a palette read stayed near-black under
+    FreeCAD Light and Studio Light on the Mac); translucent cards; CNC
+    Kitchen blue only on primary keys and links. The dock sets and refreshes
+    it through theme.follow."""
     from .. import theme
 
-    return theme.sheet(PAGE, theme.colours(palette, {}))
+    return theme.sheet(PAGE, theme.colours(seen, {}))
 
 
 def head_row(s):

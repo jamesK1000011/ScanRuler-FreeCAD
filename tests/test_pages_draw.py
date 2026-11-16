@@ -139,20 +139,25 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(kit.head_row({}), [])
 
     def test_page_follows_the_theme(self):
-        """The sheet carries concrete colours worked out from the palette
-        (never palette(...), which Qt resolves against the app's palette:
-        the panel stayed near-black in FreeCAD Light on the Mac); the only
-        fixed colour is CNC Kitchen blue, on primary keys and links."""
+        """The theme's stylesheet paints the page, text and keys: the sheet
+        sets no page background and no palette(...) (Qt resolves those
+        against the app's palette: the panel stayed near-black in FreeCAD
+        Light on the Mac); CNC Kitchen blue only on primary keys and links."""
+        import re
+
         from scanrulerfc import workspaces as W
         from scanrulerfc.pages import kit
 
-        q = kit.page_qss({"window": "#efefef", "window_text": "#000000", "button": "#f5f5f5", "button_text": "#000000",
-                          "highlight": "#3d7fd6"})
-        self.assertNotIn("palette(", q)
-        for line in q.splitlines():
-            if W.ACCENT in line:
-                self.assertIn("primary", line)
-        self.assertIn('QPushButton[primary="true"]:disabled', q)
+        for seen in (None, {"dark": False, "window": "#efefef"}, {"dark": True, "window": "#2b2b2b"}):
+            q = kit.page_qss(seen)
+            self.assertNotIn("palette(", q)
+            self.assertNotIn(f"#{kit.PAGE} {{", q)  # no rule on the page itself
+            for line in q.splitlines():
+                if W.ACCENT in line:
+                    self.assertTrue(any(k in line for k in ("primary", " a ", ":hover", ":checked")), line)
+                for bg in re.findall(r"background: (#[0-9a-fA-F]{6})", line):
+                    self.assertIn("primary", line)
+            self.assertIn('QPushButton:disabled', q)
 
     def test_labels_wrap(self):
         mods = fake_pyside()

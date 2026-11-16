@@ -198,8 +198,9 @@ class Dock:
         lay = QtWidgets.QVBoxLayout(self.widget)
         from .pages import kit
 
-        # Surfaces and text from FreeCAD's theme, restyled when the theme
-        # changes (theme.follow); CNC Kitchen blue as the accent.
+        # FreeCAD's theme paints the page, text and keys; translucent cards,
+        # restyled when the theme changes (theme.follow); CNC Kitchen blue
+        # as the accent.
         from . import theme
 
         self.widget.setObjectName(kit.PAGE)
