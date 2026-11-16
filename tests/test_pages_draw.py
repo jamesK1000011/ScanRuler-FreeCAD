@@ -162,9 +162,8 @@ class FitsTheWidth(unittest.TestCase):
     def test_card_header_sits_at_the_top_edge(self):
         """Every section card's layout (stand-in Qt) has its top contents
         margin equal to its side margins, and the panel's sheet gives the
-        card no margin or padding of its own on any theme, so the theme's
-        QGroupBox padding-top cannot open a band above the caps header
-        (12-16 px on the Mac in FreeCAD Dark and Studio Light after 2b849dd)."""
+        card no margin or padding of its own on any theme (a band of about
+        20 px opened above the caps header on the Mac after 2b849dd)."""
         import re
 
         from scanrulerfc.pages import kit
@@ -173,10 +172,10 @@ class FitsTheWidth(unittest.TestCase):
         qw = mods["PySide.QtWidgets"]
         cards = []
 
-        def group_box(*a, **k):
-            g = mock.MagicMock(name="QGroupBox")
-            cards.append(g)
-            return g
+        def frame(*a, **k):
+            f = mock.MagicMock(name="QFrame")
+            cards.append(f)
+            return f
 
         def vbox(*a, **k):
             lay = mock.MagicMock(name="QVBoxLayout")
@@ -185,7 +184,7 @@ class FitsTheWidth(unittest.TestCase):
             return lay
 
         vbox.made = []
-        qw.QGroupBox.side_effect = group_box
+        qw.QFrame.side_effect = frame
         qw.QVBoxLayout.side_effect = vbox
         with mock.patch.dict(sys.modules, mods):
             for name in PAGES:
@@ -193,16 +192,21 @@ class FitsTheWidth(unittest.TestCase):
                 for st in states():
                     page.widget(page.build(st), on_key=lambda *a: None)
         self.assertTrue(cards)
-        card_layouts = [l for l in vbox.made if any(l.owner_ is g for g in cards)]
+        card_layouts = [l for l in vbox.made if any(l.owner_ is f for f in cards)]
         self.assertEqual(len(card_layouts), len(cards))
         for lay in card_layouts:
-            left, top, right, _bottom = lay.setContentsMargins.call_args.args
+            left, top, right, bottom = lay.setContentsMargins.call_args.args
             self.assertEqual(top, left)
             self.assertEqual(top, right)
+        # No taller than the cards were before 2b849dd (6, 4, 6, 4): the
+        # panel showed a scroll bar at the same dock width when they grew.
+        self.assertLessEqual(kit.GROUP_MARGINS[1] + kit.GROUP_MARGINS[3], 4 + 4)
+        for f in cards:
+            f.setProperty.assert_any_call(kit.CARD, True)
 
         for seen in (None, {"dark": False, "window": "#f6f7f9"}, {"dark": True, "window": "#2b2b2b"}):
             q = kit.page_qss(seen)
-            body = re.search(r"#%s QGroupBox \{([^}]*)\}" % kit.PAGE, q).group(1)
+            body = re.search(r'#%s QFrame\[%s="true"\] \{([^}]*)\}' % (kit.PAGE, kit.CARD), q).group(1)
             props = dict((a.strip(), b.strip()) for a, b in (d.split(":", 1) for d in body.split(";") if ":" in d))
             self.assertEqual(props.get("padding"), "0px", seen)
             self.assertEqual(props.get("margin"), "0px", seen)
@@ -210,6 +214,24 @@ class FitsTheWidth(unittest.TestCase):
             # The translucent card and border stay.
             self.assertTrue(props["background"].startswith("rgba("), props)
             self.assertIn("rgba(127, 127, 127, 0.35)", props["border"])
+
+    def test_cards_are_not_group_boxes(self):
+        """A QGroupBox reserves a title band under FreeCAD's theme sheets
+        even untitled (margin-top / padding-top and ::title): the panel's
+        sections are plain QFrames, and its sheet styles no QGroupBox."""
+        from scanrulerfc.pages import kit
+
+        mods = fake_pyside()
+        qw = mods["PySide.QtWidgets"]
+        with mock.patch.dict(sys.modules, mods):
+            for name in PAGES:
+                page = importlib.import_module("scanrulerfc.pages." + name)
+                for st in states():
+                    page.widget(page.build(st), on_key=lambda *a: None)
+        qw.QGroupBox.assert_not_called()
+        self.assertTrue(qw.QFrame.called)
+        for seen in (None, {"dark": False, "window": "#efefef"}, {"dark": True, "window": "#2b2b2b"}):
+            self.assertNotIn("QGroupBox", kit.page_qss(seen))
 
     def test_labels_wrap(self):
         mods = fake_pyside()
