@@ -266,7 +266,8 @@ def _picks(store, body, given, what):
                 topo = store.builder.topology(b, 1)
             row = topo[what]
             if not 0 <= p < len(row):
-                _invalid(f"{what}: there is no {what[:-1]} {p} on body {body} as it is built now — reverse_body_describe {{ body: {body} }} lists {f"{len(row)}, numbered 0 to {len(row) - 1}" if row else "none"}. The numbers change with every build: read them again after each change.")
+                _has = f"{len(row)}, numbered 0 to {len(row) - 1}" if row else "none"  # (apart: FreeCAD's Python 3.11 takes no quote of its own kind inside an f-string)
+                _invalid(f"{what}: there is no {what[:-1]} {p} on body {body} as it is built now — reverse_body_describe {{ body: {body} }} lists {_has}. The numbers change with every build: read them again after each change.")
             out.append({"fingerprint": row[p]["fingerprint"]})
         elif isinstance(p, dict):
             out.append({"fingerprint": p.get("fingerprint", p)})
