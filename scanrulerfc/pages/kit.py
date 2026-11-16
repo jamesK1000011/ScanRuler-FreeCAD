@@ -262,7 +262,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             elif part == "stretch":
                 row.addStretch(1 if "title" not in parts else 0)
             elif part == "count":
-                row.addWidget(QtWidgets.QLabel(str(s["count"])))
+                row.addWidget(label(str(s["count"])))
             else:
                 row.addWidget(info_button(s["info"], s["info_text"]))
         box.addLayout(row)
@@ -297,7 +297,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             if k == "select":
                 w = QtWidgets.QComboBox()
                 w.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
-                w.setMinimumContentsLength(6)
+                w.setMinimumContentsLength(8)
                 vals = [o["value"] for o in fd["options"]]
                 for o in fd["options"]:
                     w.addItem(o["label"], o["value"])

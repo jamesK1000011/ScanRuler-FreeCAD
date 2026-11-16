@@ -13,6 +13,12 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- The ScanRuler panel fits 354 px again with a scan open: its scroll
+  areas, header and credit ask for no width of their own (a scroll area's
+  size hint is its page's, about 640 px on the Mac, and set the dock's
+  width), lists shrink to eight letters and every label wraps. The
+  "ScanRuler state" object is off the model tree (ShowInTree, set on each
+  write), so it is not deleted by accident.
 - What FreeCAD already owns is FreeCAD's. ScanRuler's state (the scan
   and its alignment, elements, dimensions, sections, the workspaces'
   results) is kept in the FreeCAD document, in a hidden "ScanRuler state"
