@@ -43,7 +43,8 @@ def shape_of(el, style):
         return Part.makeCircle(r, c, V(*map(float, f["normal"])))
     if k == "plane":
         n = np.asarray(f["normal"], float)
-        u = np.asarray(f.get("basisU") or np.cross(n, [1, 0, 0] if abs(n[0]) < 0.9 else [0, 1, 0]), float)
+        bu = f.get("basisU")  # may be an array: "or" on one raised "truth value of an array … is ambiguous"
+        u = np.asarray(bu if bu is not None and len(bu) == 3 else np.cross(n, [1, 0, 0] if abs(n[0]) < 0.9 else [0, 1, 0]), float)
         u /= np.linalg.norm(u)
         v = np.cross(n, u)
         eu, ev = max(float(f.get("extentU", 10)), 1e-6), max(float(f.get("extentV", 10)), 1e-6)
