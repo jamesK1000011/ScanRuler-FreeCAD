@@ -281,6 +281,7 @@ scanrulerfc/scanstate.py
 scanrulerfc/schema.py
 scanrulerfc/section_core.py
 scanrulerfc/segment.py
+scanrulerfc/segment_sparse.py
 scanrulerfc/settings.py
 scanrulerfc/shadow_core.py
 scanrulerfc/shapes.py
@@ -356,6 +357,7 @@ tests/test_qa.py
 tests/test_redteam_boundary.py
 tests/test_redteam_deviation.py
 tests/test_redteam_fits.py
+tests/test_release.py
 tests/test_repeat.py
 tests/test_reverse_autoconstrain.py
 tests/test_reverse_build.py
@@ -397,6 +399,8 @@ tests/test_reverse_where.py
 tests/test_reverse_wiring.py
 tests/test_scan.py
 tests/test_sections.py
+tests/test_segment_sparse.py
+tests/test_shared.py
 tests/test_snapshot.py
 tests/test_split_view.py
 tests/test_theme.py

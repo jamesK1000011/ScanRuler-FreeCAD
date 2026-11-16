@@ -9,6 +9,53 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+## 0.5.0 — 2026-11-16
+
+- scan_segment finds the faces of a sparse, CAD-style mesh. ScanRuler's
+  vertex growing (kept as it was, and still run first) needs a dense scan:
+  on a drum exported from CAD (572 triangles, 288 vertices, all on its two
+  rims) it found 0 regions, every vertex sitting on a crease with a normal
+  halfway between cap and side. When it finds nothing and half or more of
+  the vertices sit on creases, the triangles are grouped instead
+  (scanrulerfc/segment_sparse.py, written for this port): triangles in one
+  plane make a plane, a smooth strip of faces square to one axis whose
+  corners lie on a cylinder within maxRms makes a cylinder (`kind:
+  "cylinder"` with axis, point, radius, length and `bore`). The drum now
+  reads as one cylinder (r 20, sigma 0) and two caps meeting it at 90°.
+  The answer says which ran (`method`: vertices or faces) and `why`;
+  `method: "faces"` or `"vertices"` asks for one. Dense scans segment
+  exactly as before.
+- Reverse engineer's Fillet and Chamfer: a click on or just beside an edge
+  takes the edge, though the view's pick found the face beside it: the
+  edge nearest the click is taken within 8 pixels at the view's zoom
+  (never under 2 mm), where it was 2 mm at any zoom. A miss now says how
+  far it looked. (A live run's clicks on a box's top edges landed on the
+  top face beside them and were not taken.)
+- thickness_measure is about 15× faster on big scans: rays are cast in
+  runs of 256 with origins close together, each run against only the
+  triangle leaves its segments can reach, in place of ordering every leaf
+  for every ray (a 124,000-triangle shell: 40 s → 2.4 s here, readings
+  identical). A scan of more than `maxPoints` vertices (300,000 by
+  default; 0 for all) is measured at that many, spread evenly, the others
+  taking the thinnest reading among their neighbours; the answer's
+  `thickness.sampled` and the report say how many were measured, and the
+  statistics are over those.
+- thickness_measure, deviation_measure, deviation_set_target,
+  deviation_volume and scan_segment are declared heavy in tools.json
+  (Agent Link's mechanism for add-on tools): Agent Link runs them as jobs,
+  answering in line when they finish within its wait, and gives them a
+  heavy job's deadline instead of a client's 80 s.
+- layout.py in step with Agent Link's again (the panel's dock back to its
+  start width once when it comes back too wide), and a test that fails
+  when this copy of Agent Link's shared helpers differs from Agent Link's
+  (tests/test_shared.py, skipped when Agent Link is not checked out beside
+  this repository).
+- A release test: package.xml, `scanrulerfc.VERSION` and the changelog's
+  newest version agree, package.xml is dated, the changelog has an
+  Unreleased section, the README's install links and the credit to Stefan
+  Hermann (CNC Kitchen) are there.
+- README: the by-hand install from a release or main as a zip.
+
 - Boolean (mesh_boolean) and Trim to scan now cut with meshbool, a boolean
   written for this add-on in numpy alone, in place of FreeCAD's Mesh
   booleans. On a 140,698-triangle scan minus a 5,212-triangle cutter
