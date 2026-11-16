@@ -44,6 +44,23 @@ GHOST_REST_S = 0.25
 TICK_MS = 50
 RING_SEGMENTS = 64
 GRIP_LIT = "#ffb000"
+# The grips' own look: a white fill (the original's handle colour when
+# nothing else is given) inside a near-black rim (bodyPicks.ts' EDGE_COLOR),
+# so a grip reads on the ghost and on a body of any colour; lit amber on
+# hover and while held. The rim is drawn under the fill, a little wider, so
+# a grip keeps its size.
+GRIP_FILL = "#ffffff"
+GRIP_OUTLINE = "#0c0f13"
+GRIP_LINE_PX = 3
+GRIP_OUTLINE_PX = 2  # each side of the fill's line
+# The cone's rim: the outline cone this much bigger than the head.
+GRIP_CONE_RIM = 1.35
+# A picked edge (a fillet's, a chamfer's): lit along its whole run in the
+# original's pick colour (bodyPicks.ts PICKED_COLOR) over a dark rim, above
+# the body. Not CNC Kitchen blue: that is also the first bodies' colour.
+PICKED_COLOR = "#3cb371"
+PICKED_LINE_PX = 4
+PICKED_OUTLINE_PX = 2
 # The ghost: see-through for a tool body, solid for a body as a feature on
 # it would leave it (reScene's opacity 0.45).
 GHOST_TRANSPARENCY = 0.55
@@ -277,6 +294,20 @@ def qt_to_coin(qx, qy, height, dpr):
     return qx * dpr, height - qy * dpr
 
 
+def selected_by(hits, doc, obj, sub):
+    """Whether a selected element (doc, object, sub-element name) is one a
+    click of the box hit: the same element on the object clicked or its
+    parent, by name or at the end of a dotted path."""
+    for h in hits:
+        el = h.get("element") or ""
+        if not el or (h.get("doc") and doc != h["doc"]):
+            continue
+        names = {h.get("object"), h.get("parent")} - {None}
+        if (obj in names or any(sub.startswith(f"{n}.") for n in names)) and (sub == el or sub.endswith("." + el)):
+            return True
+    return False
+
+
 def _report(text):
     try:
         import FreeCAD
@@ -377,9 +408,18 @@ class Overlay:
         self.root = coin.SoSeparator()
         self.root.setName("ScanRulerEditor")
         self.ghost_sep = coin.SoSeparator()
+        self.pick_sep = coin.SoAnnotation()
         self.grip_sep = coin.SoAnnotation()
         self.root.addChild(self.ghost_sep)
+        self.root.addChild(self.pick_sep)
         self.root.addChild(self.grip_sep)
+        self.picks_drawn = None
+        self.picked_lines = []
+        # FreeCAD's selection as it was at the press (the restore a click
+        # for the box puts back), and what the box's clicks hit, unselected
+        # again when the box closes.
+        self.pending_restore = None
+        self.touched = []
         self.stretch_node = None
         self.ghost_drawn = None
         self.ghost_base = None
@@ -477,6 +517,19 @@ class Overlay:
         if self.field is not None:
             self.field.remove()
             self.field = None
+        self.pending_restore = None
+        self.unselect_touched()
+
+    def unselect_touched(self):
+        """Create or Cancel (the box closing): whatever the box's own clicks
+        left in FreeCAD's selection taken out of it again."""
+        touched, self.touched = self.touched, []
+        fn = self.env.get("unselect")
+        if fn is not None and touched:
+            try:
+                fn(touched)
+            except Exception:  # noqa: BLE001 — a document gone: nothing left selected in it
+                pass
 
     def _field(self):
         if self.field is None and not self._field_tried and self.qt is not None:
@@ -506,6 +559,7 @@ class Overlay:
             self.shapes = [grip_shape(g, mmpp * self.dpr) for g in grips]
             self.draw_grips()
             self.place_field()
+        self.draw_picks()
         self.ghost_step(now, feats)
 
     def ghost_step(self, now, feats):
@@ -608,12 +662,38 @@ class Overlay:
             fn(self.hidden, True)
 
     def _color(self, s):
+        """A grip's fill: lit on hover and in the hand, its own colour where
+        it has one (an axis'), else white — never the ghost's colour, which
+        it would vanish on."""
         if s["side"] in (self.lit, self.held and self.held["side"]):
             return rgb(GRIP_LIT)
         if s.get("color"):
             return rgb(s["color"])
-        g = self.editor.ghost or {}
-        return rgb(g.get("color") or "#1877c0")
+        return rgb(GRIP_FILL)
+
+    def _stroke(self, sep, color, width, n, cone=None, rim=1.0):
+        """One pass of a grip or a picked edge: a colour, a line width, the
+        line through the coordinates above it, and the arrow's head."""
+        c = self.coin
+        col = c.SoBaseColor()
+        col.rgb.setValue(*color)
+        sep.addChild(col)
+        style = c.SoDrawStyle()
+        style.lineWidth.setValue(width)
+        sep.addChild(style)
+        line = c.SoLineSet()
+        line.numVertices.setValue(n)
+        sep.addChild(line)
+        if cone is not None:
+            base, d, length = cone
+            head = c.SoTransform()
+            head.translation.setValue(*add_scaled(base, d, length * 0.85))
+            head.rotation.setValue(c.SbRotation(c.SbVec3f(0, 1, 0), c.SbVec3f(*d)))
+            sep.addChild(head)
+            k = c.SoCone()
+            k.height.setValue(length * 0.3 * rim)
+            k.bottomRadius.setValue(length * 0.12 * rim)
+            sep.addChild(k)
 
     def draw_grips(self):
         c = self.coin
@@ -625,37 +705,73 @@ class Overlay:
         self.grip_sep.addChild(self._unpickable())
         for s in self.shapes:
             sep = c.SoSeparator()
-            col = c.SoBaseColor()
-            col.rgb.setValue(*self._color(s))
-            sep.addChild(col)
-            style = c.SoDrawStyle()
-            style.lineWidth.setValue(3)
-            sep.addChild(style)
             if s["shape"] == "ring":
                 pts = ring_points(s["centre"], s["axis"], s["radius"])
+                cone = None
             else:
                 shaft_end = add_scaled(s["base"], s["dir"], s["length"] * 0.7)
                 pts = [s["base"], shaft_end]
+                cone = (s["base"], s["dir"], s["length"])
             coords = c.SoCoordinate3()
             coords.point.setValues(0, len(pts), pts)
             sep.addChild(coords)
-            line = c.SoLineSet()
-            line.numVertices.setValue(len(pts))
-            sep.addChild(line)
-            if s["shape"] == "arrow":
-                head = c.SoTransform()
-                head.translation.setValue(*add_scaled(s["base"], s["dir"], s["length"] * 0.85))
-                head.rotation.setValue(c.SbRotation(c.SbVec3f(0, 1, 0), c.SbVec3f(*s["dir"])))
-                sep.addChild(head)
-                cone = c.SoCone()
-                cone.height.setValue(s["length"] * 0.3)
-                cone.bottomRadius.setValue(s["length"] * 0.12)
-                sep.addChild(cone)
+            # The dark rim first, wider, then the fill over it: drawn as an
+            # annotation, the later pass lies on top.
+            rim = c.SoSeparator()
+            rim.setName("GripOutline")
+            self._stroke(rim, rgb(GRIP_OUTLINE), GRIP_LINE_PX + 2 * GRIP_OUTLINE_PX, len(pts), cone, GRIP_CONE_RIM)
+            sep.addChild(rim)
+            fill = c.SoSeparator()
+            fill.setName("GripFill")
+            self._stroke(fill, self._color(s), GRIP_LINE_PX, len(pts), cone)
+            sep.addChild(fill)
             self.grip_sep.addChild(sep)
             try:
                 self.screen.append({"side": s["side"], "points": [project(self.view, q, self.vector) for q in (pts[::4] if s["shape"] == "ring" else [s["base"], s["tip"]])]})
             except Exception:  # noqa: BLE001 — a grip off the view cannot be taken
                 pass
+
+    def draw_picks(self):
+        """The box's picked edges lit along their run, above the body, from
+        the body's topology as built; drawn again only when the picks
+        change, and gone with the last pick let go or the box closed."""
+        from .reverse.picks import PICKS, picked_polylines
+
+        r = self.editor.record if self.editor.open else None
+        kind = (r or {}).get("kind")
+        fps = (r.get("edges") or []) if PICKS.get(kind) == "edges" else []
+        key = repr((r.get("body"), fps)) if fps else None
+        if key == self.picks_drawn:
+            return
+        self.picks_drawn = key
+        self.picked_lines = []
+        if fps:
+            store = self.env.get("store", lambda: None)()
+            try:
+                self.picked_lines = picked_polylines(store.builder if store is not None else None, r.get("body"), fps)
+            except Exception:  # noqa: BLE001 — a build gone: the box's line still counts them
+                self.picked_lines = []
+        c = self.coin
+        self.pick_sep.removeAllChildren()
+        if not self.picked_lines:
+            return
+        light = c.SoLightModel()
+        light.model.setValue(c.SoLightModel.BASE_COLOR)
+        self.pick_sep.addChild(light)
+        self.pick_sep.addChild(self._unpickable())
+        for pts in self.picked_lines:
+            sep = c.SoSeparator()
+            sep.setName("PickedEdge")
+            coords = c.SoCoordinate3()
+            coords.point.setValues(0, len(pts), pts)
+            sep.addChild(coords)
+            rim = c.SoSeparator()
+            self._stroke(rim, rgb(GRIP_OUTLINE), PICKED_LINE_PX + 2 * PICKED_OUTLINE_PX, len(pts))
+            sep.addChild(rim)
+            fill = c.SoSeparator()
+            self._stroke(fill, rgb(PICKED_COLOR), PICKED_LINE_PX, len(pts))
+            sep.addChild(fill)
+            self.pick_sep.addChild(sep)
 
     def place_field(self):
         ed = self.editor
@@ -700,6 +816,8 @@ class Overlay:
                     # Watched only: the navigation keeps the press, and a
                     # release close by is a click on the part.
                     self.pressed_at = (x, y)
+                    if self.qt_press is None:  # no Qt filter saw it first
+                        self._keep_selection()
             elif c.SoMouseButtonEvent.isButtonReleaseEvent(ev, c.SoMouseButtonEvent.BUTTON1):
                 self.release_seen = True
                 qt_click, self.qt_click = self.qt_click, False
@@ -730,6 +848,20 @@ class Overlay:
         self.qt_press = None if modified else (qx, qy)
         self.qt_click = False
         self.release_seen = False
+        if not modified:
+            self._keep_selection()
+
+    def _keep_selection(self):
+        """FreeCAD's selection read at the press, before FreeCAD's own
+        handling of it or of the release can select what is under the
+        cursor: the restore a click for the box puts back (231481b's
+        swallowed press and release read it too late, with the edge in)."""
+        self.pending_restore = None
+        if self.editor.open and self.editor.wants_clicks():
+            try:
+                self.pending_restore = self.env.get("keep_selection", lambda: None)()
+            except Exception:  # noqa: BLE001 — no GUI selection to read
+                self.pending_restore = None
 
     def qt_released(self, qx, qy):
         """A left release on the view's widget: a click when the press was
@@ -843,6 +975,14 @@ class Overlay:
         ed = self.editor
         if not ed.wants_clicks():
             return False
+        # The selection as it was at the press, put back once FreeCAD has
+        # handled the release, on every route here and whether or not the
+        # click changed the box; read now only where no press was seen.
+        restore, self.pending_restore = self.pending_restore, None
+        if restore is None:
+            restore = self.env.get("keep_selection", lambda: None)()
+        if restore is not None:
+            self.env.get("later", lambda fn: fn())(restore)
         warn = self.env.get("warn", _report)
         kind = (ed.record or {}).get("kind")
         picks = kind in PICKS
@@ -851,6 +991,9 @@ class Overlay:
             if picks:
                 warn(f"{kind} pick: nothing under the click at ({x:.0f}, {y:.0f}).")
             return False
+        t = {k: hit.get(k) for k in ("doc", "object", "element", "parent")}
+        if t not in self.touched:
+            self.touched.append(t)
         point = hit["point"]
         body = None
         if picks:
@@ -864,10 +1007,9 @@ class Overlay:
                 body = self.env.get("body_at", lambda d, p: None)(hit["doc"], point)
         store = self.env.get("store", lambda: None)()
         builder = store.builder if store is not None else None
-        restore = self.env.get("keep_selection", lambda: None)()
         changed = ed.click_part(point, body, builder, self.env.get("features", lambda: [])())
-        if restore is not None:
-            self.env.get("later", lambda fn: fn())(restore)
+        if changed and picks:
+            self.draw_picks()
         if picks and not changed:
             if body is None:
                 warn(f"{kind} pick: {hit['object']}.{hit['element'] or '?'} is not a Reverse engineer body.")
@@ -1012,13 +1154,24 @@ def _env():
 
         return restore
 
+    def unselect(hits):
+        """Each element a click of the box hit taken out of the selection,
+        on the object clicked or its parent (a body's edge selected through
+        the container: ScanRulerReverse.Edge7, or a path ending in it)."""
+        import FreeCADGui
+
+        for s in FreeCADGui.Selection.getSelectionEx("", 0):
+            for sub in list(s.SubElementNames):
+                if selected_by(hits, s.DocumentName, s.ObjectName, sub):
+                    FreeCADGui.Selection.removeSelection(s.DocumentName, s.ObjectName, sub)
+
     def later(fn):
         from PySide import QtCore
 
         QtCore.QTimer.singleShot(0, fn)  # after FreeCAD's own handling of the release
 
     return {"store": store, "features": lambda: part().get("features") or [], "bodies": bodies, "units": lambda: "mm", "scope": scope, "context": context,
-            "hide": hide, "body_of": body_of, "body_at": body_at, "snap": snap, "keep_selection": keep_selection, "later": later,
+            "hide": hide, "body_of": body_of, "body_at": body_at, "snap": snap, "keep_selection": keep_selection, "unselect": unselect, "later": later,
             "warn": _report}
 
 

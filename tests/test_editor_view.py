@@ -318,7 +318,8 @@ class OverlayInAView(unittest.TestCase):
         self.assertEqual(self.ed.ghost["status"], "ok")
         names = [type(n).__name__ for n in walk(self.ov.ghost_sep)]
         self.assertIn("SoIndexedFaceSet", names)
-        cones = [n for n in walk(self.ov.grip_sep) if type(n).__name__ == "SoCone"]
+        fills = [n for n in walk(self.ov.grip_sep) if getattr(n, "name", None) == "GripFill"]
+        cones = [n for f in fills for n in walk(f) if type(n).__name__ == "SoCone"]
         self.assertEqual(len(cones), 3)  # From, To and the taper
         self.ov.detach()
         self.assertEqual(self.view.graph.children, [])
@@ -391,6 +392,34 @@ class OverlayInAView(unittest.TestCase):
         self.assertEqual(self.ed.record["extent"], {"kind": "distance", "from": 0, "to": 30})
         self.assertEqual(self.restored, [True])  # FreeCAD's selection put back as it was
 
+    def test_grips_read_on_the_ghost_white_in_a_dark_rim_lit_amber(self):
+        self.ov.tick()
+        self.assertEqual(self.ed.ghost["status"], "ok")
+        sep = self.ov.grip_sep.children[2]  # after the light model and the pick style
+        rim, fill = [n for n in sep.children if getattr(n, "name", None) in ("GripOutline", "GripFill")]
+        self.assertLess(sep.children.index(rim), sep.children.index(fill))  # the rim under the fill
+        colour = lambda n: next(c for c in n.children if type(c).__name__ == "SoBaseColor").rgb.value  # noqa: E731
+        width = lambda n: next(c for c in n.children if type(c).__name__ == "SoDrawStyle").lineWidth.value  # noqa: E731
+        self.assertEqual(colour(rim), V.rgb(V.GRIP_OUTLINE))
+        self.assertEqual(width(rim), V.GRIP_LINE_PX + 2 * V.GRIP_OUTLINE_PX)
+        self.assertEqual(width(fill), V.GRIP_LINE_PX)  # the grip's size kept
+        fills = [colour(n) for n in walk(self.ov.grip_sep) if getattr(n, "name", None) == "GripFill"]
+        self.assertNotIn(V.rgb(self.ed.ghost["color"]), fills)  # never the ghost's own colour
+        self.assertIn(V.rgb(V.GRIP_FILL), fills)
+        # The rim's cone a little bigger than the head it rims.
+        cone = lambda n: next(c for c in n.children if type(c).__name__ == "SoCone")  # noqa: E731
+        taper = next(s for s in self.ov.shapes if s["side"] == "taper")
+        i = self.ov.shapes.index(taper)
+        tsep = self.ov.grip_sep.children[2 + i]
+        trim, tfill = [n for n in tsep.children if getattr(n, "name", None) in ("GripOutline", "GripFill")]
+        self.assertAlmostEqual(cone(trim).height.value, cone(tfill).height.value * V.GRIP_CONE_RIM)
+        # Hovered: lit.
+        x0, y0 = next(s for s in self.ov.screen if s["side"] == "taper")["points"][0]
+        self.view.send(_Event("loc", x0, y0))
+        tsep = self.ov.grip_sep.children[2 + i]
+        tfill = next(n for n in tsep.children if getattr(n, "name", None) == "GripFill")
+        self.assertEqual(colour(tfill), V.rgb(V.GRIP_LIT))
+
     def test_a_replaced_body_is_hidden_and_shown_again(self):
         self.ov.ghost_sep.removeAllChildren()
         self.ed.set_ghost({"status": "ok", "mesh": {"positions": [0, 0, 0, 1, 0, 0, 0, 1, 0], "indices": [0, 1, 2]}, "color": "#1877c0", "replaces": [2], "solid": True})
@@ -433,11 +462,26 @@ class FilletPicks(unittest.TestCase):
         self.view = BodyView()
         self.coin = stand_in_coin()
         self.warned, self.later = [], []
+        # FreeCAD's selection, as the stand-in's keep_selection reads it and
+        # its restore puts it back; unselect takes the box's hits out.
+        self.sel, self.unselected = [("D", "Other", "Face1")], []
+
+        def keep():
+            was = list(self.sel)
+
+            def restore():
+                self.sel[:] = was
+            return restore
+
+        def unselect(hits):
+            self.unselected.append(list(hits))
+            self.sel[:] = [s for s in self.sel if not V.selected_by(hits, *s)]
+
         store = types.SimpleNamespace(builder=PickBuilder())
         env = {"store": lambda: store, "features": lambda: [], "hide": lambda ids, on: None,
                "body_of": lambda d, o: 2 if o == "ReverseBody" else None,
                "body_at": lambda d, p: 2 if abs(p[2] - 10) < 1e-6 else None,
-               "keep_selection": lambda: None, "later": self.later.append, "warn": self.warned.append}
+               "keep_selection": keep, "unselect": unselect, "later": self.later.append, "warn": self.warned.append}
         self.ov = V.Overlay(self.ed, self.view, self.coin, None, _Vec, env)
 
     def run_later(self):
@@ -530,6 +574,104 @@ class FilletPicks(unittest.TestCase):
         self.ov.qt_released(194.0, 396.9)
         self.run_later()
         self.assertEqual(self.view.asked, [(388, 856)])  # whole pixels, as getObjectInfo takes them
+
+    def picked(self):
+        return [n for n in walk(self.ov.pick_sep) if getattr(n, "name", None) == "PickedEdge"]
+
+    def test_picked_edges_drawn_along_their_run_and_let_go(self):
+        self.assertEqual(self.picked(), [])
+        self.click(403, 300)
+        lines = self.picked()
+        self.assertEqual(len(lines), 1)
+        coords = next(n for n in lines[0].children if type(n).__name__ == "SoCoordinate3")
+        self.assertEqual(coords.point.value, [[0, 0, 10], [10, 0, 10]])  # the whole front edge, not a dot
+        colours = [n.rgb.value for n in walk(lines[0]) if type(n).__name__ == "SoBaseColor"]
+        widths = [n.lineWidth.value for n in walk(lines[0]) if type(n).__name__ == "SoDrawStyle"]
+        self.assertEqual(colours, [V.rgb(V.GRIP_OUTLINE), V.rgb(V.PICKED_COLOR)])  # a dark rim, then the pick's colour
+        self.assertEqual(widths, [V.PICKED_LINE_PX + 2 * V.PICKED_OUTLINE_PX, V.PICKED_LINE_PX])
+        self.assertTrue(any(type(n).__name__ == "SoPickStyle" for n in self.ov.pick_sep.children))  # clicks go through it
+        self.assertEqual(type(self.ov.pick_sep).__name__, "SoAnnotation")  # above the body
+        self.click(405, 310)
+        self.assertEqual(len(self.picked()), 2)
+        self.click(403, 300)  # the front one let go
+        lines = self.picked()
+        self.assertEqual(len(lines), 1)
+        coords = next(n for n in lines[0].children if type(n).__name__ == "SoCoordinate3")
+        self.assertEqual(coords.point.value, [[0, 10, 10], [10, 10, 10]])
+        self.click(405, 310)
+        self.assertEqual(self.ov.pick_sep.children, [])
+        self.click(403, 300)
+        self.ov.draw_picks()  # drawn the same on the tick: nothing built again
+        self.assertEqual(len(self.picked()), 1)
+        self.ov.detach()  # the box closed: the picks go with it
+        self.assertNotIn(self.ov.root, self.view.graph.children)
+
+    def test_a_shell_s_faces_draw_no_edges(self):
+        self.ed.open_new("shell", {"features": [], "nextFeatureId": 2}, [{"id": 2, "surface": False, "box": None}])
+        self.ov.click(405, 305)
+        self.ov.draw_picks()
+        self.assertEqual(self.ov.pick_sep.children, [])
+
+    def freecad_selects(self):
+        """FreeCAD selecting the edge under the cursor, as it does when the
+        navigation hands it the release."""
+        self.sel.append(("D", "ScanRulerReverse", "Edge7"))
+
+    def test_the_swallowed_press_puts_the_selection_back(self):
+        # 231481b/98355c0: press and release both taken by the navigation.
+        # FreeCAD selects on the release; the click runs after it, so the
+        # selection to put back must be the one read at the press.
+        self.ov.qt_pressed(403, 300)
+        self.ov.qt_released(403, 300)
+        self.freecad_selects()
+        self.run_later()
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+        self.assertEqual(self.sel, [("D", "Other", "Face1")])
+
+    def test_the_scene_graph_s_route_puts_it_back_too(self):
+        self.view.send(_Event("btn", 403, 300, press=True))
+        self.freecad_selects()  # FreeCAD selects on the press
+        self.view.send(_Event("btn", 403, 300, press=False))
+        self.run_later()
+        self.assertEqual(self.ed.record["edges"], [self.FRONT])
+        self.assertEqual(self.sel, [("D", "Other", "Face1")])
+
+    def test_qt_s_press_then_the_scene_graph_s_release(self):
+        self.ov.qt_pressed(403, 300)
+        self.freecad_selects()
+        self.ov.qt_released(403, 300)
+        self.view.send(_Event("btn", 403, 300, press=False))
+        self.run_later()
+        self.assertEqual(self.sel, [("D", "Other", "Face1")])
+
+    def test_a_miss_puts_it_back_as_well(self):
+        self.ov.env["body_at"] = lambda d, p: None
+        self.ov.qt_pressed(390, 300)
+        self.ov.qt_released(390, 300)
+        self.freecad_selects()
+        self.run_later()
+        self.assertEqual(self.ed.record["edges"], [])
+        self.assertEqual(self.sel, [("D", "Other", "Face1")])
+
+    def test_create_or_cancel_clears_what_the_box_selected(self):
+        self.click(403, 300)
+        self.click(398, 300)  # on the container's compound
+        self.sel.append(("D", "ReverseBody", "Edge1"))  # left behind somehow
+        self.sel.append(("D", "ScanRulerReverse", "Edge1"))
+        self.sel.append(("D", "ScanRulerReverse", "Face3"))  # the person's own
+        self.ov.detach()  # Create or Cancel: the box closes
+        self.assertEqual(self.sel, [("D", "Other", "Face1"), ("D", "ScanRulerReverse", "Face3")])
+        self.assertEqual(len(self.unselected), 1)
+        self.assertEqual(self.ov.touched, [])
+
+    def test_selected_by(self):
+        hits = [{"doc": "D", "object": "ReverseBody", "element": "Edge7", "parent": "ScanRulerReverse"}]
+        self.assertTrue(V.selected_by(hits, "D", "ScanRulerReverse", "Edge7"))
+        self.assertTrue(V.selected_by(hits, "D", "ReverseBody", "Edge7"))
+        self.assertTrue(V.selected_by(hits, "D", "Assembly", "ReverseBody.Edge7"))
+        self.assertFalse(V.selected_by(hits, "D", "ScanRulerReverse", "Edge17"))
+        self.assertFalse(V.selected_by(hits, "E", "ReverseBody", "Edge7"))
+        self.assertFalse(V.selected_by(hits, "D", "Other", "Edge7"))
 
     def test_nearest_body_and_the_qt_point(self):
         self.assertEqual(V.nearest_body([(1, 0.5), (2, 0.0), (3, None)], 0.01), 2)
