@@ -290,6 +290,15 @@ class Body:
         import Part
 
         src = container_of(obj)
+        if src is not None:
+            # A document just opened: the builder lives in memory and has
+            # built nothing yet, and the bodies run before their container
+            # (its Group puts it after them). Without a build here a
+            # recompute that reaches a body first (recompute { force: true },
+            # a Placement set on it) would write an empty shape over the one
+            # the file held, and nothing would put it back until the next
+            # edit. restored_build builds once, in memory, writing nothing.
+            restored_build(src)
         shape = builder_of(src).body(obj.BodyId) if src else None
         obj.Shape = shape.copy() if shape is not None else Part.Shape()
 
@@ -359,6 +368,20 @@ def sync_bodies(container):
         doc.removeObject(o.Name)
     for b in built:
         if b["id"] not in plan["add"]:
+            # A body kept: the name and the colour reverse_body_set gave it
+            # since are put on its object (they were only worn by a body
+            # made after the naming). Written only when they differ.
+            style, o = styles.get(str(b["id"])) or {}, have.get(b["id"])
+            if o is not None and style.get("name") and o.Label != style["name"]:
+                o.Label = style["name"]
+            view = getattr(o, "ViewObject", None) if o is not None else None
+            if view is not None and style.get("color"):
+                try:
+                    # FreeCAD hands the colour back in single precision.
+                    if any(abs(x - y) > 1 / 510 for x, y in zip(tuple(view.ShapeColor)[:3], rgb(style["color"]))):
+                        view.ShapeColor = rgb(style["color"])
+                except Exception:  # noqa: BLE001 — a view without the property: the part still holds the colour
+                    pass
             continue
         o = doc.addObject("Part::FeaturePython", BODY)
         Body(o)
@@ -483,6 +506,31 @@ def put_step_file(container, key, text):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(held, f)
     container.StepFiles = path
+
+
+def health_reading(session, tool, changed):
+    """The Reverse engineer's reading for Agent Link's shared health check
+    (its health.register(owner, fn): fn(session, tool, changed) ->
+    [{ line, red, todo }]), after a reverse_ tool only. A feature that fails
+    to build fails no FreeCAD object: the container says so in its Status
+    and Results, and the tree shows no red badge. Read here, so the call's
+    health is red when the part is not what its list says. Only reads; no
+    Agent Link import (agentlink_families registers it)."""
+    if not str(getattr(tool, "name", tool) or "").startswith("reverse_"):
+        return []
+    d = getattr(session, "doc", None)
+    c = find_container(d) if d is not None else None
+    if c is None or str(getattr(c, "Status", "") or "ok") == "ok":
+        return []
+    try:
+        results = json.loads(c.Results or "[]")
+        names = {f["id"]: f["name"] for f in part_of(c.PartJson)["features"]}
+    except Exception:  # noqa: BLE001 — unreadable: the Status alone is said
+        results, names = [], {}
+    failed = [r for r in results if r.get("status") == "failed"]
+    said = "; ".join(f"{names.get(r.get('id'), r.get('id'))}: {str(r.get('message') or 'failed')[:90]}" for r in failed[:3])
+    return [{"line": f"Reverse engineer: {c.Status}" + (f" ({said}{' …' if len(failed) > 3 else ''})" if said else ""), "red": True,
+             "todo": "reverse_feature_list gives each feature's status and message; mend the first that failed with reverse_feature_update, or reverse_feature_suppress it"}]
 
 
 def forget(container):

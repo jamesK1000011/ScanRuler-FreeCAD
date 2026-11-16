@@ -44,7 +44,8 @@ def fl_state(session):
     if want and want != f["subject"]:
         # A section put on the sheet (section_cut): its cut is the sheet's
         # edges, in millimetres.
-        f.update({"subject": dict(want), "elements": [], "dimensions": [], "nextEl": 1, "nextDim": 1, "chains": None, "notes": [], "alignment": None})
+        # flat_objects' outlines were read off the old subject too.
+        f.update({"subject": dict(want), "elements": [], "dimensions": [], "nextEl": 1, "nextDim": 1, "chains": None, "notes": [], "alignment": None, "objects": None})
     return f
 
 
@@ -199,6 +200,9 @@ def bind(session):
         f = fl_state(session)
         ppm = FC.image_pixels_per_mm(data)
         S.state(session)["flatSubject"] = {"kind": "image", "name": os.path.basename(path)}
+        # "In place of what was there", an image of the same file name too:
+        # the sheet starts empty (fl_state clears it for a subject that differs).
+        f["subject"] = None
         f = fl_state(session)
         # Rows bottom first: the sheet's y runs up.
         f.update({"image": {"name": os.path.basename(path), "fileName": os.path.basename(path), "width": w, "height": h, "gray": gray[::-1].copy(), "decoder": decoder},
@@ -210,12 +214,12 @@ def bind(session):
         f = fl_state(session)
         units, unit, _c, sec = sheet(session)
         if sec:
-            raise ToolError("invalid_state", "A section is in millimetres already.")
+            raise ToolError("invalid_state", "A section is in millimetres already: there is nothing to calibrate (flat_open_image puts an image on the sheet).")
         mode, pts, mm = a["mode"], a["points"], a["mm"]
         if mode == "distance" and len(pts) != 2:
-            raise ToolError("invalid_input", "distance takes two places.")
+            raise ToolError("invalid_input", f"points: mode distance takes exactly two places [x, y] a known distance apart ({len(pts)} given); for a circle of known diameter use mode diameter with three or more on its edge.")
         if mode == "diameter" and len(pts) < 3:
-            raise ToolError("invalid_input", "diameter takes three places or more.")
+            raise ToolError("invalid_input", f"points: mode diameter takes three places or more on the circle's edge ({len(pts)} given); for two places a known distance apart use mode distance.")
         px = [[p[0] / unit["x"], p[1] / unit["y"]] for p in pts]
         try:
             ppm = FC.distance_calibration(px[0], px[1], mm, f["pxPerMm"]) if mode == "distance" else FC.diameter_calibration(px, mm)
@@ -226,8 +230,16 @@ def bind(session):
         k = {"x": unit["x"] * ppm["x"], "y": unit["y"] * ppm["y"]}
         for e in f["elements"]:
             e["fit"] = scale_fit(e["fit"], 1 / k["x"])
+        # The notes and the alignment's zero point are places on the sheet
+        # as well; flat_objects' outlines were in the old units (read again).
+        for n in f["notes"]:
+            n["at"] = [n["at"][0] / k["x"], n["at"][1] / k["y"]]
+        if f["alignment"]:
+            f["alignment"] = {**f["alignment"], "origin": [f["alignment"]["origin"][0] / k["x"], f["alignment"]["origin"][1] / k["y"]]}
+        f["objects"] = None
         detect(f, f["sensitivity"])
-        return {"calibration": {"source": "measured", "pxPerMm": rounded(ppm), "dpi": round(ppm["x"] * 25.4, 2)}, "chains": len(f["chains"])}
+        return {"calibration": {"source": "measured", "pxPerMm": rounded(ppm), "dpi": round(ppm["x"] * 25.4, 2)}, "chains": len(f["chains"]), "units": "mm", "scaledBy": round(1 / k["x"], 6),
+                "note": "Every place on the sheet is now this many times what it was: elements, notes and the alignment were scaled with it; chain numbers and flat_objects' numbers are new."}
 
     def flat_detect_edges(a):
         f = fl_state(session)
@@ -273,7 +285,13 @@ def bind(session):
                 pts = edge_points(chains, a.get("chains"), a.get("box"))
                 if len(pts) == 0:
                     raise ToolError("invalid_input", "No point of those chains lies inside the box." if a.get("chains") else "No detected edge point lies inside the box.")
-                fit = {"line": fit_line_region, "circle": fit_circle_region, "arc": fit_arc_region}[kind](pts)
+                try:
+                    fit = {"line": fit_line_region, "circle": fit_circle_region, "arc": fit_arc_region}[kind](pts)
+                except FitError as e:
+                    # A section of a CAD-style mesh has a point only where the
+                    # cut crosses a triangle's edge: a straight side is two.
+                    raise ToolError("failed", f"{e} The selection holds {len(pts)} edge point{'' if len(pts) == 1 else 's'} (flat_edges gives each chain's count). On a section of a mesh with few triangles, "
+                                    "mesh_densify then mesh_use_edited and section_cut again; or give points instead (two for a line, three for a circle or an arc): each snaps onto the nearest edge.")
             else:
                 pts = a.get("points") or []
                 if len(pts) < m[2]:
@@ -314,7 +332,10 @@ def bind(session):
 
         chosen = a.get("type") or next((t["id"] for t in FC.DIMENSION_TYPES if fits(t["id"])), None)
         if not chosen or not fits(chosen):
-            raise ToolError("invalid_input", f"{' and '.join(e['name'] for e in els)} make no {a.get('type') or '2D'} dimension in that order.")
+            have = " then ".join(f"{e['name']} (a {e['kind']}, counted as a {r or 'nothing'})" for e, r in zip(els, roles))
+            raise ToolError("invalid_input", f"refs: {have} make no {a.get('type') or '2D'} dimension in that order. The types take, in order: "
+                            + "; ".join(f"{t['id']}: {' then '.join(t['slots'])}" for t in FC.DIMENSION_TYPES)
+                            + ". A point, circle or arc counts as a point (its centre): with a line, give the point first.")
         did = f["nextDim"]
         f["nextDim"] += 1
         group = next(t["group"] for t in FC.DIMENSION_TYPES if t["id"] == chosen)
@@ -356,9 +377,14 @@ def bind(session):
         text = FC.build_dxf(drawing) if fmt == "dxf" else FC.build_svg(drawing)
         stem = os.path.splitext(f["image"]["name"])[0] if not sec and f["image"] else (sec["name"].replace(" ", "-") if sec else "sheet")
         path = a.get("path") or os.path.join(session.out_dir, f"{stem}.{fmt}")
-        with open(path, "w", encoding="utf-8" if fmt == "svg" else "latin-1", errors="replace") as fh:
-            fh.write(text)
-        return {"file": {"path": path, "bytes": os.path.getsize(path)}, "elements": len(drawing["elements"]), "chains": len(chains or [])}
+        if not path.lower().endswith("." + fmt):
+            path += "." + fmt  # as mesh_export: a name without its format gets it
+        try:
+            with open(path, "w", encoding="utf-8" if fmt == "svg" else "latin-1", errors="replace") as fh:
+                fh.write(text)
+        except OSError as e:
+            raise ToolError("failed", f"{path}: could not be written ({e.strerror or e}) — give a path in a folder that exists, or leave path out for the session's folder.")
+        return {"file": {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}, "format": fmt, "units": units, "elements": len(drawing["elements"]), "chains": len(chains or [])}
 
     def flat_objects(a):
         import math
@@ -401,20 +427,20 @@ def bind(session):
         if a.get("object") is not None:
             objs = f.get("objects")
             if not objs:
-                raise ToolError("invalid_state", "No objects yet: flat_objects first.")
+                raise ToolError("invalid_state", "object: no objects are numbered on this sheet yet (a new image, a section or a calibration clears them) — flat_objects first, or name the outline with chains.")
             if not 1 <= a["object"] <= len(objs):
-                raise ToolError("invalid_input", f"object: 1 to {len(objs)}.")
+                raise ToolError("invalid_input", f"object: flat_objects numbered 1 to {len(objs)}; {a['object']} is none of them.")
             o = objs[a["object"] - 1]
             P = o["outline"]
         elif a.get("chains"):
             dc, _u = doc_chains(session)
             bad = [i for i in a["chains"] if not 0 <= i < len(dc)]
             if bad:
-                raise ToolError("invalid_input", f"chains: 0 to {len(dc) - 1}.")
+                raise ToolError("invalid_input", f"chains {bad}: the sheet has 0 to {len(dc) - 1} (flat_edges lists them; their numbers change when edges are found again).")
             P = np.concatenate([dc[i] for i in a["chains"]])
             o = None
         else:
-            raise ToolError("invalid_input", "Give object (a number from flat_objects) or chains.")
+            raise ToolError("invalid_input", "Give object (a number from flat_objects, for an image) or chains (edge chains by number, from flat_edges; the only way on a section).")
         kind = a.get("kind", "radial")
         if a.get("about") is not None:
             el = element_named(f, a["about"])
@@ -487,7 +513,7 @@ def bind(session):
                 raise ToolError("not_found", f"There is no 2D dimension {ref!r}.")
             target = hits[0]
         else:
-            raise ToolError("invalid_input", "Give element, dimension or note.")
+            raise ToolError("invalid_input", "Give element or dimension (by id or name) or note (by id): the one thing to change. flat_report lists them.")
         if a.get("name") is not None:
             if not a["name"].strip():
                 raise ToolError("invalid_input", "name: give a name.")
@@ -553,9 +579,10 @@ def bind(session):
             img = f["image"]
             lo, hi = np.zeros(2), np.array([img["width"] * unit["x"], img["height"] * unit["y"]])
         if a.get("frame"):
+            whole = (lo, hi)
             lo, hi = np.maximum(lo, a["frame"]["min"]), np.minimum(hi, a["frame"]["max"])
             if not (hi > lo).all():
-                raise ToolError("invalid_input", "frame lies off the sheet.")
+                raise ToolError("invalid_input", f"frame lies off the sheet, which runs from {[round(float(x), 3) for x in whole[0]]} to {[round(float(x), 3) for x in whole[1]]} ({units}): give min and max inside it, min below max.")
         size = int(a.get("size", 1200))
         upp = float(max(hi - lo)) / size  # sheet units a pixel
         W, H = max(1, int((hi[0] - lo[0]) / upp)), max(1, int((hi[1] - lo[1]) / upp))
@@ -614,8 +641,13 @@ def bind(session):
                     t = st + np.linspace(0, sw, 361)
                     plot(np.column_stack([fit["center"][0] + fit["radius"] * np.cos(t), fit["center"][1] + fit["radius"] * np.sin(t)]), col, 3)
         path = a.get("path") or os.path.join(session.out_dir, "sheet.png")
-        with open(path, "wb") as fh:
-            fh.write(R.png(canvas))
+        if not path.lower().endswith(".png"):
+            path += ".png"  # a PNG whatever the name given
+        try:
+            with open(path, "wb") as fh:
+                fh.write(R.png(canvas))
+        except OSError as e:
+            raise ToolError("failed", f"{path}: could not be written ({e.strerror or e}) — give a path in a folder that exists, or leave path out for the session's folder.")
         return {"file": {"path": path, "name": os.path.basename(path)}, "units": units, "width": W, "height": H,
                 "map": {"left": round(float(lo[0]), 4), "top": round(float(hi[1]), 4), "unitsPerPx": round(upp, 6),
                         "note": "pixel (column c, row r from the top) is the sheet place [left + c·unitsPerPx, top − r·unitsPerPx]"},
@@ -630,7 +662,7 @@ def bind(session):
         units, scale, chains, sec = sheet(session)
         ids, ref = a.get("chains"), a.get("element")
         if (ids is None) == (ref is None):
-            raise ToolError("invalid_input", "Name chains or an element — one of them.")
+            raise ToolError("invalid_input", "Give chains (edge chains by number, from flat_edges) or element (a fitted 2D arc or circle, from flat_fit) — one of them, not both.")
         sb, tol, step = a.get("straightBelow"), a.get("tolerance", 0.1), a.get("step")
 
         def told(run, min_length):
@@ -687,7 +719,7 @@ def bind(session):
             import Part
 
             if session.doc is None:
-                raise ToolError("invalid_state", "No document to draw the comb in: doc_new first.")
+                raise ToolError("invalid_state", "comb: there is no document to draw the comb in — doc_new first, or leave comb out for the readings alone.")
             allp = np.vstack([r[2]["points"] for r in runs])
             diag = float(np.hypot(*(allp.max(0) - allp.min(0))))
             per, cap = K.reach([r[2] for r in runs], diag, float(a.get("scale", 1.0)))

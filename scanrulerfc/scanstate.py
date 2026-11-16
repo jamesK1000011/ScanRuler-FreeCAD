@@ -148,26 +148,39 @@ def fresh():
 _TICKS = itertools.count(1)
 
 
-def touched(session, tool):
+def touched(session, tool, write=True):
     """After a call went through (the add-on's runner, or Agent Link's
     family layer): the session's version moves and last_tool names the
     tool, so the dock refreshes and turns to that tool's workspace. Every
     call counts, not only the ones that change the document (data/tools.json
     "changes"): a fit, an alignment or a map changes what the panels show
-    without touching the document. The snapshot tools only read the shots."""
+    without touching the document. The snapshot tools only read the shots.
+    write: False leaves the copy in the document for a later call.
+
+    The document is never written from a worker thread (a heavy tool run
+    as an Agent Link job answers on one): docstate.on_gui_thread hands the
+    write to the GUI thread when a window is up, and otherwise leaves it;
+    the next call on the document's thread then writes it (docstate.mark
+    writes whenever the state differs from what it wrote last)."""
     if tool.startswith("scan_snapshot_") or getattr(session, "family_state", None) is None:
         return  # a session that keeps no state (a catalog-only caller): nothing to show
     st = state(session)
     st["version"] = next(_TICKS)
     st["last_tool"] = tool
+    if not write:
+        return
     try:
         from . import docstate
-
-        docstate.mark(session)  # FreeCAD's Save carries it from here
     except ImportError:
-        pass
-    except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
-        _report(f"the state could not be written into the document: {e}")
+        return
+
+    def to_document():
+        try:
+            docstate.mark(session)  # FreeCAD's Save carries it from here
+        except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
+            _report(f"the state could not be written into the document: {e}")
+
+    docstate.on_gui_thread(to_document)
 
 
 def _report(text):

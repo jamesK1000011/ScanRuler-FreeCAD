@@ -676,6 +676,118 @@ class Handlers(unittest.TestCase):
         self.assertEqual(tooldata.check(doc), [])
 
 
+
+class Hardened(unittest.TestCase):
+    """The hardening pass of 16 Nov 2026: what the Mesh Tools handlers say
+    and keep, in plain Python on a CAD-style box (8 vertices, 12 triangles)."""
+
+    def setUp(self):
+        from scanrulerfc.handlers import meshtools as HM
+
+        self.HM = HM
+        self.s = Session(*cad_box(40, 30, 20))
+        self.t = HM.bind(self.s)
+
+    def refused(self, tool, code, **a):
+        with self.assertRaises(Exception) as c:
+            self.t[tool](a)
+        self.assertEqual(c.exception.code, code, c.exception.message)
+        return c.exception.message
+
+    def test_the_wrap_preview_is_listed_and_discarded(self):
+        self.assertIn("no wrap to discard", self.refused("mesh_discard", "invalid_state", what="wrap"))
+        self.t["mesh_wrap"]({"gap": 4, "edges": "smooth"})
+        parts = self.t["mesh_parts"]({})
+        self.assertGreater(parts["wrap"]["triangles"], 0)
+        self.assertIsNone(parts["piece"])
+        self.assertEqual(self.t["mesh_discard"]({"what": "wrap"}), {"discarded": "wrap", "wrap": None})
+        self.assertIsNone(self.t["mesh_parts"]({})["wrap"])
+        self.assertIn("mesh_reduce makes one", self.refused("mesh_discard", "invalid_state", what="reduced"))
+
+    def test_refusals_say_what_to_do_next(self):
+        self.assertIn("no open rim", self.refused("mesh_fill_holes", "invalid_state"))
+        msg = self.refused("mesh_cut", "failed", plane="XY", offset=50, keep="minus")
+        self.assertIn("from offset 0 to 20", msg)
+        self.assertIn("mesh_cut_preview", msg)
+        msg = self.refused("mesh_remove_islands", "failed", size=5)
+        self.assertIn("mesh_inspect", msg)
+        self.t["mesh_densify"]({"maxEdge": 2})
+        self.t["mesh_delete_marked"]({"region": {"box": {"min": [14, 9, 19], "max": [26, 21, 21]}}})
+        msg = self.refused("mesh_fill_holes", "invalid_input", at=[20, 15, 20])
+        self.assertIn("the smallest is 15.05", msg)
+        out = self.t["mesh_fill_holes"]({"size": 30, "patch": "flat"})
+        self.assertEqual((out["report"]["filled"], out["mesh"]["open"]), (1, 0))
+        self.assertAlmostEqual(out["mesh"]["volume"], 24000, 3)
+
+    def test_panel_words_name_their_tools(self):
+        self.assertEqual(self.HM.said("close it with Fill holes first."), "close it with Fill holes (mesh_fill_holes) first.")
+        self.assertEqual(self.HM.said("Fill holes (mesh_fill_holes)"), "Fill holes (mesh_fill_holes)")
+        self.assertIn("mesh_reduce", self.HM.said("too large. Decimate it first."))
+
+    def test_mirror_goes_through_the_middle_of_the_mesh_worked_on(self):
+        # After a cut the scan's own middle (Z 10) is no longer the part's (Z 6).
+        self.t["mesh_cut"]({"plane": "XY", "offset": 12, "keep": "minus"})
+        out = self.t["mesh_mirror"]({"plane": "XY"})
+        self.assertIn("Z 6 mm", out["edit"]["text"])
+        self.assertEqual(out["mesh"]["bounds"]["max"][2], 12.0)
+
+    def test_trim_on_a_sparse_mesh_says_to_densify(self):
+        body = cad_box(10, 10, 10)
+        doc = type("Doc", (), {})()
+        mesh = type("M", (), {"Topology": ([type("P", (), {"x": p[0] + 35, "y": p[1] + 10, "z": p[2] + 5})() for p in body[0].tolist()], [tuple(t) for t in body[1].tolist()]), "CountFacets": 12})()
+        doc.Objects = [type("O", (), {"Name": "Stub", "Label": "Stub", "Mesh": mesh})()]
+        self.s.doc = doc
+        with self.assertRaises(Exception) as c:
+            H.HANDLERS["mesh_trim"](self.s, {"body": "Stub"})
+        self.assertIn("mesh_densify first", c.exception.message)
+        self.t["mesh_densify"]({"maxEdge": 2})
+        out = H.HANDLERS["mesh_trim"](self.s, {"body": "Stub"})
+        self.assertAlmostEqual(out["piece"]["volume"], 499, 0)
+        self.assertAlmostEqual(out["piece"]["matingArea"], 100, 0)
+        self.assertEqual(self.t["mesh_parts"]({})["piece"]["name"], "Stub")
+
+
+class HardenedData(unittest.TestCase):
+    """What data/tools.json declares of the Mesh Tools and 2D tools."""
+
+    def test_flags(self):
+        import json
+
+        with open(os.path.join(HERE, "..", "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
+            E = json.load(f)["entries"]
+        # A document write is a change, with its transaction and health; the file write is a read.
+        self.assertTrue(E["mesh_export"]["changes"])
+        self.assertEqual(E["mesh_export"]["reads"], {"to": ["file"]})
+        self.assertEqual(E["mesh_export"]["inputSchema"]["properties"]["to"]["default"], "file")
+        self.assertTrue(E["flat_curvature"]["changes"])
+        self.assertEqual(E["flat_curvature"]["reads"], {"comb": [False]})
+        self.assertIs(E["flat_curvature"]["inputSchema"]["properties"]["comb"]["default"], False)
+        # Tools that write the path given are checked as writers.
+        for n in ("mesh_export", "flat_export", "flat_render"):
+            self.assertTrue(E[n].get("writes"), n)
+        for n in ("mesh_smooth", "mesh_reduce", "mesh_cut", "mesh_cut_preview", "mesh_offset", "mesh_inspect", "mesh_shell", "mesh_wrap", "mesh_trim",
+                  "flat_open_image", "flat_detect_edges", "flat_calibrate"):
+            self.assertTrue(E[n].get("heavy"), n)
+        for n, e in E.items():
+            if e["group"] in ("meshtools", "flat", "reverse"):
+                self.assertEqual(e.get("workbench"), "ScanRulerWorkbench", n)
+                self.assertTrue(e.get("words"), n)
+                self.assertIn("Stefan Hermann (CNC Kitchen)", e["source"], n)
+
+    def test_a_job_leaves_the_document_write_for_later(self):
+        from unittest import mock
+
+        from scanrulerfc import docstate
+
+        s = Session(*cad_box(1, 1, 1))
+        with mock.patch.object(docstate, "mark") as mark:
+            S.touched(s, "mesh_wrap", write=False)
+            self.assertEqual(mark.call_count, 0)
+            self.assertEqual(S.state(s)["last_tool"], "mesh_wrap")
+            S.touched(s, "mesh_parts")
+            self.assertEqual(mark.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
 

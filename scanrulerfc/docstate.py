@@ -34,6 +34,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 import zipfile
 
 import numpy as np
@@ -271,6 +272,93 @@ def _report(text):
         pass
 
 
+# ---- which thread writes the document --------------------------------------------------------------
+# A heavy read (deviation_align, deviation_measure, thickness_measure,
+# scan_segment, section_fit, mesh_shell, mesh_wrap, mesh_trim, …) may be run
+# by its host on a worker thread beside the call (Agent Link's jobs, its
+# threads named "agentlink-job-<tool>"). FreeCAD's document and its view are
+# the GUI thread's: a Placement set or an object added from another thread
+# reaches Qt and the 3D view from that thread. So nothing here writes the
+# document from a worker, ever. What the scan tools write after such a call
+# (the scan's Placement following a best fit, the state kept in the
+# document) goes one of two ways, on_gui_thread deciding:
+#   a window is up   handed to the GUI thread (a queued Qt signal, not
+#                    waited for): it lands a moment after the answer.
+#   no window / Qt   left for the next ScanRuler call on the document's
+#                    thread: mark writes whenever the state differs from
+#                    what it wrote last, and carries a waiting Placement
+#                    with it (flush_pose).
+
+_POSTER = []
+_POSTER_LOCK = threading.Lock()
+
+
+def _gui_up():
+    try:
+        import FreeCAD
+
+        return bool(getattr(FreeCAD, "GuiUp", False))
+    except ImportError:
+        return False
+
+
+def _poster():
+    """An object living on the GUI thread whose signal runs a function
+    there (a queued connection); None where there is no Qt application."""
+    with _POSTER_LOCK:
+        if not _POSTER:
+            made = None
+            try:
+                from PySide import QtCore
+
+                app = QtCore.QCoreApplication.instance()
+                if app is not None:
+
+                    class Poster(QtCore.QObject):
+                        go = QtCore.Signal(object)
+
+                        def __init__(self):
+                            super().__init__()
+                            self.go.connect(self._run, QtCore.Qt.QueuedConnection)
+
+                        def _run(self, fn):
+                            try:
+                                fn()
+                            except Exception as e:  # noqa: BLE001 — the call it followed has answered
+                                _report(f"a document write handed to the GUI thread failed: {e}")
+
+                    made = Poster()
+                    made.moveToThread(app.thread())
+            except Exception as e:  # noqa: BLE001 — no Qt here: written where it stands, as before
+                _report(f"document writes cannot be handed to the GUI thread: {e}")
+                made = None
+            _POSTER.append(made)
+        return _POSTER[0]
+
+
+def on_document_thread():
+    """True on the thread FreeCAD's documents live on (the interpreter's
+    main thread: the GUI thread with a window, the only one without)."""
+    return threading.current_thread() is threading.main_thread()
+
+
+def on_gui_thread(fn):
+    """fn() where the document may be written, never on a worker thread.
+    True: run at once (this is the document's thread). False: queued for
+    the GUI thread and not waited for — the GUI thread may be the one
+    waiting for this worker. None: on a worker with no window (or no Qt)
+    to hand it to, so not run at all: the caller leaves it for the next
+    call on the document's thread."""
+    if on_document_thread():
+        fn()
+        return True
+    p = _poster() if _gui_up() else None
+    if p is None:
+        return None
+    p.go.emit(fn)
+    return False
+
+
 class StateProxy:
     """The proxy of the ScanRulerState object: nothing to compute."""
 
@@ -422,7 +510,7 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
         scan.on_pose = None
         return
 
-    def push(s):
+    def write(s):
         try:
             o = doc.getObject(s.object)
             if o is None:
@@ -435,6 +523,16 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
         except Exception as e:  # noqa: BLE001 — the view only: the measurement holds
             _report(f"the scan's placement could not follow its alignment: {e}")
 
+    def push(s):
+        # From a worker thread (a best fit run as a job) the write waits
+        # for the GUI thread; s.placed stays the object's placement till
+        # then, so pull_pose reads no move in between. With no window to
+        # hand it to, it waits for the next call (flush_pose, from mark).
+        s.pose_waiting = False
+        if on_gui_thread(lambda: write(s)) is None:
+            s.pose_waiting = True
+
+    scan.write_pose = write
     scan.on_pose = push
     scan.meshed_k = scan.k
     if push_now:
@@ -468,10 +566,30 @@ def pull_pose(st, doc):
         return False
     from . import model
 
-    # The pose the measurement stands in is the scan's own (R, t); the
-    # object's new one is where the person put it.
-    rig = rigid_between(scan.R, scan.t, R1, t1)
+    if getattr(scan, "pose_waiting", False):
+        # A best fit's pose still waits to be written to the object (it
+        # ran on a worker with no window): the person's move is the one
+        # from where the object stood, put on top of the fit.
+        rig = rigid_between(R0, t0, R1, t1)
+    else:
+        # The pose the measurement stands in is the scan's own (R, t); the
+        # object's new one is where the person put it.
+        rig = rigid_between(scan.R, scan.t, R1, t1)
     model.transform_all(st, rig)
+    return True
+
+
+def flush_pose(st):
+    """A scan pose that could not be written to its object when it was set
+    (a worker thread with no window: on_gui_thread) written now. Called on
+    the document's thread only (mark). True when one was waiting."""
+    scan = st.get("scan")
+    if scan is None or not getattr(scan, "pose_waiting", False):
+        return False
+    scan.pose_waiting = False
+    w = getattr(scan, "write_pose", None)
+    if w is not None and getattr(scan, "on_pose", None) is not None:
+        w(scan)
     return True
 
 
@@ -565,12 +683,16 @@ _SIGS = {}
 
 def mark(session):
     """After a call: the state written into the document when it changed
-    (scanstate.touched)."""
+    (scanstate.touched), and a scan Placement left waiting by a worker
+    thread with it. On the document's thread only."""
     doc = getattr(session, "doc", None)
     fs = getattr(session, "family_state", None)
     if doc is None or not fs or "scanruler" not in fs or not hasattr(doc, "addObject"):
         return False
     st = fs["scanruler"]
+    if not on_document_thread():
+        return False  # never from a worker: scanstate.touched hands it over or leaves it
+    flush_pose(st)
     sig = signature(st)
     key = (getattr(doc, "Name", id(doc)), id(session))
     if _SIGS.get(key) == sig:

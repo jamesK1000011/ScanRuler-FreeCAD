@@ -211,3 +211,18 @@ def _echo():
 
 for _name, _call in (("lent readers", _lend), ("pictures", _render), ("wall readers", _wall), ("thread scan readers", _thread), ("services", _register), ("panel tab", _tab), ("echo", _echo)):
     _hook(_name, _call)
+
+
+def _reverse_health():
+    # The Reverse engineer's failed features in Agent Link's shared health
+    # check (health.register): a feature that fails to build fails no
+    # FreeCAD object, so nothing else would turn a reverse_ call's health
+    # red. The reading is reverse/doc.py's and imports no Agent Link.
+    from agentlink import health
+
+    from .reverse import doc as _D
+
+    health.register("scanruler_reverse", _D.health_reading)
+
+
+_hook("reverse health", _reverse_health)

@@ -113,7 +113,7 @@ def bind(session):
             name = a.get("name")
             left = [x for x in scanners if x["name"] != name]
             if len(left) == len(scanners):
-                raise ToolError("not_found", f"No scanner named {name!r}: {[x['name'] for x in scanners]}.")
+                raise ToolError("not_found", f"action remove: no scanner named {name!r} — the scanners: {', '.join(x['name'] for x in scanners) or 'none'}.")
             save(session, left)
             return {"removed": name, "note": "A project naming it keeps its copy." if n["using"] and n["using"]["name"] == name else None}
         if act == "use":
@@ -122,7 +122,7 @@ def bind(session):
             else:
                 found = [x for x in scanners if x["name"] == a.get("name")]
                 if not found:
-                    raise ToolError("not_found", f"No scanner named {a.get('name')!r}: scanner add it, or one of {[x['name'] for x in scanners]}.")
+                    raise ToolError("not_found", f"action use: no scanner named {a.get('name')!r} — the scanners: {', '.join(x['name'] for x in scanners) or 'none'}. scanner {{ action: \"add\", scanner: {{ name, noiseMm }} }} adds one; use {{ measured: true }} plans with this scan's own noise.")
                 n["using"] = dict(found[0])  # by value, so the project reads the same elsewhere
             return {"using": n["using"], **planned(session)}
         if act == "export":
@@ -136,10 +136,10 @@ def bind(session):
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
             except (OSError, TypeError, ValueError) as e:
-                raise ToolError("invalid_input", f"path {path!r}: {e}")
+                raise ToolError("invalid_input", f"action import: path {path!r} could not be read as JSON ({e}) — give the path of a file scanner {{ action: \"export\" }} wrote.")
             incoming = data.get("scanners") if isinstance(data, dict) else data
             if not isinstance(incoming, list):
-                raise ToolError("invalid_input", "The file holds no scanners list.")
+                raise ToolError("invalid_input", "action import: the file holds no scanners list — it takes a file scanner { action: \"export\" } wrote ({ scanners: [{ name, noiseMm }] }).")
             for p in incoming:
                 check(p)
             names = {p["name"] for p in incoming}

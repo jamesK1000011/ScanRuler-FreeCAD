@@ -115,6 +115,12 @@ def _next_name(st, kind):
     return f"{KIND_NAMES[kind]} {c}"
 
 
+def _listed(rows, most=12):
+    """The names a refusal offers: "A" (1), "B" (2) … the first few."""
+    said = ", ".join(f'"{r["name"]}" ({r["id"]})' for r in rows[:most])
+    return (said + (f" and {len(rows) - most} more" if len(rows) > most else "")) or "none yet"
+
+
 def find_element(st, ref):
     els = st["elements"]
     if isinstance(ref, bool):
@@ -122,14 +128,14 @@ def find_element(st, ref):
     if isinstance(ref, (int, float)) and not isinstance(ref, str):
         hit = [e for e in els if e["id"] == int(ref)]
         if not hit:
-            raise Refusal("not_found", f"There is no element {int(ref)}.")
+            raise Refusal("not_found", f"There is no element {int(ref)} — the elements, by name (id): {_listed(els)}. element_fit or element_construct makes one; element_list shows them all.")
         return hit[0]
     want = str(ref).strip().lower()
     hit = [e for e in els if e["name"].strip().lower() == want]
     if not hit and want.isdigit():
         return find_element(st, int(want))
     if not hit:
-        raise Refusal("not_found", f'There is no element named "{ref}".')
+        raise Refusal("not_found", f'There is no element named "{ref}" — the elements, by name (id): {_listed(els)}. element_fit or element_construct makes one; element_list shows them all.')
     if len(hit) > 1:
         raise Refusal("invalid_input", f'{len(hit)} elements are named "{ref}" — name it by its id.')
     return hit[0]
@@ -138,7 +144,7 @@ def find_element(st, ref):
 def measured(st, ref, kinds=None):
     el = find_element(st, ref)
     if el.get("fit") is None:
-        raise Refusal("invalid_state", f"{el['name']} has no geometry.")
+        raise Refusal("invalid_state", f"{el['name']} has no geometry: an element it was built from is gone or no longer gives one — fit or construct it again, or element_remove it.")
     if kinds and el["kind"] not in kinds:
         raise Refusal("invalid_input", f"{el['name']} is a {el['kind']}; this takes a {' or '.join(kinds)}.")
     return el
@@ -272,6 +278,13 @@ def _fit_out(fit):
     return fit, (np.asarray(region, dtype=np.int64) if region is not None else None)
 
 
+# What a fit that found no surface is to try next, for a caller with no
+# mouse: the fitters' own words (ScanRuler's) speak of clicking.
+_FIT_NEXT = ("Here that means: move at onto the surface (scan_nearest says where a point lands; scan_query { box } lists points on a face), "
+             "say what is sought with side, radius, axis or within, or fit exactly the points you choose with element_fit_marked. "
+             "On a CAD tessellation (scan_qa says tessellation.sparse) mesh_densify first.")
+
+
 def element_fit(st, a):
     scan = require_scan(st)
     kind = a["kind"]
@@ -301,7 +314,7 @@ def element_fit(st, a):
             if _z:
                 fit["zoneWidth"] = _z["width"]
         except FitError as e:
-            raise Refusal("failed", str(e))
+            raise Refusal("failed", f"{e} Give other places in at (three or more, spread round the circle, not in a line).")
         few = fit.pop("warning", None)
         el = _add(st, "circle", fit, {"type": "picked", "points": [s["point"] for s in spots]}, None, a.get("name"))
         _finish(el, a.get("assumed"))
@@ -318,7 +331,7 @@ def element_fit(st, a):
     try:
         fit = G.FROM_SEED[kind](scan.graph(), seeds, settings, guide)
     except FitError as e:
-        raise Refusal("failed", str(e))
+        raise Refusal("failed", f"{e} {_FIT_NEXT}")
     fit, region = _fit_out(fit)
     if a.get("assumed") is not None and kind not in ("sphere", "cylinder"):
         raise Refusal("invalid_input", f"A {kind} has no diameter to assume.")
@@ -364,7 +377,7 @@ def element_fit_marked(st, a):
     try:
         fit = G.ON_SELECTION[kind](scan.graph(), sel, settings)
     except FitError as e:
-        raise Refusal("failed", str(e))
+        raise Refusal("failed", f"{e} Here that means: give more of the surface in vertices or box (scan_query {{ box, mark: true }} gathers them), or another kind.")
     fit, region = _fit_out(fit)
     el = _add(st, kind, fit, {"type": "fitted", "seeds": [], "selection": sel, "settings": settings}, region, a.get("name"))
     _finish(el, a.get("assumed"))
@@ -650,13 +663,13 @@ def _slot_fit(st, slot, value, scan):
 def align_datum(st, a):
     scan = require_scan(st)
     if not a.get("primary") and not a.get("origin"):
-        raise Refusal("invalid_input", "Give a primary (levelling) datum, an origin, or both.")
+        raise Refusal("invalid_input", "Give primary (the levelling datum: { element }, { points: 3 } or { plane: { origin, normal } }), origin ({ element } or { point }), or both; secondary only with primary.")
     first = applied(scan) is None
     prim = _slot_fit(st, "primary", a["primary"], scan) if a.get("primary") else None
     sec = _slot_fit(st, "secondary", a["secondary"], scan) if a.get("secondary") else None
     org = _slot_fit(st, "origin", a["origin"], scan) if a.get("origin") else None
     if org is not None and C.ref_point(org) is None and org["kind"] not in ("point",):
-        raise Refusal("invalid_input", "The zero point takes a point, sphere, circle or torus.")
+        raise Refusal("invalid_input", f"origin: a {org['kind']} gives no single zero point — it takes a point, sphere, circle or torus element, or {{ point: [x, y, z] }}. element_construct makes a point from others (point-three-planes, point-line-plane, point-center).")
     pax, sax = a.get("primaryAxis", "z-"), a.get("secondaryAxis", "x+")
     owned = set()
     for spec, ax in ((prim, pax), (sec, sax)):
@@ -686,7 +699,7 @@ def align_datum(st, a):
             rig = A.datum_alignment({"fit": prim, "axis": pax}, {"fit": sec, "axis": sax} if sec is not None else None, org, centre)
         else:
             if sec is not None:
-                raise Refusal("invalid_input", "A rotation datum needs a levelling one.")
+                raise Refusal("invalid_input", "secondary turns the part about the primary's normal, so it needs primary too: give primary (a plane, 3 points or plane { origin, normal }), or leave secondary out to move the zero point alone.")
             rig = A.translation_to_origin(org["center"])
     except A.AlignmentError as e:
         raise Refusal("invalid_input", str(e))
@@ -715,7 +728,7 @@ def align_clear(st):
     scan = require_scan(st)
     total = applied(scan)
     if total is None:
-        raise Refusal("invalid_state", "The part is in scan coordinates already.")
+        raise Refusal("invalid_state", "The part is in scan coordinates already: there is no alignment to clear (align_datum, align_auto and align_symmetry set one).")
     transform_all(st, A.inverse(total))
     scan.set_pose(scan.k, np.eye(3), np.zeros(3))
     return {"appliedAlignment": None, "elements": len(st["elements"])}
@@ -776,7 +789,7 @@ def _reference(st, r):
     d = find_dimension(st, r["dimension"])
     info = D.type_info(d["type"])
     if info["family"] != "dimension" or info["unit"] == "°":
-        raise Refusal("invalid_input", f"{d['name']} is not a length — give a distance or a diameter.")
+        raise Refusal("invalid_input", f"{d['name']} is not a length — a reference takes a distance or diameter dimension (dimension_add type dist-… or size-diameter), an element with a diameter, or two points.")
     v = evaluate_dimension(st, d)["value"]
     if v.get("raw") is None or not v["raw"] > 0:
         raise Refusal("invalid_state", f"{d['name']} has no value to scale from{(' — ' + v['invalid']) if v.get('invalid') else ''}.")
@@ -786,7 +799,7 @@ def _reference(st, r):
 def scan_scale(st, a):
     scan = require_scan(st)
     if (a.get("factor") is None) == (a.get("references") is None):
-        raise Refusal("invalid_input", "Give either factor or references — one of them.")
+        raise Refusal("invalid_input", "Give factor (a number, 25.4 for inches read as mm) or references ([{ dimension | element | points, true }]) — one of them, not both and not neither.")
     comb = None
     if a.get("references") is not None:
         try:
@@ -827,7 +840,7 @@ def find_dimension(st, ref):
             return find_dimension(st, int(str(ref).strip()))
         label = f'named "{ref}"'
     if not hit:
-        raise Refusal("not_found", f"There is no dimension {label}.")
+        raise Refusal("not_found", f"There is no dimension {label} — the dimensions, by name (id): {_listed(ds)}. dimension_add makes one; report_get lists them with their values.")
     if len(hit) > 1:
         raise Refusal("invalid_input", f'{len(hit)} dimensions are named "{ref}" — name it by its id.')
     return hit[0]
@@ -896,7 +909,7 @@ def dimension_add(st, a):
             tid = D.resolve_type(tid, [p[1] for p in picked])
         refs = D.assign_refs(tid, picked)
         if any(r is None for r in refs) or any(e["id"] not in refs for e in els):
-            raise Refusal("invalid_input", f"{' and '.join(e['name'] for e in els)} make no dimension on their own — name a type.")
+            raise Refusal("invalid_input", f"{' and '.join(e['name'] + ' (' + e['kind'] + ')' for e in els)} make no dimension on their own — name a type: one of {', '.join(ids)}.")
     info = D.type_info(tid)
     d = {"id": st["dimNext"], "type": tid, "name": None, "refs": refs, "visible": True}
     if a.get("anchor"):
@@ -968,7 +981,7 @@ def report_text(st):
         lines.append(el["name"])
         s = el["source"]
         if s["type"] == "constructed":
-            lines.append(f"  constructed: {s['method']} from {', '.join(name_of(i) for i in s['refs']) or 'numbers'}{(' ' + str([round(x, 4) for x in s['params']])) if s['params'] else ''}")
+            lines.append(f"  constructed: {s['method']} from {', '.join(name_of(i) for i in s['refs']) or 'numbers'}{(' ' + str([round(float(x), 4) for x in s['params']])) if s['params'] else ''}")
         f = el.get("fit")
         if not f:
             lines.append("  no geometry")

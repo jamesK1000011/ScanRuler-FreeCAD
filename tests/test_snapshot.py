@@ -157,6 +157,29 @@ class TestHandlers(unittest.TestCase):
         self.assertFalse(out["came"])
         self.assertLess(time.monotonic() - t0, 2)
 
+    def test_wait_never_holds_the_window_it_waits_on(self):
+        # On FreeCAD's GUI thread a wait would stop the window whose camera
+        # key the person is to press: nothing is waited for, and the answer
+        # says how to wait beside the window.
+        import unittest.mock
+
+        with unittest.mock.patch.object(H, "holds_window", lambda: True):
+            t0 = time.monotonic()
+            out = H.scan_snapshot_wait(self.ctx, {"timeout": 30})
+        self.assertLess(time.monotonic() - t0, 1)
+        self.assertEqual((out["came"], out["waited"]), (False, 0))
+        self.assertIn("job_start", out["next"])
+        self.assertIn("timeoutSeconds: 30", out["next"])
+        self.assertIn("scan_snapshot_latest", out["next"])
+
+    def test_a_worker_thread_or_no_freecad_holds_no_window(self):
+        self.assertFalse(H.holds_window())  # no FreeCAD window in the plain tests
+        got = []
+        th = threading.Thread(target=lambda: got.append(H.holds_window()))
+        th.start()
+        th.join(3)
+        self.assertEqual(got, [False])
+
     def test_wait_wakes_on_shot(self):
         res = {}
         th = threading.Thread(target=lambda: res.update(H.scan_snapshot_wait(self.ctx, {"timeout": 5})))

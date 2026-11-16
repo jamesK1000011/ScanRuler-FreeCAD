@@ -74,8 +74,6 @@ def bind(session):
     """{tool name: fn(args)} for one session (Agent Link's, or the
     add-on's own runner's context)."""
     def element_to_document(a):
-        import Part
-
         st = S.state(session)
         refs = a.get("elements")
         try:
@@ -84,9 +82,11 @@ def bind(session):
             raise ToolError(e.code, e.message)
         els = [e for e in els if e.get("fit")]
         if not els:
-            raise ToolError("invalid_state", "No elements to bring over: element_fit first.")
+            raise ToolError("invalid_state", "No element with geometry to bring over: element_fit or element_construct first (element_list shows what there is).")
         style = a.get("style", "solids")
-        doc = session.doc
+        doc = getattr(session, "doc", None)
+        if doc is None or not hasattr(doc, "addObject"):
+            raise ToolError("invalid_state", "No FreeCAD document is open to put the elements in: open or make one (doc_new), then element_to_document again.")
         group_name = a.get("group", "Scan elements")
         group = next((o for o in doc.Objects if o.TypeId == "App::DocumentObjectGroup" and o.Label == group_name), None) or doc.addObject("App::DocumentObjectGroup", "ScanElements")
         group.Label = group_name
@@ -107,6 +107,8 @@ def bind(session):
             path = a["export"] if os.path.isabs(a["export"]) else os.path.join(session.out_dir, a["export"])
             if not path.lower().endswith((".step", ".stp")):
                 path += ".step"
+            import Part
+
             Part.makeCompound(shapes).exportStep(path)
             out["file"] = {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}
         return out

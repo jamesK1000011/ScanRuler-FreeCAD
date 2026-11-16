@@ -60,7 +60,7 @@ def bind(session):
         ids = a.get("sources")
         bad = [i for i in ids or [] if i not in [s["id"] for s in C.SOURCES]]
         if bad:
-            raise ToolError("invalid_input", f"sources: {', '.join(s['id'] for s in C.SOURCES)}.")
+            raise ToolError("invalid_input", f"sources: {', '.join(bad)} not known — the sources are {', '.join(s['id'] for s in C.SOURCES)} (leave sources out for all of them).")
         return {"links": C.links(a["query"], ids), "note": "Search pages for the person to open; nothing is fetched or downloaded from here. A file they download comes in with import_file; record where it came from with catalog_provenance."}
 
     def _prov_path():
@@ -78,7 +78,7 @@ def bind(session):
         if a.get("action", "list") == "record":
             r = a.get("record") or {}
             if not r.get("file") or not r.get("source"):
-                raise ToolError("invalid_input", "record: { file, source, page?, licence?, shareable? }.")
+                raise ToolError("invalid_input", "action record needs record: { file, source } at least (file: the file's name; source: where it came from), with page, licence and shareable when known.")
             r = {**r, "at": datetime.date.today().isoformat()}
             files = [x for x in files if x["file"] != r["file"]] + [r]
             with open(_prov_path(), "w", encoding="utf-8") as f:

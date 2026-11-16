@@ -169,8 +169,17 @@ def bind(session):
                 out["calibrated"] = False
                 out["calibrateWhy"] = "Only a run that fits well and separates the hole and contour offsets becomes the printer's calibration."
             else:
-                cal = session.fit({"action": "calibrate", "hole": round(2 * sol["hole"]["value"], 3), "shaft": round(2 * sol["contour"]["value"], 3)})
-                out["calibrated"] = cal.get("calibration")
+                hole, shaft = round(2 * sol["hole"]["value"], 3), round(2 * sol["contour"]["value"], 3)
+                fit = getattr(session, "fit", None)
+                if callable(fit):
+                    cal = fit({"action": "calibrate", "hole": hole, "shaft": shaft})
+                    out["calibrated"] = cal.get("calibration")
+                else:
+                    # The printer's fit calibration is another add-on's to
+                    # keep (its fit tool): the values are handed over.
+                    out["calibrated"] = False
+                    out["calibrateWhy"] = "This run is good, but the printer's fit calibration is not kept here."
+                    out["calibrateNext"] = f"fit {{ action: \"calibrate\", hole: {hole:g}, shaft: {shaft:g} }} sets it (diametral mm, from this run)."
         return out
 
     def last_good(fs):

@@ -438,5 +438,91 @@ class InADocument(unittest.TestCase):
         self.assertEqual(results[-1]["message"], "The body this feature works on is gone, or failed to build.")
 
 
+
+class Hardened(unittest.TestCase):
+    """The hardening pass of 16 Nov 2026: a body never empties itself on a
+    recompute that reaches it before its container has built, and a failed
+    feature turns the shared health check red."""
+
+    def test_a_body_builds_its_container_before_it_reads_its_shape(self):
+        from unittest import mock
+
+        calls = []
+        shape = type("Shape", (), {"copy": lambda self: "copied"})()
+        builder = type("B", (), {"body": lambda self, i: shape if calls else None})()
+        part = type(sys)("Part")
+        part.Shape = lambda: "empty"
+        src = object()
+        obj = type("Obj", (), {"BodyId": 2.0, "Shape": None})()
+        with mock.patch.dict(sys.modules, {"Part": part}), mock.patch.object(D, "container_of", lambda o: src), \
+                mock.patch.object(D, "restored_build", lambda c: calls.append(c)), mock.patch.object(D, "builder_of", lambda c: builder):
+            D.Body.execute(None, obj)
+        self.assertEqual(calls, [src])
+        self.assertEqual(obj.Shape, "copied")
+
+    def test_a_failed_feature_is_red_in_the_health_check(self):
+        doc = FakeDocument()
+        c = FakeObject(doc, D.CONTAINER)
+        doc.Objects.append(c)
+        for name in ("PartJson", "Results", "Status"):
+            c.addProperty("App::PropertyString", name, mode=24)
+        c.PartJson = dumps(part(cube_features()))
+        c.Results, c.Status = json.dumps([{"id": 2, "status": "failed", "message": "The result is not a closed solid."}]), "1 failed"
+        s = type("S", (), {"doc": doc})()
+        tool = type("T", (), {"name": "reverse_feature_add"})()
+        got = D.health_reading(s, tool, [])
+        self.assertEqual(len(got), 1)
+        self.assertTrue(got[0]["red"])
+        self.assertIn("Extrude 2: The result is not a closed solid", got[0]["line"])
+        self.assertIn("reverse_feature_list", got[0]["todo"])
+        self.assertEqual(D.health_reading(s, type("T", (), {"name": "part_primitive"})(), []), [])
+        c.Status = "ok"
+        self.assertEqual(D.health_reading(s, "reverse_build", []), [])
+
+
+@unittest.skipUnless(HAVE_FC, "needs FreeCAD")
+class HardenedInADocument(unittest.TestCase):
+    """In FreeCAD (written on the hardening pass without a FreeCAD to run it
+    on): a saved part reopened and recomputed whole keeps its bodies."""
+
+    def test_a_reopened_part_keeps_its_bodies_through_a_forced_recompute(self):
+        import tempfile
+
+        doc = FreeCAD.newDocument("ReverseReopen")
+        c = D.make_container(doc)
+        doc.recompute()
+        D.edit(c, "add", "Cube", lambda p: {**p, "features": cube_features(), "nextFeatureId": 3})
+        self.assertAlmostEqual(D.bodies_of(c)[0].Shape.Volume, 1000, 3)
+        path = os.path.join(tempfile.mkdtemp(), "reopen.FCStd")
+        doc.saveAs(path)
+        D.forget(c)
+        FreeCAD.closeDocument(doc.Name)
+        doc = FreeCAD.openDocument(path)
+        try:
+            c = D.find_container(doc)
+            D.forget(c)  # this session has built nothing for it, as after a restart
+            for o in doc.Objects:
+                o.touch()
+            doc.recompute()
+            self.assertAlmostEqual(D.bodies_of(c)[0].Shape.Volume, 1000, 3)
+            self.assertAlmostEqual(c.Shape.Volume, 1000, 3)
+        finally:
+            D.forget(c)
+            FreeCAD.closeDocument(doc.Name)
+
+    def test_a_body_wears_the_name_and_colour_given_later(self):
+        doc = FreeCAD.newDocument("ReverseStyle")
+        try:
+            c = D.make_container(doc)
+            doc.recompute()
+            D.edit(c, "add", "Cube", lambda p: {**p, "features": cube_features(), "nextFeatureId": 3})
+            D.edit(c, "set", "Cube", lambda p: {**p, "bodyStyles": {"2": {"name": "Housing", "color": "#0f9b9b"}}})
+            self.assertEqual(D.bodies_of(c)[0].Label, "Housing")
+            self.assertEqual([o.Name for o in doc.Objects if "Touched" in o.State], [])
+        finally:
+            D.forget(c)
+            FreeCAD.closeDocument(doc.Name)
+
+
 if __name__ == "__main__":
     unittest.main()

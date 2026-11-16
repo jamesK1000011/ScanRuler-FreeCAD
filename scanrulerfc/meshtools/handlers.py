@@ -16,7 +16,7 @@ import numpy as np
 from .. import mesh_core as M
 from .. import scanstate as S
 from ..errors import ToolError
-from ..handlers.meshtools import mesh_out, mt_state, push_undo, region_vertices, working
+from ..handlers.meshtools import mesh_out, mt_state, push_undo, region_vertices, said, working
 from . import boolean as BO
 from . import densify as DE
 from . import shell as SH
@@ -40,7 +40,7 @@ def _edit(session, label, job, kind):
     except BO.NeedsKernel as e:
         raise ToolError("unavailable", str(e))
     except M.MeshError as e:
-        raise ToolError("failed", str(e))
+        raise ToolError("failed", said(e))
     push_undo(session, label)
     ms = mt_state(session)
     ms["copy"] = (np.asarray(V2, dtype=float), np.asarray(F2, dtype=np.int64))
@@ -113,13 +113,13 @@ def solid_named(session, ref):
             elif getattr(o, "Shape", None) is not None and o.Shape.Solids:
                 pts, tris = o.Shape.tessellate(SO.BOOLEAN_CHORD_MM)
             else:
-                raise ToolError("invalid_input", f"{o.Label} is not a solid body.")
+                raise ToolError("invalid_input", f"{o.Label} is not a solid body: it has neither a mesh with triangles nor a shape with a solid (object_list gives each object's solids).")
             V = np.array([[p.x, p.y, p.z] for p in pts], dtype=float).reshape(-1, 3)
             outer = outer_placement(o)
             if outer is not None:
                 V = V @ outer[:3, :3].T + outer[:3, 3]
             return f"body:{o.Name}", o.Label, V, np.array(tris, dtype=np.int64).reshape(-1, 3)
-    raise ToolError("not_found", f"There is no solid {ref!r} on offer — a cylinder, cone or sphere measured (element_list), or a solid body in the document.")
+    raise ToolError("not_found", f"There is no solid {ref!r} on offer — a cylinder, cone or sphere measured (element_list gives their ids and names; a hidden one is not on offer), or a solid body in the document by its Name or Label (object_list).")
 
 
 # ---- the handlers ----------------------------------------------------------------------
@@ -203,7 +203,7 @@ def mesh_wrap(session, a):
     try:
         WV, WF, bridge, rep = WR.wrap_mesh(V, F, gap, grow, edges, a.get("tolerance"))
     except M.MeshError as e:
-        raise ToolError("failed", str(e))
+        raise ToolError("failed", said(e))
     d = M.describe(V, F)
     rep = {**rep, "fromTriangles": int(len(F)), "volumeBefore": d["volume"], "from": which}
     mt_state(session)["wrap"] = {"V": WV, "F": WF, "bridge": bridge, "report": rep}
@@ -247,7 +247,12 @@ def mesh_trim(session, a):
     except BO.NeedsKernel as e:
         raise ToolError("unavailable", str(e))
     except M.MeshError as e:
-        raise ToolError("failed", str(e))
+        text = said(e)
+        if "nowhere lies more than" in text or "is only specks" in text:
+            # The break is read at the mesh's own vertices: a CAD-style mesh
+            # (a box is 8 vertices) has none inside the body to find it by.
+            text += f" The break is read at the mesh's vertices ({len(V):,} here): on a mesh with vertices only on its edges, mesh_densify first."
+        raise ToolError("failed", text)
     mt_state(session)["piece"] = {"V": PV, "F": PF, "mating": mating, "gap": gap, "report": rep, "name": name, "solid": key}
     dropped = f", {rep['dropped']} piece{'' if rep['dropped'] == 1 else 's'} on the other side of the break dropped" if rep["dropped"] else ""
     status = (f"Trimmed {name} to the break — {rep['volume']:.1f} mm³, its mating face {rep['matingArea']:.1f} mm²"

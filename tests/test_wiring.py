@@ -303,6 +303,11 @@ class Package(Fresh):
         self.assertIn(f"<version>{scanrulerfc.VERSION}</version>", xml)
 
 
+# Reads at the base that the hardening pass of 16 Nov 2026 declared changes
+# (they write the document for one value of an input; "reads" names the rest).
+NOW_CHANGES = ("flat_curvature", "mesh_export")
+
+
 def _base_entries():
     try:
         out = subprocess.run(["git", "-C", ROOT, "show", f"{BASE}:scanrulerfc/data/tools.json"], capture_output=True, text=True, timeout=30)
@@ -320,17 +325,116 @@ class ToolDump(Fresh):
         if base is None:
             self.skipTest(f"{BASE} is not in this clone")
         sess = types.SimpleNamespace(family_state={}, out_dir=tempfile.mkdtemp(), doc=None)
-        now = {t.name: (t.description, t.schema, t.changes, fam.GROUP) for fam in fl.FAMILIES for t in fam.tools(sess)}
-        was = {k: (v["description"], v["inputSchema"], v["changes"], v["group"]) for k, v in base.items()}
+        # What must hold from before the GUI on: no tool gone, none moved to
+        # another group or turned from a read into a change, and no input
+        # taken away. Descriptions are free to be rewritten (the hardening
+        # pass of 16 Nov 2026 rewrote them), and inputs may be added.
+        now = {t.name: (t.schema, t.changes, fam.GROUP) for fam in fl.FAMILIES for t in fam.tools(sess)}
+        was = {k: (v["inputSchema"], v["changes"], v["group"]) for k, v in base.items()}
         from scanrulerfc.reverse.handlers import tool_names
 
         self.assertEqual(sorted(set(now) - set(was)), sorted(SNAPSHOT + MESH_ADDED + tuple(tool_names())))
         self.assertEqual(set(was) - set(now), set())
-        changed = sorted(k for k in was if was[k] != now[k])
+        # Two tools were turned into changes on purpose by the same pass:
+        # mesh_export { to: "document" } and flat_curvature { comb: true }
+        # write the document and now say so (their other calls are "reads").
+        self.assertEqual(sorted(k for k in was if was[k][1:] != now[k][1:]), sorted(NOW_CHANGES))
+        for k in NOW_CHANGES:
+            self.assertEqual((was[k][1], now[k][1], was[k][2]), (False, True, now[k][2]), k)
+        lost = {k: sorted(set(was[k][0]["properties"]) - set(now[k][0]["properties"])) for k in was}
+        self.assertEqual({k: v for k, v in lost.items() if v}, {})
+        needs = {k: sorted(set(now[k][0].get("required", [])) - set(was[k][0].get("required", []))) for k in was}
+        self.assertEqual({k: v for k, v in needs.items() if v}, {}, "a new required input")
         # mesh_export also writes the trimmed piece and the wrap.
-        self.assertEqual(changed, ["mesh_export"])
-        self.assertEqual(now["mesh_export"][1]["properties"]["part"]["enum"], ["edited", "reduced", "piece", "wrap"])
+        self.assertEqual(now["mesh_export"][0]["properties"]["part"]["enum"], ["edited", "reduced", "piece", "wrap"])
 
+
+class RefusalsSayWhatNext(unittest.TestCase):
+    """A refusal names the wrong input, what there is, and the call that
+    fixes it (hardening pass, 16 Nov 2026)."""
+
+    def setUp(self):
+        self.ctx = runner.Context(doc=None, out_dir=tempfile.mkdtemp())
+        V, F = box_mesh(40.0, 30.0, 20.0, n=10)
+        S.state(self.ctx)["scan"] = S.Scan("box.stl", np.asarray(V, float), np.asarray(F, np.int64))
+        self.h = handlers.bound(self.ctx)
+        self.h["element_fit"]({"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+
+    def refused(self, tool, args):
+        from scanrulerfc import errors
+
+        with self.assertRaises(errors.ToolError) as c:
+            self.h[tool](args)
+        return c.exception.code, c.exception.message
+
+    def test_an_unknown_element_lists_the_ones_there_are(self):
+        code, msg = self.refused("element_remove", {"element": "Nope"})
+        self.assertEqual(code, "not_found")
+        self.assertIn('"Top" (1)', msg)
+        self.assertIn("element_list", msg)
+
+    def test_an_unknown_dimension_lists_them(self):
+        self.h["dimension_add"]({"refs": ["Top"], "type": "form-flatness", "name": "Flat"})
+        code, msg = self.refused("dimension_remove", {"dimension": "Nope"})
+        self.assertEqual(code, "not_found")
+        self.assertIn('"Flat" (1)', msg)
+
+    def test_a_plane_is_no_zero_point(self):
+        code, msg = self.refused("align_datum", {"origin": {"element": "Top"}})
+        self.assertEqual(code, "invalid_input")
+        self.assertIn("a plane gives no single zero point", msg)
+        self.assertIn("element_construct", msg)
+
+    def test_a_heightmap_of_a_stale_deviation_map_is_a_refusal_with_a_code_agents_know(self):
+        from scanrulerfc.handlers import deviation as FD
+
+        d = FD.dstate(self.ctx)
+        d.update(values=np.zeros(3), source="reference")
+        code, msg = self.refused("scan_heightmap", {"of": "deviation"})
+        self.assertEqual(code, "failed")
+        self.assertIn("deviation_align", msg)
+
+    def test_no_document_is_said_not_crashed_on(self):
+        code, msg = self.refused("element_to_document", {})
+        self.assertEqual(code, "invalid_state")
+        self.assertIn("doc_new", msg)
+
+    def test_the_text_report_prints_plain_numbers(self):
+        self.h["element_construct"]({"kind": "plane", "method": "plane-coords", "params": [0, 0, 1, 0, 0, 5], "name": "Datum"})
+        text = self.h["report_get"]({"format": "text"})["text"]
+        self.assertIn("Datum", text)
+        self.assertNotIn("np.float64", text)
+
+
+class ToolData(unittest.TestCase):
+    """What data/tools.json declares beside the descriptions."""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
+            cls.entries = json.load(f)["entries"]
+
+    def test_tools_that_write_their_path_say_so(self):
+        # Agent Link checks a written path harder than a read one (home or
+        # the session's folder only, never a script): these write "path".
+        for n in ("scan_cloud", "scan_heightmap", "export_csv", "deviation_export", "wear_rebuild", "wear_prewarp", "fit_scan_export", "manual_render", "pack_write"):
+            self.assertTrue(self.entries[n].get("writes"), n)
+
+    def test_long_reads_are_declared_heavy(self):
+        for n in ("scan_qa", "scan_segment", "scan_heightmap", "section_fit", "deviation_align", "deviation_measure", "deviation_set_target", "deviation_hotspots",
+                  "deviation_volume", "deviation_export", "thickness_measure", "manual_check", "manual_render"):
+            self.assertTrue(self.entries[n].get("heavy"), n)
+            self.assertFalse(self.entries[n]["changes"], n)  # a change cannot run as a job
+
+    def test_finding_fields_are_words_and_known_commands(self):
+        own = {k["command"] for k in W.keys() + [W.SNAPSHOT]} | {"ScanRuler_OpenScan", "ScanRuler_Snapshot"}
+        for n, e in self.entries.items():
+            for k in ("commands", "words"):
+                self.assertTrue(all(isinstance(x, str) and x for x in e.get(k, [])), (n, k))
+            for c in e.get("commands", []):
+                if c.startswith("ScanRuler_"):
+                    self.assertIn(c, own, n)
+            self.assertIn("Stefan Hermann", e["source"], n)  # the credit stays on every tool
 
 if __name__ == "__main__":
     unittest.main()

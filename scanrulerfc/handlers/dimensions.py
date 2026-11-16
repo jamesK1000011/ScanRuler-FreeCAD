@@ -32,7 +32,7 @@ def bind(session):
         path = a.get("path") or os.path.join(session.out_dir, os.path.splitext(s["scan"].name)[0] + "-measurements.csv")
         d = os.path.dirname(os.path.abspath(path))
         if not os.path.isdir(d):
-            raise ToolError("not_found", f"{d}: no such folder.")
+            raise ToolError("not_found", f"path: the folder {d} does not exist — give a path in a folder that does, or leave path out for the session's output folder.")
         return M.export_csv(s, path)
 
     return {
