@@ -121,7 +121,7 @@ def read_reference(session, a):
         raise ToolError("invalid_input", f"units: one of {', '.join(S.UNITS)}.")
     if bool(path) == bool(body):
         raise ToolError("invalid_input", "Give path (a STEP, IGES, BREP, STL, PLY, OBJ or 3MF file) or body (a shape in the document), one of them.")
-    note = None
+    note, obj = None, None
     if body:
         doc = session.doc
         o = doc.getObject(body) or next((x for x in doc.Objects if x.Label == body), None)
@@ -131,6 +131,7 @@ def read_reference(session, a):
         V, F = tessellate(o.Shape)
         name = o.Label
         kind = "body"
+        obj = o.Name  # the reference shown is this body itself (docstate.put_reference)
     else:
         if not os.path.isfile(path):
             raise ToolError("not_found", f"path {path!r}: no such file — give the reference's path on this computer.")
@@ -164,7 +165,10 @@ def read_reference(session, a):
     e = np.sort(np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]]), axis=1)
     _, counts = np.unique(e, axis=0, return_counts=True)
     open_edges = int((counts != 2).sum())
-    return {"name": name, "kind": kind, "V": V, "F": F, "surface": NominalSurface(V, F), "volume": abs(vol), "openEdges": open_edges, "note": note}
+    out = {"name": name, "kind": kind, "V": V, "F": F, "surface": NominalSurface(V, F), "volume": abs(vol), "openEdges": open_edges, "note": note}
+    if obj is not None:
+        out["object"] = obj
+    return out
 
 
 def require_reference(session):

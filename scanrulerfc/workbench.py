@@ -7,9 +7,10 @@
 #
 # The original's tab strip becomes the "ScanRuler workspaces" toolbar, its
 # per-workspace panels' key grids become toolbars of which only the active
-# workspace's show, its top bar's New, Save and Load become the ScanRuler
-# menu's project items (FreeCAD's own toolbars have undo, redo, New, Open and
-# Save, so no second set stands beside them), and its floating view bar
+# workspace's show, its top bar's New, Save and Load are FreeCAD's own (the
+# document holds ScanRuler's state, docstate.py; the ScanRuler menu keeps
+# Import ScanRuler Project… for the browser app's files), its settings a page
+# of FreeCAD's Preferences (settings.py), and its floating view bar
 # becomes the "ScanRuler View" toolbar in the bottom toolbar area: FreeCAD has
 # no stable overlay API over the 3D view across 1.x (design 2.8). Names show
 # as FreeCAD's design guide asks (workspaces.title_case).
@@ -31,9 +32,9 @@ def toolbars():
 
 
 def menus():
-    """(menu path, [commands]) in order: Open Scan… and the project's New,
-    Open and Save, Workspace ▸, one submenu per workspace, then Snapshot,
-    Settings…, About ScanRuler."""
+    """(menu path, [commands]) in order: Open Scan… and Import ScanRuler
+    Project…, Workspace ▸, one submenu per workspace, then Snapshot and
+    About ScanRuler. New, Open, Save and the settings are FreeCAD's own."""
     out = [([W.WORKBENCH_MENU], [W.OPEN_SCAN["command"], "Separator"] + [p["command"] for p in W.PROJECT] + ["Separator"])]
     out.append(([W.WORKBENCH_MENU, "Workspace"], [w["command"] for w in W.WORKSPACES]))
     for w in W.WORKSPACES:
@@ -43,7 +44,7 @@ def menus():
                 cmds.append("Separator")
             cmds.extend(k["command"] for k in ks)
         out.append(([W.WORKBENCH_MENU, W.title_case(w["label"])], cmds))
-    out.append(([W.WORKBENCH_MENU], ["Separator", W.SNAPSHOT["command"], W.SETTINGS["command"], W.ABOUT["command"]]))
+    out.append(([W.WORKBENCH_MENU], ["Separator", W.SNAPSHOT["command"], W.ABOUT["command"]]))
     return out
 
 
@@ -151,9 +152,13 @@ def _bottom_view_bar(Gui):
 
 
 def add(Gui=None):
-    """Add the workbench to FreeCAD; what InitGui.py calls."""
+    """Add the workbench to FreeCAD, and ScanRuler's page of its
+    Preferences; what InitGui.py calls."""
     if Gui is None:
         import FreeCADGui as Gui
     cls = make_class(Gui)
     Gui.addWorkbench(cls())
+    from . import settings
+
+    settings.register(Gui)
     return cls

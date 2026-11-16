@@ -69,12 +69,18 @@ class Scan:
         self.t = np.zeros(3)
         self.version = 0
         self._graph = None
+        # The document object the scan is shown as (docstate.py), and the
+        # hook that moves it when the pose changes: None without FreeCAD.
+        self.object = None
+        self.on_pose = None
 
     def set_pose(self, k, R, t):
         self.k, self.R, self.t = float(k), np.asarray(R, dtype=float), np.asarray(t, dtype=float)
         self.V = (self.k * self.V0) @ self.R.T + self.t
         self._normals = self._areas = self._graph = None
         self.version += 1
+        if self.on_pose is not None:
+            self.on_pose(self)
 
     def graph(self):
         """The scan's mesh graph (adjacency, vertex normals) in its current
@@ -154,13 +160,74 @@ def touched(session, tool):
     st = state(session)
     st["version"] = next(_TICKS)
     st["last_tool"] = tool
+    try:
+        from . import docstate
+
+        docstate.mark(session)  # FreeCAD's Save carries it from here
+    except ImportError:
+        pass
+    except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
+        _report(f"the state could not be written into the document: {e}")
+
+
+def _report(text):
+    try:
+        import FreeCAD
+
+        FreeCAD.Console.PrintWarning(f"ScanRuler: {text}\n")
+    except ImportError:
+        pass
 
 
 def state(session):
-    st = session.family_state.setdefault(KEY, fresh())
+    fs = session.family_state
+    if KEY not in fs:
+        restored = _restored(session)
+        if restored is not None:
+            fs[KEY] = restored
+    st = fs.setdefault(KEY, fresh())
     for k, v in fresh().items():
         st.setdefault(k, v)
     return st
+
+
+def _restored(session):
+    """The state a reopened document holds (docstate.read), or None."""
+    doc = getattr(session, "doc", None)
+    if doc is None or not hasattr(doc, "getObject"):
+        return None
+    try:
+        from . import docstate
+
+        return docstate.read(doc)
+    except ImportError:
+        return None
+    except Exception as e:  # noqa: BLE001 — a state that cannot be read starts afresh, and says so
+        _report(f"the ScanRuler state in {getattr(doc, 'Label', 'the document')} could not be read: {e}")
+        return None
+
+
+def before(session):
+    """Before a call: a move made on the scan object in FreeCAD carried
+    in (pull_pose); never stops the call."""
+    try:
+        if getattr(session, "family_state", None) is not None:
+            state(session)  # a reopened document's state read in
+            pull_pose(session)
+    except Exception as e:  # noqa: BLE001
+        _report(f"the scan's placement could not be read: {e}")
+
+
+def pull_pose(session):
+    """A move made on the scan object in FreeCAD carried into the scan and
+    its elements (docstate.pull_pose); False without one."""
+    doc = getattr(session, "doc", None)
+    st = session.family_state.get(KEY) if getattr(session, "family_state", None) else None
+    if doc is None or not st or st.get("scan") is None or getattr(st["scan"], "on_pose", None) is None:
+        return False
+    from . import docstate
+
+    return docstate.pull_pose(st, doc)
 
 
 def scan_of(session):

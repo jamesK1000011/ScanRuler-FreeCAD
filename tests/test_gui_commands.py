@@ -136,8 +136,8 @@ class Commands(unittest.TestCase):
         C.set_ui(lambda key, *a: seen.append((key,) + a))
         C.build()["ScanRuler_ElementSphere"].Activated()
         C.build()["ScanRuler_WsMeshTools"].Activated()
-        C.build()["ScanRuler_ViewScanMesh"].Activated(True)
-        self.assertEqual(seen, [("ElementSphere", {"kind": "sphere"}), ("workspace", "mesh"), ("view", "ViewScanMesh", True)])
+        C.build()["ScanRuler_ViewScanBackfaces"].Activated(False)
+        self.assertEqual(seen, [("ElementSphere", {"kind": "sphere"}), ("workspace", "mesh"), ("view", "ViewScanBackfaces", False)])
         self.assertTrue(C.build()["ScanRuler_WsMeshTools"].GetResources()["Checkable"])
         self.assertFalse(C.build()["ScanRuler_Ws3DMeasure"].GetResources()["Checkable"])
         self.assertTrue(C.build()["ScanRuler_ViewCopyDeviation"].IsActive())
@@ -153,18 +153,21 @@ class Commands(unittest.TestCase):
         self.assertFalse(C.build()["ScanRuler_ReImport"].IsActive())
         self.assertTrue(C.build()["ScanRuler_WsReverse"].IsActive())
 
-    def test_load_takes_fcstd_and_scanruler(self):
+    def test_import_takes_only_scanruler(self):
         seen = []
         C.set_ui(lambda key, *a: seen.append((key,) + a))
         try:
             # Not there: refused in words, the panel not told (a real one:
             # test_wiring.ProjectImport).
-            self.assertIsNone(C.load("/tmp/no-such-old.scanruler"))
-            with self.assertRaises(ValueError):
-                C.load("/tmp/x.stl")
+            self.assertIsNone(C.import_project("/tmp/no-such-old.scanruler"))
+            for other in ("/tmp/x.stl", "/tmp/x.FCStd"):  # a document is FreeCAD's to open
+                with self.assertRaises(ValueError):
+                    C.import_project(other)
         finally:
             C.set_ui(None)
         self.assertEqual(seen, [])
+        for gone in ("NewCommand", "SaveCommand", "LoadCommand", "load"):
+            self.assertFalse(hasattr(C, gone), gone)
 
     def test_placeholder_runner_says_so(self):
         C.set_runner(None)
@@ -192,14 +195,15 @@ class InitGui(unittest.TestCase):
         # No second Undo, Redo, New, Save and Open beside FreeCAD's: the
         # project's are in the ScanRuler menu.
         on_bars = {c for _n, cmds in wb.toolbars for c in cmds}
-        for c in ("Std_Undo", "Std_Redo", "ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load"):
+        for c in ("Std_Undo", "Std_Redo", "ScanRuler_ImportProject"):
             self.assertNotIn(c, on_bars)
+        for c in ("ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load", "ScanRuler_Settings"):  # FreeCAD's own
+            self.assertNotIn(c, gui.commands)
         self.assertEqual(dict(wb.toolbars)["ScanRuler Workspaces"], [w["command"] for w in W.WORKSPACES])
-        self.assertEqual(wb.menus[0], (["ScanRuler"], ["ScanRuler_OpenScan", "Separator", "ScanRuler_New", "ScanRuler_Save",
-                                                       "ScanRuler_Load", "Separator"]))
+        self.assertEqual(wb.menus[0], (["ScanRuler"], ["ScanRuler_OpenScan", "Separator", "ScanRuler_ImportProject", "Separator"]))
         self.assertEqual(wb.menus[1][0], ["ScanRuler", "Workspace"])
         self.assertIn(["ScanRuler", "Reverse Engineer"], [p for p, _ in wb.menus])
-        self.assertEqual(wb.menus[-1][1][-3:], ["ScanRuler_Snapshot", "ScanRuler_Settings", "ScanRuler_About"])
+        self.assertEqual(wb.menus[-1][1][-2:], ["ScanRuler_Snapshot", "ScanRuler_About"])
         self.assertTrue(set(W.all_commands()) <= set(gui.commands))
         wb.Activated()  # no window: switches the workspace headless
         self.assertEqual(C.current_workspace(), "elements")

@@ -19,13 +19,20 @@ bar in the bottom toolbar area, the ScanRuler panel beside the Combo View
 (under Agent Link, its panel's ScanRuler tab) and the status strip (READY,
 element and dimension counts, "ScanRuler · CNC Kitchen"). Names follow
 FreeCAD's design guide (Title Case). The ScanRuler menu holds Open Scan…,
-the project's New Project, Save Project and Open Project… (FreeCAD's own
-toolbars keep undo, redo, New, Open and Save), Settings… and About. A key
-that cannot run yet says why in the status bar. Colour maps start on `jet`,
-as the original's do. Save Project writes the FreeCAD document; Open
-Project… opens a `.FCStd` or a `.scanruler` project from the original (its
-scan, fitted elements and sections, and its Reverse engineer part, which
-needs FreeCAD's Part kernel). It needs no other add-on.
+Import ScanRuler Project…, Snapshot and About. What FreeCAD already does
+is FreeCAD's: its New, Open and Save carry ScanRuler's state (the scan,
+its alignment, elements, dimensions, sections and the workspaces' results
+are kept in the FreeCAD document, in a hidden "ScanRuler state" object,
+with the scan and the reference as mesh objects); Move / Rotate by Numbers
+is FreeCAD's Placement dialog on the scan (the elements move with it); the
+Section key is FreeCAD's clipping plane; the view bar's show, Transparent
+and Mesh keys set the objects' own Visibility, Transparency and Display
+Mode; the settings are a page of Edit ▸ Preferences. A key that cannot run
+yet says why in the status bar. Colour maps start on `jet`, as the
+original's do. Import ScanRuler Project… reads a `.scanruler` project from
+the original browser app (its scan, fitted elements and sections, and its
+Reverse engineer part, which needs FreeCAD's Part kernel). It needs no
+other add-on.
 
 It also adds its tools to **Agent Link**, the FreeCAD add-on that lets an agent
 drive FreeCAD. Agent Link finds it at run time by convention, not by name:

@@ -74,12 +74,14 @@ class Tooltips(unittest.TestCase):
         self.assertNotEqual(r["ScanRuler_ViewBodies"]["ToolTip"], r["ScanRuler_ViewBodiesGroup"]["ToolTip"])
         self.assertEqual(r["ScanRuler_FlatArc"]["ToolTip"], "Fit an arc to the edges you pick on the flat scan.")
 
-    def test_project_items_say_they_act_on_the_project(self):
+    def test_new_open_save_are_freecads_import_stays(self):
+        # FreeCAD's New, Open and Save carry the project (docstate.py): no
+        # second set. The browser app's .scanruler files come in by import.
         r = resources()
-        for name in ("ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load"):
-            self.assertIn("ScanRuler project", r[name]["ToolTip"])
-        self.assertEqual([r[n]["MenuText"] for n in ("ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load")],
-                         ["New Project", "Save Project", "Open Project…"])
+        for name in ("ScanRuler_New", "ScanRuler_Save", "ScanRuler_Load", "ScanRuler_Settings"):
+            self.assertNotIn(name, r)
+        self.assertEqual(r["ScanRuler_ImportProject"]["MenuText"], "Import ScanRuler Project…")
+        self.assertIn(".scanruler", r["ScanRuler_ImportProject"]["ToolTip"])
 
 
 class AboutAndSettings(unittest.TestCase):
@@ -90,17 +92,17 @@ class AboutAndSettings(unittest.TestCase):
         for want in (scanrulerfc.VERSION, "AGPL-3.0-only", "Stefan Hermann (CNC Kitchen)", "github.com/CNCKitchen/ScanRuler"):
             self.assertIn(want, text)
 
-    def test_settings_open_scanrulers_own_dialog(self):
-        # Not FreeCAD's Preferences: showPreferences("ScanRuler") opened its
-        # General page, no page of that group being registered.
-        seen = []
-        real = ST.show
-        ST.show = lambda parent=None: seen.append(parent) or True
-        try:
-            self.assertTrue(C.SettingsCommand().Activated())
-        finally:
-            ST.show = real
-        self.assertEqual(len(seen), 1)
+    def test_settings_are_a_freecad_preferences_page(self):
+        # No dialog or command of ScanRuler's: a page in Edit ▸ Preferences.
+        self.assertFalse(hasattr(C, "SettingsCommand"))
+        self.assertFalse(hasattr(ST, "show"))
+        added = []
+        gui = types.SimpleNamespace(addPreferencePage=lambda cls, group: added.append((cls, group)))
+        self.assertTrue(ST.register(gui))
+        self.assertEqual(added, [(ST.PreferencePage, "ScanRuler")])
+        for m in ("loadSettings", "saveSettings"):
+            self.assertTrue(callable(getattr(ST.PreferencePage, m)))
+        self.assertFalse(ST.register(types.SimpleNamespace()))  # an older FreeCAD: the defaults hold
 
     def test_settings_read_and_write_freecads_parameters(self):
         store = {}

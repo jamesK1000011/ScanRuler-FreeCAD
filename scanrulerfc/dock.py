@@ -99,10 +99,17 @@ def dock_model(st, ui=None, current=W.DEFAULT_WORKSPACE, project=None, agent=Non
             "page": PAGES[ws].build(st, page_ui), "footer": W.CREDIT}
 
 
-def press(page, key_id, page_ui, run=None):
+def press(page, key_id, page_ui, run=None, native=None):
     """A page key that runs a tool (the page's call_for), run through the
     workbench's runner: {"tool", "args", "ok", "answer"}, or None for a key
-    that only opens something in the panel. Pure but for the runner."""
+    that only opens something in the panel. A key whose job is FreeCAD's
+    (Move / rotate by numbers: Std_Placement on the scan) runs FreeCAD's
+    command (commands.run_native) and answers None. Pure but for the
+    runner and the command."""
+    spec = C.native_key(key_id)
+    if spec is not None:
+        (native or C.run_native)(spec)
+        return None
     call = getattr(page, "call_for", None)
     got = call(key_id, page_ui) if call is not None else None
     if got is None:

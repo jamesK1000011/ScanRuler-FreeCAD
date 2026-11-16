@@ -13,6 +13,25 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- What FreeCAD already owns is FreeCAD's. ScanRuler's state (the scan
+  and its alignment, elements, dimensions, sections, the workspaces'
+  results) is kept in the FreeCAD document, in a hidden "ScanRuler state"
+  object written on each change and read when the document opens, with
+  the scan and a file reference as mesh objects: FreeCAD's New, Open and
+  Save carry the project, and ScanRuler's New Project, Save Project and
+  Open Project… are gone. Import ScanRuler Project… brings in a
+  `.scanruler` from the browser app. Move / Rotate by Numbers runs
+  FreeCAD's Placement dialog on the scan object; a move made there (or
+  with the transform dragger) carries the elements with the scan before the
+  next tool runs. The view bar's Scan, Reference and Bodies keys and their
+  Transparent and Mesh switches show and set the objects' own Visibility,
+  Transparency and Display Mode ("Flat Lines"), with no state of their own;
+  Elements runs `element_set_visible`; Section is FreeCAD's clipping plane
+  and reads whether its dialog is open. `reverse_body_set` with `visible`
+  shows or hides the body object too. Settings… is a ScanRuler page in
+  Edit ▸ Preferences. Stefan Hermann's own view keys (Backfaces, Colours,
+  Labels, Overlaps, Tangent Edges, Split View, Colour Plot, On Reference,
+  Deviation), the snapshot key and every workspace and tool stay.
 - Fixes from a live run in FreeCAD 1.1.3: a fillet's or chamfer's edge
   clicked in the 3D view is picked (and let go on a second click) also when
   the pick lands on the Reverse engineer container's compound or the

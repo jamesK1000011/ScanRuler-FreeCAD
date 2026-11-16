@@ -49,6 +49,12 @@ def bind(session):
         st.update(S.fresh())
         st["scan"] = scan
         out = {"opened": scan.summary()}
+        if ref is not None and getattr(o, "ViewObject", None) is not None and hasattr(session.doc, "addObject"):
+            # The scan is shown by its own mesh object (docstate.put_scan,
+            # after this call), which follows its alignment: the document's
+            # mesh it was read from is hidden, so the two do not overlap.
+            o.ViewObject.Visibility = False
+            out["shownAs"] = f"{o.Label} is hidden: the scan is shown in its place by its own mesh object, which moves with the alignment."
         warn = scan.warnings()
         if warn:
             out["warnings"] = warn

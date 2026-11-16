@@ -54,6 +54,7 @@ scanrulerfc/dev_volume.py
 scanrulerfc/dfm_wall.py
 scanrulerfc/dimensions.py
 scanrulerfc/dock.py
+scanrulerfc/docstate.py
 scanrulerfc/draft_core.py
 scanrulerfc/editor_view.py
 scanrulerfc/errors.py
@@ -142,7 +143,6 @@ scanrulerfc/icons/mirror.svg
 scanrulerfc/icons/model.svg
 scanrulerfc/icons/moveBody.svg
 scanrulerfc/icons/moveFace.svg
-scanrulerfc/icons/newProject.svg
 scanrulerfc/icons/note.svg
 scanrulerfc/icons/offsetBody.svg
 scanrulerfc/icons/offsetSurface.svg
@@ -153,12 +153,10 @@ scanrulerfc/icons/pickPoints.svg
 scanrulerfc/icons/reduceMesh.svg
 scanrulerfc/icons/revolve.svg
 scanrulerfc/icons/rotateCcw.svg
-scanrulerfc/icons/save.svg
 scanrulerfc/icons/scan.svg
 scanrulerfc/icons/scanColours.svg
 scanrulerfc/icons/section.svg
 scanrulerfc/icons/sectionView.svg
-scanrulerfc/icons/settings.svg
 scanrulerfc/icons/share.svg
 scanrulerfc/icons/sheet.svg
 scanrulerfc/icons/shell.svg
@@ -292,10 +290,12 @@ scanrulerfc/split_view.py
 scanrulerfc/statusbar.py
 scanrulerfc/symmetry.py
 scanrulerfc/thread_core.py
+scanrulerfc/viewprops.py
 scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 scanrulerfc/workbench.py
 scanrulerfc/workspaces.py
+tests/fakedoc.py
 tests/meshes.py
 tests/meshkit.py
 tests/network_meshes.py
@@ -325,6 +325,7 @@ tests/test_flat.py
 tests/test_flat_objects.py
 tests/test_flat_sheet.py
 tests/test_font_enums.py
+tests/test_freecad_owned.py
 tests/test_gui_commands.py
 tests/test_gui_guide.py
 tests/test_gui_pages.py
