@@ -129,22 +129,15 @@ SPACING, MARGIN, GROUP_MARGINS = 4, 4, (6, 4, 6, 4)
 PAGE = "ScanRulerPage"
 
 
-def page_qss(accent=None):
-    """The ScanRuler panel's stylesheet: backgrounds and text from the
-    window's palette, so it follows FreeCAD's theme (it stayed a dark slab
-    in FreeCAD Light and Studio Light); CNC Kitchen blue only as the accent
-    on primary keys and links. A disabled primary key reads as disabled in
-    a light and a dark theme alike."""
-    a = accent or W.ACCENT
-    return "\n".join((
-        f"#{PAGE}, #{PAGE} QStackedWidget, #{PAGE} QScrollArea, #{PAGE} QScrollArea > QWidget > QWidget"
-        " { background: palette(window); color: palette(window-text); }",
-        f"#{PAGE} QGroupBox {{ background: palette(base); border: 1px solid palette(mid); border-radius: 4px; }}",
-        f"#{PAGE} QLabel {{ background: transparent; color: palette(window-text); }}",
-        f"#{PAGE} QPushButton[primary=\"true\"] {{ background: {a}; color: white; }}",
-        f"#{PAGE} QPushButton[primary=\"true\"]:disabled {{ background: palette(button); color: palette(placeholder-text); }}",
-        f"#{PAGE} a {{ color: {a}; }}",
-    ))
+def page_qss(palette):
+    """The ScanRuler panel's stylesheet for a palette ({role: '#rrggbb'},
+    theme.ROLES): concrete colours worked out by theme.colours, so it
+    follows FreeCAD's theme (it stayed a near-black slab with grey key text
+    in FreeCAD Light and Studio Light); CNC Kitchen blue only on primary
+    keys and links. The dock sets and refreshes it through theme.follow."""
+    from .. import theme
+
+    return theme.sheet(PAGE, theme.colours(palette, {}))
 
 
 def head_row(s):

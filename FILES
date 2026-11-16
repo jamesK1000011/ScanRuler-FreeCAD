@@ -215,6 +215,7 @@ scanrulerfc/pages/measure3d.py
 scanrulerfc/pages/meshtools.py
 scanrulerfc/pages/reverse.py
 scanrulerfc/pages/thickness.py
+scanrulerfc/paths.py
 scanrulerfc/planar.py
 scanrulerfc/project_import.py
 scanrulerfc/qa_core.py
@@ -290,6 +291,7 @@ scanrulerfc/snapshot/store.py
 scanrulerfc/split_view.py
 scanrulerfc/statusbar.py
 scanrulerfc/symmetry.py
+scanrulerfc/theme.py
 scanrulerfc/thread_core.py
 scanrulerfc/viewprops.py
 scanrulerfc/wall_thickness.py
@@ -347,6 +349,7 @@ tests/test_outline.py
 tests/test_pack.py
 tests/test_pack_service.py
 tests/test_pages_draw.py
+tests/test_paths.py
 tests/test_qa.py
 tests/test_redteam_boundary.py
 tests/test_redteam_deviation.py
@@ -394,6 +397,7 @@ tests/test_scan.py
 tests/test_sections.py
 tests/test_snapshot.py
 tests/test_split_view.py
+tests/test_theme.py
 tests/test_thickness.py
 tests/test_thickness_maths.py
 tests/test_thread.py

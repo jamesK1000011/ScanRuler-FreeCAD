@@ -198,9 +198,12 @@ class Dock:
         lay = QtWidgets.QVBoxLayout(self.widget)
         from .pages import kit
 
-        # Backgrounds and text from FreeCAD's theme; CNC Kitchen blue as the accent.
+        # Surfaces and text from FreeCAD's theme, restyled when the theme
+        # changes (theme.follow); CNC Kitchen blue as the accent.
+        from . import theme
+
         self.widget.setObjectName(kit.PAGE)
-        self.widget.setStyleSheet(kit.page_qss())
+        theme.follow(self.widget)
 
         lay.setSpacing(kit.SPACING)  # dense: a whole section fits without scrolling
         lay.setContentsMargins(kit.MARGIN, kit.MARGIN, kit.MARGIN, kit.MARGIN)
