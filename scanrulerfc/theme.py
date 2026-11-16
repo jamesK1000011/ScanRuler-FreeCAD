@@ -176,8 +176,12 @@ def sheet(name, c):
         # (a scroll area's viewport would otherwise fill from the palette).
         f"{p} QStackedWidget, {p} QScrollArea, {p} QScrollArea > QWidget, {p} QScrollArea > QWidget > QWidget"
         " { background: transparent; }",
+        # The card's inner spacing is the group layout's contents margins
+        # alone (kit.GROUP_MARGINS): no margin or padding of the theme's own
+        # QGroupBox rule (FreeCAD Dark / Studio Light reserve a title band
+        # with padding-top), so the caps header sits at the card's top edge.
         f"{p} QGroupBox {{ background: {c['card_bg']}; border: 1px solid {c['border']};"
-        " border-radius: 4px; margin-top: 0px; }",
+        " border-radius: 4px; margin: 0px; padding: 0px; }",
         f"{p} QLabel {{ background: transparent; }}",
         f"{p} QLabel:disabled {{ color: {c['disabled_text']}; }}",
         # Keys: the theme's QPushButton style; only a checked, hovered or

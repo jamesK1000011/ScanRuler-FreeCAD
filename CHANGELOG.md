@@ -9,6 +9,15 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Section cards in the ScanRuler panel no longer open an empty band of
+  about 12-16 px above their caps header (Model, Alignment, Create Element…)
+  in FreeCAD Dark and Studio Light, seen on the Mac after the translucent
+  cards. The panel's card rule (scanrulerfc/theme.py) now sets `margin: 0px;
+  padding: 0px`, so the theme's own QGroupBox padding no longer adds to the
+  card's inside, and the card's layout margins (GROUP_MARGINS in
+  scanrulerfc/pages/kit.py) put the header as far from the top edge as the
+  rows are from the sides (6 px; 4 px at the bottom as before). The
+  translucent card background and border are unchanged.
 - The ScanRuler panel lets the theme paint it: under Studio Light and
   FreeCAD Light the page and cards stayed near-black, because those themes
   restyle by stylesheet while the Mac's QPalette stays dark, so any colour
