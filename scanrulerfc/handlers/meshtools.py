@@ -37,6 +37,29 @@ def r(v, nd=4):
     return None if v is None else round(float(v), nd)
 
 
+# The Mesh Tools maths (mesh_core, meshtools/*) refuses in the words of
+# ScanRuler's panel, which names its keys; an agent is told the tool as well.
+TOOL_WORDS = (
+    ("Fill holes", "Fill holes (mesh_fill_holes)"),
+    ("Decimate it first.", "Reduce it first: mesh_reduce, then mesh_apply_reduced."),
+    ("Smooth on a marked region", "mesh_smooth { region }"),
+    ("Grow by", "grow"),
+    ("flip the side back", "pass flip: false"),
+    ("flip the side.", "pass flip: true."),
+    ("flip the side to keep", "pass the other keep (plus / minus)"),
+    ("keep the other side", "pass the other keep (plus / minus)"),
+)
+
+
+def said(message):
+    """A Mesh Tools refusal with the tools its panel words stand for."""
+    text = str(message)
+    for words, tool in TOOL_WORDS:
+        if tool not in text:
+            text = text.replace(words, tool)
+    return text
+
+
 def mt_state(session):
     st = S.state(session)
     mine = st.setdefault("meshToolsState", {"base": None, "copy": None, "edits": [], "pending": [], "reduced": None, "undo": [], "piece": None, "wrap": None})
@@ -82,7 +105,7 @@ def plane_at(session, plane, offset, keep, auto=False):
     """cutPlane.ts cutPlaneOf: across a coordinate axis through the origin
     (the offset its coordinate), or across an element with a direction; the
     normal turned to point to the side that goes."""
-    scan = S.scan_of(session)
+    S.scan_of(session)  # refuses when no scan is open
     axis_name = SC.parse_plane_name(plane) if isinstance(plane, str) else None
     if axis_name:
         axis = SC.world_cut_axis(axis_name)
@@ -95,8 +118,12 @@ def plane_at(session, plane, offset, keep, auto=False):
             raise ToolError("invalid_input", f"{name} has no direction to cut across — take a plane, a cylinder, a cone, a line or a circle.")
     d = axis["dir"] / np.linalg.norm(axis["dir"])
     if auto:
-        centre = (scan.V.min(axis=0) + scan.V.max(axis=0)) / 2
-        offset = M.middle_offset(float((centre - axis["origin"]) @ d), 2 * M.diagonal(scan.V))
+        # The middle of the mesh worked on (the edited copy once there is
+        # one), as every other default here is read: after a cut the scan's
+        # own middle is no longer the part's.
+        W = working(session)[0]
+        centre = (W.min(axis=0) + W.max(axis=0)) / 2
+        offset = M.middle_offset(float((centre - axis["origin"]) @ d), 2 * M.diagonal(W))
     frame = SC.section_frame_along(axis, offset)
     label = f"{name}, {axis_name.upper()} {offset:g} mm" if axis_name else (name if offset == 0 else f"{name} {'+' if offset > 0 else '−'}{abs(offset):g} mm")
     normal = -frame["normal"] if keep == "plus" else frame["normal"]
@@ -131,7 +158,7 @@ def bind(session):
         try:
             V2, F2, _vmap, report = job(V, F)
         except M.MeshError as e:
-            raise ToolError("failed", str(e))
+            raise ToolError("failed", said(e))
         push_undo(session, label)
         ms = mt_state(session)
         ms["copy"] = (np.asarray(V2, dtype=float), np.asarray(F2, dtype=np.int64))
@@ -145,8 +172,11 @@ def bind(session):
     def mesh_parts(a):
         ms = mt_state(session)
         scan = S.scan_of(session)
-        red = ms["reduced"]
-        return {"scan": {"name": scan.name, "triangles": int(len(scan.F)), "edits": ms["edits"]}, "edited": None if ms["copy"] is None else {"triangles": int(len(ms["copy"][1])), "edits": ms["pending"]}, "reduced": None if red is None else red["report"], "undo": ms["undo"][-1]["label"] if ms["undo"] else None}
+        red, wrap, piece = ms["reduced"], ms.get("wrap"), ms.get("piece")
+        return {"scan": {"name": scan.name, "triangles": int(len(scan.F)), "edits": ms["edits"]}, "edited": None if ms["copy"] is None else {"triangles": int(len(ms["copy"][1])), "edits": ms["pending"]}, "reduced": None if red is None else red["report"],
+                # The previews beside the mesh that mesh_wrap and mesh_trim leave (mesh_export { part: "wrap" | "piece" }).
+                "wrap": None if wrap is None else {"triangles": int(len(wrap["F"]))}, "piece": None if piece is None else {"name": piece.get("name"), "triangles": int(len(piece["F"]))},
+                "undo": ms["undo"][-1]["label"] if ms["undo"] else None}
 
     def mesh_inspect(a):
         V, F, which = working(session)
@@ -166,9 +196,10 @@ def bind(session):
         def job(V, F):
             survey, mask, _ = M.survey_pieces(V, F, size)
             if survey["islands"] == 0:
-                raise M.MeshError("No piece of the scan is smaller than that.")
+                raise M.MeshError(f"No piece of the mesh is smaller than {size:g} mm across — its {survey['pieces']} piece{'' if survey['pieces'] == 1 else 's'} {'is' if survey['pieces'] == 1 else 'are'} all larger (the smallest {survey['smallestKept']:.4g} mm): nothing to remove. "
+                                  "A larger size takes a larger piece; mesh_inspect { pieceSize } counts them first.")
             if survey["islands"] == survey["pieces"]:
-                raise M.MeshError("Every piece of the scan is smaller than that — nothing would be left.")
+                raise M.MeshError(f"Every piece of the mesh is smaller than {size:g} mm across (the largest {survey['largestIsland']:.4g} mm) — nothing would be left. Give a size under the part's own.")
             V2, F2, vm = M.without_triangles(V, F, mask)
             return V2, F2, vm, survey
 
@@ -204,7 +235,16 @@ def bind(session):
 
     def mesh_cut(a):
         o, n, off, label = plane_at(session, a["plane"], float(a["offset"]), a["keep"])
-        return edit(f"cut at {label}", lambda V, F: M.cut_mesh(V, F, o, n, a.get("cap", True)))
+
+        def job(V, F):
+            try:
+                return M.cut_mesh(V, F, o, n, a.get("cap", True))
+            except M.MeshError as e:
+                # Where the mesh lies along the plane's own direction, as offsets.
+                along = (V - o) @ (-n if a["keep"] == "plus" else n)
+                raise M.MeshError(f"{e} At {label} the mesh runs from offset {off + float(along.min()):.4g} to {off + float(along.max()):.4g} mm: give an offset between them (mesh_cut_preview tries one without cutting).")
+
+        return edit(f"cut at {label}", job)
 
     def mesh_cut_preview(a):
         V, F, _ = working(session)
@@ -220,6 +260,13 @@ def bind(session):
 
     def mesh_fill_holes(a):
         size = a.get("size", M.default_hole_size(sizes()[0]))
+        V, F, which = working(session)
+        survey, _centres = M.survey_holes(V, F, size)
+        if survey["rims"] == 0:
+            raise ToolError("invalid_state", f"The {which} has no open rim: there is no hole to fill (mesh_inspect: open 0).")
+        if survey["holes"] == 0:
+            raise ToolError("invalid_input", f"size: no open rim of the {which} is smaller than {size:g} mm across — the smallest is {survey['smallestOpen']:.4g} mm. Pass a size above that"
+                            f"{' (at picks among the holes under size; it does not lift the limit)' if a.get('at') else ''}; mesh_inspect {{ holeSize }} lists each hole's middle.")
         return edit("fill a hole" if a.get("at") else "fill holes", lambda V, F: M.fill_holes(V, F, size, a.get("patch", "curved"), a.get("at")))
 
     def mesh_smooth(a):
@@ -231,7 +278,7 @@ def bind(session):
 
     def mesh_offset(a):
         if a.get("region") is not None:
-            raise ToolError("invalid_input", "region: moving a marked region as a step is not ported to ScanRuler for FreeCAD yet — the whole mesh moves.")
+            raise ToolError("invalid_input", "region: moving a marked region as a step is not ported to ScanRuler for FreeCAD yet — leave region out and the whole mesh moves.")
         d = float(a["distance"]) * (1 if a["direction"] == "expand" else -1)
         return edit(f"{a['direction']} by {a['distance']} mm", lambda V, F: M.offset_mesh(V, F, d))
 
@@ -273,12 +320,13 @@ def bind(session):
 
     def mesh_discard(a):
         ms = mt_state(session)
-        if a["what"] != "reduced":
-            raise ToolError("invalid_input", "what: \"reduced\" — the wrap is not ported.")
-        if ms["reduced"] is None:
-            raise ToolError("invalid_state", "There is no reduced mesh to discard.")
-        ms["reduced"] = None
-        return {"discarded": "reduced", "reduced": None}
+        what = a["what"]
+        if what not in ("reduced", "wrap"):
+            raise ToolError("invalid_input", "what: \"reduced\" (mesh_reduce's preview) or \"wrap\" (mesh_wrap's).")
+        if ms.get(what) is None:
+            raise ToolError("invalid_state", f"There is no {'reduced mesh' if what == 'reduced' else 'wrap'} to discard — {'mesh_reduce' if what == 'reduced' else 'mesh_wrap'} makes one; mesh_parts says what is on hand.")
+        ms[what] = None
+        return {"discarded": what, what: None}
 
     def mesh_use_edited(a):
         st, ms = S.state(session), mt_state(session)
@@ -357,7 +405,7 @@ def bind(session):
             m.write(path)
         except Exception as e:
             raise ToolError("failed", f"{path}: could not be written — {e}")
-        return {"file": {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}, "triangles": int(len(F)), "status": f"{part} mesh written in millimetres"}
+        return {"file": {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}, "format": fmt, "triangles": int(len(F)), "status": f"{part} mesh written in millimetres"}
 
     def surface_distances(P, V, F):
         return point_mesh_distances(P, V, F)

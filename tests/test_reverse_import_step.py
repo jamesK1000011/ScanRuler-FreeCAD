@@ -53,7 +53,9 @@ class Tool(unittest.TestCase):
     def test_refusals(self):
         with self.assertRaises(H.Refusal) as e:
             self.t["reverse_import_step"]({"path": write("solid box\nendsolid\n", "box.stl")})
-        self.assertEqual(e.exception.message, "box.stl is not a STEP file — it does not begin as one (ISO-10303-21).")
+        # The original's sentence, then what to do next (the hardening pass of 16 Nov 2026).
+        self.assertTrue(e.exception.message.startswith("box.stl is not a STEP file — it does not begin as one (ISO-10303-21)."), e.exception.message)
+        self.assertIn("export", e.exception.message)
         with self.assertRaises(H.Refusal) as e:
             self.t["reverse_import_step"]({"path": os.path.join(tempfile.mkdtemp(), "gone.step")})
         self.assertEqual(e.exception.code, "not_found")

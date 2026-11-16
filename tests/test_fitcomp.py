@@ -135,6 +135,38 @@ except ImportError:
     HAVE_AL = False
 
 
+class CalibrateWithoutAFitOfItsOwn(unittest.TestCase):
+    """A session that keeps no fit calibration itself (Agent Link's: the
+    fit tool is another add-on's): calibrate: true hands the values over
+    as the call to make, and the run still answers."""
+
+    def test_good_run_names_the_fit_call(self):
+        from scanrulerfc import handlers
+        from scanrulerfc import scanstate as S
+        from scanrulerfc.handlers import deviation as D
+
+        class Sess:
+            family_state = {}
+            out_dir = tempfile.mkdtemp()
+
+        s = Sess()
+        V, F = reference()
+        d = D.dstate(s)
+        d["reference"] = {"name": "coupon.step", "V": V, "F": F}
+        d["align"] = {"aligned": True}
+        P, N = printed()
+        k = len(P)
+        t = np.cross(N, [0.3, 0.5, 0.81])
+        t /= np.linalg.norm(t, axis=1)[:, None]
+        b = np.cross(N, t)
+        S.state(s)["scan"] = S.Scan("print.stl", np.concatenate([P, P + 1e-3 * t, P + 1e-3 * b]), np.column_stack([np.arange(k), np.arange(k) + k, np.arange(k) + 2 * k]))
+        o = handlers.bound(s, "fitcomp")["fit_scan_measure"]({"calibrate": True})
+        json.dumps(o)
+        self.assertFalse(o["poor"])
+        self.assertIs(o["calibrated"], False)
+        self.assertIn('fit { action: "calibrate", hole: 0.3, shaft: 0.201 }', o["calibrateNext"])
+
+
 @unittest.skipUnless(HAVE_AL, "Agent Link is not importable here")
 class Tools(unittest.TestCase):
     def test_measure_calibrate_export(self):

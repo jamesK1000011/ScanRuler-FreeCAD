@@ -35,7 +35,18 @@ def refusing(fn):
 
 def touching(fn, session, tool):
     """fn, and after each call that goes through the session's scanstate
-    version moves (the dock follows), as the add-on's own runner does."""
+    version moves (the dock follows), as the add-on's own runner does.
+
+    The state is written into the FreeCAD document (docstate.mark: the
+    ScanRulerState object, the scan's mesh object) on the thread FreeCAD's
+    documents live on only. A heavy tool that Agent Link runs as a job
+    (its jobs.py: a worker thread named "agentlink-job-<tool>") answers
+    off that thread, where a document write would reach the window's
+    views from the wrong thread: scanstate.touched hands its write to the
+    GUI thread when a window is up, and otherwise leaves it for the next
+    ScanRuler call off a job (docstate.on_gui_thread; mark writes whenever
+    the state differs from what it wrote last), so nothing is lost but
+    the moment."""
 
     @functools.wraps(fn)
     def run(*a):

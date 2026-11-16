@@ -237,5 +237,49 @@ class AtWork(unittest.TestCase):
         self.assertEqual(self.call("reverse_build")["bodies"], [])
 
 
+
+class Hardened(AtWork):
+    """The hardening pass of 16 Nov 2026."""
+
+    def test_an_added_sketch_is_not_said_rolled_back(self):
+        out = self.call("reverse_feature_add", features=[sketch_record(0, 0, 10, 10, "Base"), {"kind": "extrude", "name": "Block", "sketchId": 1, "extent": {"kind": "distance", "from": 0, "to": 10}, "op": "new"}])
+        self.assertEqual([(r["name"], r["kind"], r["status"]) for r in out["added"]], [("Base", "sketch", "ok"), ("Block", "extrude", "ok")])
+        self.assertIn("note", out["added"][0])
+        self.call("reverse_feature_rollback", top=True)
+        out = self.call("reverse_feature_add", feature=sketch_record(20, 0, 30, 10, "Above"))
+        self.assertEqual(out["added"][0]["status"], "ok")
+        self.assertEqual(self.call("reverse_feature_list")["features"][1]["rolledBack"], True)
+
+    def test_a_body_is_found_by_the_name_it_was_given(self):
+        self.block()
+        self.call("reverse_body_set", body=2, name="Housing")
+        self.assertEqual(self.call("reverse_body_check", body="housing")["body"], 2)
+        self.assertEqual(self.call("reverse_body_check", body="Extrude 1")["body"], 2)
+        msg = self.refused("reverse_body_check", "not_found", body="Nope")
+        self.assertIn("2 (Extrude 1)", msg)
+        self.refused("reverse_body_check", "invalid_input")
+
+    def test_an_update_takes_bodies_by_name_and_picks_by_index(self):
+        self.block()
+        self.call("reverse_feature_add", feature={"kind": "shell", "body": 2, "faces": [0], "thickness": 1})
+        faces = self.call("reverse_body_describe", body=2)["faces"]
+        out = self.call("reverse_feature_update", feature="Shell 1", set={"body": "Extrude 1", "faces": [1]})
+        stored = self.store.part()["features"][2]
+        self.assertEqual(stored["body"], 2)
+        self.assertEqual(stored["faces"], [{k: v for k, v in faces[1].items() if k != "index"}])
+        self.assertIn("reverse_feature_rollback", out["note"])
+        self.assertNotIn("note", self.call("reverse_feature_update", feature="Shell 1", set={"thickness": 2}))
+
+    def test_refusals_say_what_to_do_next(self):
+        self.block()
+        msg = self.refused("reverse_feature_add", "invalid_input", feature={"kind": "shell", "body": 2, "faces": [99], "thickness": 1})
+        self.assertIn("numbered 0 to 5", msg)
+        self.assertIn("change with every build", msg)
+        self.assertIn("app_force_restart", self.refused("reverse_build_stop", "unavailable"))
+        self.assertIn("there are: none yet", self.refused("reverse_parameter_set", "not_found", parameter="h", expression=1))
+        self.assertIn("teal", self.refused("reverse_body_set", "invalid_input", body=2, color="mauve"))
+        self.assertIn("export", self.refused("reverse_import_step", "not_found", path=os.path.join(HERE, "no-such.step")))
+
+
 if __name__ == "__main__":
     unittest.main()

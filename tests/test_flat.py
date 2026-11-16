@@ -241,5 +241,69 @@ class Tools(unittest.TestCase):
         self.assertIn("a section, not an image", d["report"])
 
 
+
+class Hardened(unittest.TestCase):
+    """The hardening pass of 16 Nov 2026, in plain Python through the
+    add-on's own runner context: what stays true on the sheet when an image
+    is opened again or calibrated, and what the refusals say."""
+
+    def setUp(self):
+        from scanrulerfc import handlers, runner
+
+        self.dir = tempfile.mkdtemp()
+        self.png = os.path.join(self.dir, "part.png")
+        write_png(self.png, picture(), ppm=10000)  # 10 px/mm
+        self.t = handlers.bound(runner.Context(out_dir=self.dir), "flat")
+
+    def refused(self, tool, code, **a):
+        with self.assertRaises(Exception) as c:
+            self.t[tool](a)
+        self.assertEqual(c.exception.code, code, c.exception.message)
+        return c.exception.message
+
+    def test_the_same_image_opened_again_starts_an_empty_sheet(self):
+        self.t["flat_open_image"]({"path": self.png})
+        self.t["flat_fit"]({"kind": "point", "points": [[1, 1]], "snap": False})
+        self.t["flat_objects"]({})
+        out = self.t["flat_open_image"]({"path": self.png})
+        self.assertEqual(out["flat"]["elements"], [])
+        self.assertIn("flat_objects first", self.refused("flat_profile", "invalid_state", object=1))
+
+    def test_a_calibration_scales_everything_on_the_sheet(self):
+        self.t["flat_open_image"]({"path": self.png})
+        self.t["flat_objects"]({})
+        self.t["flat_fit"]({"kind": "point", "points": [[10, 5]], "snap": False, "name": "P"})
+        self.t["flat_note_add"]({"text": "here", "at": [10, 5]})
+        self.t["flat_set_alignment"]({"origin": [4, 5], "xAxis": [16, 5]})
+        # The rectangle is 12 sheet units wide; call it 24 mm.
+        out = self.t["flat_calibrate"]({"mode": "distance", "points": [[4, 10], [16, 10]], "mm": 24})
+        self.assertEqual(out["scaledBy"], 2.0)
+        self.assertEqual(out["calibration"]["pxPerMm"], {"x": 5.0, "y": 5.0})
+        state = self.t["flat_report"]({})
+        self.assertEqual(state["flat"]["elements"][0]["fit"]["at"], [20.0, 10.0])
+        note = self.t["flat_edit"]({"note": 1, "visible": True})["note"]
+        self.assertEqual(note["at"], [20.0, 10.0])
+        self.assertIn("origin at 8.000, 10.000", state["text"])
+        self.assertIn("flat_objects first", self.refused("flat_profile", "invalid_state", object=1))
+
+    def test_an_export_ends_in_its_format(self):
+        self.t["flat_open_image"]({"path": self.png})
+        out = self.t["flat_export"]({"format": "svg", "path": os.path.join(self.dir, "sheet-out")})
+        self.assertEqual(out["file"]["name"], "sheet-out.svg")
+        self.assertEqual((out["format"], out["units"]), ("svg", "mm"))
+        self.assertTrue(os.path.isfile(out["file"]["path"]))
+
+    def test_refusals_say_what_to_do_next(self):
+        self.assertIn("flat_open_image", self.refused("flat_edges", "invalid_state"))
+        self.t["flat_open_image"]({"path": self.png})
+        self.t["flat_fit"]({"kind": "line", "points": [[4, 8], [4, 12]], "name": "Side"})
+        self.t["flat_fit"]({"kind": "point", "points": [[23, 10]], "snap": False, "name": "Mid"})
+        msg = self.refused("flat_dimension_add", "invalid_input", refs=["Side", "Mid"])
+        self.assertIn("flat-dist-point-line: point then line", msg)
+        self.assertIn("give the point first", msg)
+        self.assertIn("exactly two places", self.refused("flat_calibrate", "invalid_input", mode="distance", points=[[0, 0], [1, 0], [2, 0]], mm=5))
+        self.assertIn("one of them, not both", self.refused("flat_curvature", "invalid_input"))
+
+
 if __name__ == "__main__":
     unittest.main()

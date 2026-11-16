@@ -74,6 +74,139 @@ class Codec(unittest.TestCase):
         np.testing.assert_allclose(D.points_from_object(P @ R.T + t, (R, t), box), P, atol=1e-12)
 
 
+class WhichThreadWrites(unittest.TestCase):
+    """A heavy read may run on a worker thread (Agent Link's jobs): what it
+    writes into the document afterwards goes to the GUI thread."""
+
+    def test_runs_at_once_on_the_main_thread_and_never_on_a_worker(self):
+        import threading
+
+        ran = []
+        self.assertTrue(D.on_gui_thread(lambda: ran.append("main")))
+        got = []
+        th = threading.Thread(target=lambda: got.append(D.on_gui_thread(lambda: ran.append("worker"))))
+        th.start()
+        th.join(3)
+        # No window here to hand it to: not run on the worker, left for the next call.
+        self.assertEqual((ran, got), (["main"], [None]))
+
+    def test_without_a_window_a_job_leaves_the_state_for_the_next_call(self):
+        import threading
+        import unittest.mock
+
+        ctx = types.SimpleNamespace(doc=None, family_state={})
+        with unittest.mock.patch.object(D, "mark") as mark:
+            th = threading.Thread(target=lambda: S.touched(ctx, "deviation_measure"), name="agentlink-job-deviation_measure")
+            th.start()
+            th.join(3)
+            self.assertEqual(mark.call_count, 0)
+            self.assertEqual(S.state(ctx)["last_tool"], "deviation_measure")  # the dock still follows
+            S.touched(ctx, "scan_info")
+            self.assertEqual(mark.call_count, 1)
+
+    def test_with_a_window_a_job_hands_the_state_to_the_gui_thread(self):
+        import threading
+        import unittest.mock
+
+        ctx = types.SimpleNamespace(doc=None, family_state={})
+        sent = []
+        poster = types.SimpleNamespace(go=types.SimpleNamespace(emit=sent.append))
+        with unittest.mock.patch.object(D, "mark") as mark, unittest.mock.patch.object(D, "_gui_up", lambda: True), \
+                unittest.mock.patch.object(D, "_poster", lambda: poster):
+            th = threading.Thread(target=lambda: S.touched(ctx, "mesh_wrap"), name="agentlink-job-mesh_wrap")
+            th.start()
+            th.join(3)
+            self.assertEqual((mark.call_count, len(sent)), (0, 1))
+            sent[0]()
+            self.assertEqual(mark.call_count, 1)
+
+    def test_mark_itself_refuses_a_worker_thread(self):
+        import threading
+
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        D._SIGS.clear()
+        doc = fakedoc.Doc("Job")
+        ctx = types.SimpleNamespace(doc=doc, family_state={})
+        S.state(ctx)["scan"] = box_scan()
+        got = []
+        th = threading.Thread(target=lambda: got.append(D.mark(ctx)))
+        th.start()
+        th.join(3)
+        self.assertEqual(got, [False])
+        self.assertIsNone(D.find_state(doc))
+        self.assertTrue(D.mark(ctx))
+        self.assertIsNotNone(D.find_state(doc))
+
+    def test_without_a_window_a_best_fit_on_a_worker_moves_the_object_at_the_next_call(self):
+        import threading
+
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        D._SIGS.clear()
+        doc = fakedoc.Doc("Fit")
+        ctx = types.SimpleNamespace(doc=doc, family_state={})
+        sc = box_scan()
+        S.state(ctx)["scan"] = sc
+        D.put_scan(doc, sc)
+        before = sc.placed
+        th = threading.Thread(target=lambda: sc.set_pose(1.0, rot_z(90), np.array([5.0, 0, 0])))
+        th.start()
+        th.join(3)
+        self.assertIs(sc.placed, before)  # the object not moved from the worker
+        self.assertTrue(sc.pose_waiting)
+        self.assertFalse(D.pull_pose(S.state(ctx), doc))  # and no move read in between
+        self.assertTrue(D.mark(ctx))  # the next call, on the document's thread
+        self.assertFalse(sc.pose_waiting)
+        np.testing.assert_allclose(sc.placed[1], [5.0, 0, 0], atol=1e-9)
+
+    def test_a_worker_thread_hands_the_write_over_when_a_window_is_up(self):
+        import threading
+        import unittest.mock
+
+        class Go:
+            def __init__(self):
+                self.sent = []
+
+            def emit(self, fn):
+                self.sent.append(fn)
+
+        poster = types.SimpleNamespace(go=Go())
+        ran, got = [], []
+        with unittest.mock.patch.object(D, "_gui_up", lambda: True), unittest.mock.patch.object(D, "_poster", lambda: poster):
+            th = threading.Thread(target=lambda: got.append(D.on_gui_thread(lambda: ran.append(1))))
+            th.start()
+            th.join(3)
+            self.assertEqual((ran, got, len(poster.go.sent)), ([], [False], 1))  # queued, not run on the worker
+            self.assertTrue(D.on_gui_thread(lambda: ran.append(2)))  # the GUI thread itself writes at once
+        poster.go.sent[0]()
+        self.assertEqual(ran, [2, 1])
+
+    def test_a_best_fit_on_a_worker_moves_the_scan_object_on_the_gui_thread(self):
+        import threading
+        import unittest.mock
+
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        doc = fakedoc.Doc("Fit")
+        sc = box_scan()
+        D.put_scan(doc, sc)
+        sent = []
+        poster = types.SimpleNamespace(go=types.SimpleNamespace(emit=sent.append))
+        before = sc.placed
+        with unittest.mock.patch.object(D, "_gui_up", lambda: True), unittest.mock.patch.object(D, "_poster", lambda: poster):
+            th = threading.Thread(target=lambda: sc.set_pose(1.0, rot_z(90), np.array([5.0, 0, 0])))
+            th.start()
+            th.join(3)
+        self.assertEqual(len(sent), 1)
+        self.assertIs(sc.placed, before)  # the object not yet moved: pull_pose reads no move
+        sent[0]()
+        np.testing.assert_allclose(sc.placed[1], [5.0, 0, 0], atol=1e-9)
+
+
 class InTheDocument(unittest.TestCase):
     """mark writes the state on change; a reopened document reads it; the
     scan is a mesh object whose Placement is the alignment."""

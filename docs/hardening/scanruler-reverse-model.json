@@ -1,0 +1,769 @@
+{
+ "tutorial": "No FreeCAD wiki tutorial covers ScanRuler's Reverse engineer (Stefan Hermann's / CNC Kitchen's feature engine, ported onto Part / OCCT). The model rebuilds the simplest tutorial-style part — a block with a bored hole and rounded upright edges, as PartDesign's Basic_Part_Design_Tutorial.md builds one with Pad, Pocket and Fillet — through the feature list, so every volume has a worked-out answer; then a second body, a clearance, an imported STEP gauge block and a revolved ring.",
+ "reference": null,
+ "expected": {
+  "block": {
+   "size_mm": [
+    40,
+    30,
+    20
+   ],
+   "volume_mm3": 24000,
+   "faces": 6,
+   "edges": 12
+  },
+  "halfHeight": {
+   "volume_mm3": 12000
+  },
+  "bored": {
+   "volume_mm3": 22429.2,
+   "faces": 7
+  },
+  "rounded": {
+   "radius_mm": 3,
+   "removed_mm3": 154.51,
+   "volume_mm3": 22274.69,
+   "faces": 11
+  },
+  "roundedNoBore": {
+   "volume_mm3": 23845.49,
+   "faces": 10
+  },
+  "peg": {
+   "volume_mm3": 1000,
+   "gapToBlock_mm": 10,
+   "overlapAfterMove_mm3": 480.69
+  },
+  "gauge": {
+   "volume_mm3": 512
+  },
+  "ring": {
+   "volume_mm3": 1963.5
+  },
+  "ids": "In a fresh document the features get ids 1 to 11 in the order added (a refused call uses none): Base sketch 1, Block 2, Hole sketch 3, Bore 4, Round 5, Peg sketch 6, Peg 7, Seat dowel 8, gauge 9, Ring sketch 10, Ring 11.",
+  "where": "The argument shapes, ids, refusals and parameter answers were run in plain Python on the add-on's stand-in kernel on this pass; the volumes are worked out by hand. No geometry ran: the kernel is FreeCAD's Part."
+ },
+ "conventions": {
+  "placeholders": {
+   "<UPRIGHT_EDGES>": "a list of four whole numbers: the index of each edge in the reverse_body_describe { body: 'Block' } answer just before whose kind is 'line', length 20 and mid [0 or 40, 0 or 30, 10] (the block's corners; NOT the bore's seam, whose mid is at y 15)",
+   "<MOVED_PEG>": "the id of the 1000 mm³ body in the answer of the moveBody call (7 if a move keeps the body's id, 8 if the move makes it its own)"
+  },
+  "session": "A fresh document: the ids above depend on it. Run the chunks in order.",
+  "health": "Every changing reverse_ call carries health; it is red when a feature failed (the add-on's own reading, new on this pass). Expected green throughout.",
+  "tolerances": "Volumes within 0.05 mm³ (exact geometry)."
+ },
+ "calls": [
+  {
+   "tool": "doc_new",
+   "arguments": {
+    "name": "ScanReverseModel"
+   },
+   "expect": "a new empty document"
+  },
+  {
+   "tool": "reverse_feature_list",
+   "arguments": {},
+   "expect": "features []; rollback { built 0, of 0 }; parameters 0 (no container is made by a read)"
+  },
+  {
+   "tool": "reverse_feature_schema",
+   "arguments": {
+    "kind": "extrude"
+   },
+   "expect": "fields { sketchId null, regions [], extent { kind distance, from 0, to 10 }, draftDeg 0, op 'join' }"
+  },
+  {
+   "tool": "reverse_feature_schema",
+   "arguments": {
+    "kind": "gear"
+   },
+   "expect": "refused (invalid_input): no feature kind 'gear', with the list of kinds"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "features": [
+     {
+      "kind": "sketch",
+      "name": "Base sketch",
+      "plane": {
+       "kind": "world",
+       "axis": "z",
+       "offset": 0
+      },
+      "sketch": {
+       "entities": [
+        {
+         "id": 1,
+         "kind": "line",
+         "a": [
+          0,
+          0
+         ],
+         "b": [
+          40,
+          0
+         ]
+        },
+        {
+         "id": 2,
+         "kind": "line",
+         "a": [
+          40,
+          0
+         ],
+         "b": [
+          40,
+          30
+         ]
+        },
+        {
+         "id": 3,
+         "kind": "line",
+         "a": [
+          40,
+          30
+         ],
+         "b": [
+          0,
+          30
+         ]
+        },
+        {
+         "id": 4,
+         "kind": "line",
+         "a": [
+          0,
+          30
+         ],
+         "b": [
+          0,
+          0
+         ]
+        }
+       ],
+       "constraints": [],
+       "nextId": 5
+      }
+     },
+     {
+      "kind": "extrude",
+      "name": "Block",
+      "sketchId": 1,
+      "extent": {
+       "kind": "distance",
+       "from": 0,
+       "to": 20
+      },
+      "op": "new"
+     }
+    ]
+   },
+   "expect": "added [{ id 1, name 'Base sketch', kind 'sketch', status 'ok', note }, { id 2, name 'Block', kind 'extrude', status 'ok', bodies [2] }] (the sketch read 'rolledBack' before the pass); failed []; bodies [{ id 2, name 'Block', volume 24000, closed true, surface false, faces 6, box [0,0,0] to [40,30,20] }]; health ok. The document gains 'Reverse engineer' and a body object 'Block'"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "bodies [{ id 2, name 'Block', volume 24000, closed true, faces 6, visible true }]"
+  },
+  {
+   "tool": "reverse_body_check",
+   "arguments": {
+    "body": "Block"
+   },
+   "expect": "body 2; closed true; valid true; solids 1; shells [1]; volume 24000; surface false"
+  },
+  {
+   "tool": "reverse_body_describe",
+   "arguments": {
+    "body": 2
+   },
+   "expect": "faces: 6 planes (index 0 to 5), areas 1200, 1200, 800, 800, 600, 600 in some order, origin 2; edges: 12 lines (index 0 to 11): four of length 40, four of 30, four of 20 with dir [0, 0, 1] or [0, 0, -1]"
+  },
+  {
+   "tool": "reverse_parameter_add",
+   "arguments": {
+    "name": "h",
+    "expression": 20,
+    "kind": "length",
+    "comment": "block height"
+   },
+   "expect": "parameter { id 1, name 'h', kind 'length', expression '20', value 20 }; bodies unchanged"
+  },
+  {
+   "tool": "reverse_parameter_add",
+   "arguments": {
+    "name": "sin",
+    "expression": 1
+   },
+   "expect": "refused (invalid_input): the name will not do — a word the expressions keep"
+  },
+  {
+   "tool": "reverse_feature_update",
+   "arguments": {
+    "feature": "Block",
+    "set": {
+     "exprs": {
+      "extent.to": "h"
+     }
+    }
+   },
+   "expect": "feature.exprs { 'extent.to': 'h' }; result.status 'ok'; Block volume 24000; no note (no picks by index)"
+  },
+  {
+   "tool": "reverse_parameter_set",
+   "arguments": {
+    "parameter": "h",
+    "expression": "10"
+   },
+   "expect": "parameter.value 10; bodies: Block volume 12000, box.max [40, 30, 10]; steps.recomputed 1"
+  },
+  {
+   "tool": "reverse_parameter_set",
+   "arguments": {
+    "parameter": "h",
+    "expression": "2 * 10"
+   },
+   "expect": "parameter.value 20; Block volume 24000"
+  },
+  {
+   "tool": "reverse_parameter_rename",
+   "arguments": {
+    "parameter": "h",
+    "to": "height"
+   },
+   "expect": "results ok; reverse_feature_list { feature: 'Block' } would show exprs { 'extent.to': 'height' }"
+  },
+  {
+   "tool": "reverse_parameter_remove",
+   "arguments": {
+    "parameter": "height"
+   },
+   "expect": "refused (invalid_state): height is read by Block"
+  },
+  {
+   "tool": "reverse_parameter_set",
+   "arguments": {
+    "parameter": "h",
+    "expression": 5
+   },
+   "expect": "refused (not_found): no parameter 'h'; the message lists 'height'"
+  },
+  {
+   "tool": "reverse_parameter_list",
+   "arguments": {},
+   "expect": "parameters [{ id 1, name 'height', kind 'length', expression '2 * 10', value 20, comment 'block height' }]"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "feature": {
+     "kind": "sketch",
+     "name": "Hole sketch",
+     "plane": {
+      "kind": "world",
+      "axis": "z",
+      "offset": 0
+     },
+     "sketch": {
+      "entities": [
+       {
+        "id": 1,
+        "kind": "circle",
+        "c": [
+         20,
+         15
+        ],
+        "r": 5
+       }
+      ],
+      "constraints": [],
+      "nextId": 2
+     }
+    }
+   },
+   "expect": "added [{ id 3, name 'Hole sketch', kind 'sketch', status 'ok' }]; bodies unchanged"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "feature": {
+     "kind": "extrude",
+     "name": "Bore",
+     "sketchId": 3,
+     "extent": {
+      "kind": "distance",
+      "from": -1,
+      "to": 21
+     },
+     "op": "cut"
+    }
+   },
+   "expect": "added [{ id 4, name 'Bore', status 'ok' }]; Block: volume 22429.20 (24000 - pi x 25 x 20), faces 7, closed true; still one body, id 2"
+  },
+  {
+   "tool": "reverse_body_describe",
+   "arguments": {
+    "body": "Block"
+   },
+   "expect": "faces 7: six planes and one cylinder (radius 5, dir [0, 0, ±1], origin 4); edges: the 12 lines of the box, two circles of radius 5 and the cylinder's seam (a line of length 20 at x 25 or 15, y 15). Note the indices of the four upright edges at the block's corners for the next call"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "feature": {
+     "kind": "fillet",
+     "name": "Round",
+     "body": "Block",
+     "edges": "<UPRIGHT_EDGES>",
+     "radius": 3
+    }
+   },
+   "expect": "added [{ id 5, name 'Round', status 'ok' }]; Block: volume 22274.69 (22429.20 - (4 - pi) x 3² x 20 = 154.51), faces 11, closed true"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "feature": {
+     "kind": "fillet",
+     "name": "Round 2",
+     "body": "Block",
+     "edges": [
+      999
+     ],
+     "radius": 1
+    }
+   },
+   "expect": "refused (invalid_input): there is no edge 999; the message gives how many reverse_body_describe lists and says the numbers change with every build; nothing added"
+  },
+  {
+   "tool": "reverse_feature_list",
+   "arguments": {},
+   "expect": "five rows in order: Base sketch, Block (status ok, key 20 mm, exprs), Hole sketch, Bore (ok), Round (ok, key 3 mm); rollback { built 5, of 5 }; parameters 1"
+  },
+  {
+   "tool": "reverse_feature_list",
+   "arguments": {
+    "feature": "Round"
+   },
+   "expect": "the record whole: kind 'fillet', body 2, radius 3, chain true, edges: four fingerprints { kind 'line', mid [0|40, 0|30, 10], dir, length 20, faces, origin 2 } — not the indices given; result.status 'ok'"
+  },
+  {
+   "tool": "reverse_feature_suppress",
+   "arguments": {
+    "feature": "Round"
+   },
+   "expect": "results without a row for Round; Block volume 22429.20, faces 7"
+  },
+  {
+   "tool": "reverse_feature_suppress",
+   "arguments": {
+    "feature": "Round",
+    "suppressed": false
+   },
+   "expect": "Block volume 22274.69, faces 11"
+  },
+  {
+   "tool": "reverse_feature_rollback",
+   "arguments": {
+    "after": "Block"
+   },
+   "expect": "rollback { after 2, built 2, of 5 }; bodies: Block volume 24000, faces 6 (the bore and the rounds are below the bar)"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "features": [
+     {
+      "kind": "sketch",
+      "name": "Peg sketch",
+      "plane": {
+       "kind": "world",
+       "axis": "z",
+       "offset": 0
+      },
+      "sketch": {
+       "entities": [
+        {
+         "id": 1,
+         "kind": "line",
+         "a": [
+          50,
+          0
+         ],
+         "b": [
+          60,
+          0
+         ]
+        },
+        {
+         "id": 2,
+         "kind": "line",
+         "a": [
+          60,
+          0
+         ],
+         "b": [
+          60,
+          10
+         ]
+        },
+        {
+         "id": 3,
+         "kind": "line",
+         "a": [
+          60,
+          10
+         ],
+         "b": [
+          50,
+          10
+         ]
+        },
+        {
+         "id": 4,
+         "kind": "line",
+         "a": [
+          50,
+          10
+         ],
+         "b": [
+          50,
+          0
+         ]
+        }
+       ],
+       "constraints": [],
+       "nextId": 5
+      }
+     },
+     {
+      "kind": "extrude",
+      "name": "Peg",
+      "sketchId": 6,
+      "extent": {
+       "kind": "distance",
+       "from": 0,
+       "to": 10
+      },
+      "op": "new"
+     }
+    ]
+   },
+   "expect": "added ids 6 and 7, at the bar (after Block); bodies: Block 24000 and Peg { id 7, volume 1000, box [50,0,0] to [60,10,10] }"
+  },
+  {
+   "tool": "reverse_feature_rollback",
+   "arguments": {},
+   "expect": "rollback { after null, built 7, of 7 }; bodies: Block volume 22274.69 and Peg 1000 (the bore's cut does not reach the peg)"
+  },
+  {
+   "tool": "reverse_body_clearance",
+   "arguments": {
+    "a": "Block",
+    "b": "Peg"
+   },
+   "expect": "a 2; b 7; gap 10 (x 40 to x 50); overlap 0"
+  },
+  {
+   "tool": "reverse_feature_move",
+   "arguments": {
+    "feature": "Peg sketch",
+    "after": "Peg"
+   },
+   "expect": "refused (invalid_state): Peg builds on Peg sketch, which would then come after it"
+  },
+  {
+   "tool": "reverse_feature_move",
+   "arguments": {
+    "features": [
+     "Peg sketch",
+     "Peg"
+    ],
+    "after": "Round"
+   },
+   "expect": "results all ok; reverse_feature_list order now: Base sketch, Block, Hole sketch, Bore, Round, Peg sketch, Peg; volumes unchanged"
+  },
+  {
+   "tool": "reverse_body_set",
+   "arguments": {
+    "body": "Peg",
+    "name": "Dowel",
+    "color": "teal"
+   },
+   "expect": "bodies: id 7 with style { name 'Dowel', color '#0f9b9b' }, visible true; in the document the body's label is 'Dowel' and it is teal (before the pass the label and colour did not change on an existing body)"
+  },
+  {
+   "tool": "reverse_body_check",
+   "arguments": {
+    "body": "Dowel"
+   },
+   "expect": "body 7; closed true; valid true; solids 1; volume 1000 (found by the name given; this was 'not found' before the pass)"
+  },
+  {
+   "tool": "reverse_body_set",
+   "arguments": {
+    "body": "Dowel",
+    "color": "mauve"
+   },
+   "expect": "refused (invalid_input): not a colour; the swatches are listed"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "feature": {
+     "kind": "moveBody",
+     "name": "Seat dowel",
+     "bodies": [
+      "Dowel"
+     ],
+     "translate": [
+      -15,
+      0,
+      0
+     ],
+     "rotate": [
+      0,
+      0,
+      0
+     ],
+     "copy": false
+    }
+   },
+   "expect": "added [{ id 8, name 'Seat dowel', kind 'moveBody', status 'ok' }]; bodies: Block 22274.69 and a 1000 mm³ body with box [35,0,0] to [45,10,10] (note its id for the next call)"
+  },
+  {
+   "tool": "reverse_body_clearance",
+   "arguments": {
+    "a": 2,
+    "b": "<MOVED_PEG>"
+   },
+   "expect": "gap 0; overlap 480.69 (the 5 x 10 x 10 the peg shares with the block, 500, less the rounded corner (1 - pi/4) x 3² x 10 = 19.31)"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     8,
+     8,
+     8
+    ],
+    "at": [
+     0,
+     50,
+     0
+    ],
+    "name": "Gauge"
+   },
+   "expect": "volume 512"
+  },
+  {
+   "tool": "export",
+   "arguments": {
+    "objects": [
+     "Gauge"
+    ],
+    "path": "gauge.step"
+   },
+   "expect": "a STEP file gauge.step in the session's folder"
+  },
+  {
+   "tool": "reverse_import_step",
+   "arguments": {
+    "path": "gauge.stp"
+   },
+   "expect": "refused (not_found): cannot be read; the message says where a relative name is looked for and names export"
+  },
+  {
+   "tool": "reverse_import_step",
+   "arguments": {
+    "path": "gauge.step"
+   },
+   "expect": "added [{ id 9, name 'gauge', kind 'import', status 'ok', bodies [9] }]; bodies now include { id 9, name 'gauge', volume 512, box [0,50,0] to [8,58,8], closed true }"
+  },
+  {
+   "tool": "reverse_feature_add",
+   "arguments": {
+    "features": [
+     {
+      "kind": "sketch",
+      "name": "Ring sketch",
+      "plane": {
+       "kind": "world",
+       "axis": "y",
+       "offset": 0
+      },
+      "sketch": {
+       "entities": [
+        {
+         "id": 1,
+         "kind": "line",
+         "a": [
+          10,
+          10
+         ],
+         "b": [
+          15,
+          10
+         ]
+        },
+        {
+         "id": 2,
+         "kind": "line",
+         "a": [
+          15,
+          10
+         ],
+         "b": [
+          15,
+          15
+         ]
+        },
+        {
+         "id": 3,
+         "kind": "line",
+         "a": [
+          15,
+          15
+         ],
+         "b": [
+          10,
+          15
+         ]
+        },
+        {
+         "id": 4,
+         "kind": "line",
+         "a": [
+          10,
+          15
+         ],
+         "b": [
+          10,
+          10
+         ]
+        }
+       ],
+       "constraints": [],
+       "nextId": 5
+      }
+     },
+     {
+      "kind": "revolve",
+      "name": "Ring",
+      "sketchId": 10,
+      "axis": {
+       "kind": "world",
+       "axis": "z"
+      },
+      "angleDeg": 360,
+      "op": "new"
+     }
+    ]
+   },
+   "expect": "added ids 10 and 11; a body 'Ring' { id 11, volume 1963.50 (pi x (15² - 10²) x 5), closed true, faces 4 }, its box 30 x 30 x 5 round the Z axis (z 10 to 15 or -15 to -10, by the sketch plane's v direction)"
+  },
+  {
+   "tool": "reverse_feature_remove",
+   "arguments": {
+    "feature": "Hole sketch"
+   },
+   "expect": "refused (invalid_state): Bore uses what Hole sketch makes — dependents: true"
+  },
+  {
+   "tool": "reverse_feature_remove",
+   "arguments": {
+    "feature": "Hole sketch",
+    "dependents": true
+   },
+   "expect": "removed [3, 4]; Block volume 23845.49 (24000 - 154.51: the rounds stay, their edges found again by fingerprint), faces 10; Round's row ok, perhaps with a warning"
+  },
+  {
+   "tool": "reverse_build",
+   "arguments": {},
+   "expect": "results: every built feature ok; failed []; steps { recomputed 0 or more, restored, of }; bodies: four (Block 23845.49, the dowel 1000, gauge 512, Ring 1963.50)"
+  },
+  {
+   "tool": "reverse_build_stop",
+   "arguments": {},
+   "expect": "refused (unavailable): builds run inside FreeCAD; names reverse_feature_suppress, reverse_feature_rollback and app_force_restart"
+  },
+  {
+   "tool": "recompute",
+   "arguments": {
+    "force": true
+   },
+   "expect": "ok true; no errors; nothing stillTouched"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "the same four bodies and volumes as before the recompute"
+  },
+  {
+   "tool": "doc_save",
+   "arguments": {
+    "path": "scan-reverse-model"
+   },
+   "expect": "path …/scan-reverse-model.FCStd"
+  },
+  {
+   "tool": "doc_close",
+   "arguments": {},
+   "expect": "closed"
+  },
+  {
+   "tool": "doc_open",
+   "arguments": {
+    "path": "scan-reverse-model.FCStd"
+   },
+   "expect": "objects include 'Reverse engineer' and four body objects; errors []"
+  },
+  {
+   "tool": "recompute",
+   "arguments": {
+    "force": true
+   },
+   "expect": "ok true; errors []. THE CHECK OF THE PASS'S RECOMPUTE FIX: before it, the bodies ran before their container had built in this session and were left with empty shapes"
+  },
+  {
+   "tool": "object_list",
+   "arguments": {
+    "type": "Part::FeaturePython"
+   },
+   "expect": "the four bodies each with its volume (23845.49, 1000, 512, 1963.50) — none empty; 'Reverse engineer' holds the solids as one compound"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "four bodies, volumes as above; the dowel still styled { name 'Dowel', color '#0f9b9b' }"
+  },
+  {
+   "tool": "reverse_feature_clear",
+   "arguments": {
+    "confirm": false
+   },
+   "expect": "refused (invalid_input): give confirm: true"
+  },
+  {
+   "tool": "reverse_feature_clear",
+   "arguments": {
+    "confirm": true
+   },
+   "expect": "results []; bodies []; the body objects leave the document; reverse_parameter_list is empty"
+  },
+  {
+   "tool": "history_undo",
+   "arguments": {},
+   "expect": "the clear is taken back: reverse_body_names lists the four bodies again"
+  }
+ ],
+ "notCovered": [
+  "feature kinds beyond sketch, extrude, revolve, fillet, moveBody and import (chamfer, shell, hole, thread, draft, pattern, mirror, boolean, cutPlane, loft, sweep, the surface kinds): each needs picks or planes whose record shapes were not checked on this pass — reverse_feature_schema gives them",
+  "sketches on a section's or a measured plane, extract, surface, network, trim, split: they need a scan with sections and elements (the other ScanRuler agent's families)",
+  "reverse_feature_update with picks by index on a rolled-back part (the road its description gives)",
+  "reverse_body_set { visible: false }",
+  "a build slow enough to matter, and a failing feature (health red): set Round's radius to 30 with reverse_feature_update to see one"
+ ]
+}

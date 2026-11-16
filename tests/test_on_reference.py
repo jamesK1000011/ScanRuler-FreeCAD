@@ -57,6 +57,21 @@ class OnReference(unittest.TestCase):
         self.assertTrue(np.allclose(R.read(c, n, SV, SF, reach=3.0), 0.3))
         self.assertTrue(np.isnan(R.read(c, n, SV, SF, reach=0.2)).all())
 
+    def test_thin_triangles_do_not_run_past_the_most_readings(self):
+        # A strip 0.5 mm wide and 200 long as two triangles (a bore wall's
+        # facet in a CAD tessellation): halving until no edge is over the
+        # spacing makes far more pieces than its area over spacing²/8.
+        V = np.array([(0, 0, 0), (200, 0, 0), (200, 0.5, 0), (0, 0.5, 0)], dtype=float)
+        F = np.array([(0, 1, 2), (0, 2, 3)])
+        plain = R.cut(V, F, 0.25)
+        self.assertGreater(len(plain[0]), 4000)
+        centres, normals, pieces, areas, spacing = R.cut_within(V, F, 0.25, most=4000)
+        self.assertLessEqual(len(centres), 4000)
+        self.assertGreater(spacing, 0.25)
+        self.assertAlmostEqual(float(areas.sum()), 100.0, places=6)  # the whole strip still read
+        same = R.cut_within(V, F, 0.25, most=10**7)
+        self.assertEqual((len(same[0]), same[4]), (len(plain[0]), 0.25))
+
     def test_spacing(self):
         self.assertEqual(R.wanted_spacing(0.1, 100), 0.25)
         self.assertEqual(R.wanted_spacing(5, 100), 2.0)

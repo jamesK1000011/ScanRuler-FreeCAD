@@ -60,6 +60,19 @@ def cut(V, F, spacing):
     return P.mean(1), n, P, area
 
 
+def cut_within(V, F, spacing, most=MAX_SAMPLES):
+    """cut, with the spacing opened until there are no more than `most`
+    readings: wanted_spacing counts on pieces of about spacing²/8, but long
+    thin triangles (a CAD tessellation's fans and strips) are halved many
+    more times than that and gave nine times the readings it allows for.
+    (centres, normals, pieces, areas, the spacing used)."""
+    while True:
+        got = cut(V, F, spacing)
+        if len(got[0]) <= most:
+            return (*got, spacing)
+        spacing *= max(1.25, math.sqrt(len(got[0]) / most) ** 0.5)
+
+
 def read(centres, normals, SV, SF, reach, facing_deg=DEFAULT_FACING_DEG, group=64, chunk_cells=4_000_000):
     """Signed mm per reading (positive: the scan outside the reference,
     excess material — as on the scan's own map), NaN where no scan surface

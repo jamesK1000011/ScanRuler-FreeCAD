@@ -33,7 +33,7 @@ Coordinates are mm in the frame the part is measured in now, after any alignment
 3. **Normals.** `mesh_flip_normals { region }` for a part exported inside out, or patches that face in.
 4. **Holes.** `mesh_fill_holes { size, patch, at }` closes holes smaller than `size` (a twentieth of the part to start) — or with `at` only the one nearest that point. `patch` curved (to start) or flat. The answer's `closed` says whether the mesh is now closed.
 5. **Scatter.** `mesh_smooth { size, limit, keepEdges, region }` — bumps smaller than `size` go, larger shape stays; no point moves further than `limit`; `keepEdges` (on) leaves sharp edges as scanned.
-6. **Reduce.** `mesh_reduce { tolerance, maxTriangles }` — a light mesh within `tolerance` of the one worked on (FreeCAD's quadric decimation, measured both ways). Read `held`: whether 99.9 % lies within tolerance both ways.
+6. **Reduce.** `mesh_reduce { tolerance, maxTriangles }` — a light mesh made by FreeCAD's quadric decimation and measured against the one worked on both ways. FreeCAD's decimator does not take the tolerance as millimetres, so the result is not guaranteed to lie within it: read `held` (whether 99.9 % lies within tolerance both ways), `max` and `backMax`.
 
 ## Shape edits
 
@@ -51,3 +51,7 @@ Coordinates are mm in the frame the part is measured in now, after any alignment
 - `mesh_fill_holes` on an opening the part really has (a bore, a slot) closes the part's own hole: read each hole's middle in `mesh_inspect` first and fill by `at`.
 - `mesh_smooth` with a large `size` rounds real edges and small features off: keep `limit` near the scan's noise.
 - A reduced mesh is a preview: nothing is changed until `mesh_apply_reduced` or `mesh_export`.
+- `mesh_wrap`'s skin and `mesh_trim`'s piece are previews too (`mesh_parts` lists them; `mesh_discard { what }` drops the reduced mesh or the wrap).
+- Mesh edits are the session's, not the FreeCAD document's: `mesh_undo` takes one back, FreeCAD's undo does not. Vertex numbers and chain numbers change with every edit.
+- On a CAD-style mesh (vertices only on its edges: a box is 12 triangles) `mesh_smooth`, `mesh_trim`, the fits and the sections find little: `mesh_densify` first.
+- Size: `mesh_smooth` is the slowest edit (about 40 s at 130,000 triangles where it was timed, a Linux container) and `mesh_wrap` grows with the input's triangles (6 minutes at 86,000): `mesh_reduce` and `mesh_apply_reduced` first on a large scan. The heavy tools answer as a job past 45 s (`job_status`).

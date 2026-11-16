@@ -68,6 +68,12 @@ def _declared():
         return json.load(f)["entries"]
 
 
+# Reads at the base that the hardening pass of 16 Nov 2026 declared changes:
+# mesh_export { to: "document" } and flat_curvature { comb: true } write the
+# document and now say so (their other calls are "reads").
+NOW_CHANGES = ("flat_curvature", "mesh_export")
+
+
 def _base_entries():
     try:
         out = subprocess.run(["git", "-C", ROOT, "show", f"{BASE}:scanrulerfc/data/tools.json"], capture_output=True, text=True, timeout=30)
@@ -94,12 +100,19 @@ class Registry(unittest.TestCase):
         now = _declared()
         self.assertEqual(sorted(set(now) - set(base)), ADDED)
         self.assertEqual(set(base) - set(now), set())
-        # Edited since on purpose: the boolean and the trim no longer need
-        # FreeCAD's Mesh booleans (meshbool), and their descriptions say so.
-        edited = {"mesh_boolean", "mesh_trim"}
-        self.assertEqual(sorted(k for k in base if base[k] != now[k] and k not in edited), [])
-        for k in edited:
-            self.assertEqual({f: v for f, v in base[k].items() if f != "description"}, {f: v for f, v in now[k].items() if f != "description"})
+        # Descriptions, dates, the heavy / writes / reads flags and the index
+        # fields (workbench, commands, words) are free to change — the
+        # hardening pass of 16 Nov 2026 rewrote them, mesh_boolean and
+        # mesh_trim (edited before it, for meshbool) included. What holds:
+        # a tool's group, whether it changes the document (but for the two
+        # the pass declared changes on purpose, NOW_CHANGES), no input
+        # taken away (one may be added) and no new required input.
+        self.assertEqual(sorted(k for k in base if base[k]["group"] != now[k]["group"]), [])
+        self.assertEqual(sorted(k for k in base if base[k].get("changes") != now[k].get("changes")), sorted(NOW_CHANGES))
+        for k in base:
+            was, is_ = base[k]["inputSchema"], now[k]["inputSchema"]
+            self.assertEqual(set(was["properties"]) - set(is_["properties"]), set(), f"{k}: an input went")
+            self.assertEqual(set(is_.get("required", [])) - set(was.get("required", [])), set(), f"{k}: a new required input")
 
     def test_a_refusal_is_the_add_ons(self):
         # Imported here: other tests load scanrulerfc afresh.
@@ -143,7 +156,14 @@ class Family(unittest.TestCase):
         was = {k: (v["description"], v["inputSchema"], v["changes"], v["group"]) for k, v in base.items()}
         self.assertEqual(sorted(set(now) - set(was)), ADDED)
         self.assertEqual(set(was) - set(now), set())
-        self.assertEqual(sorted(k for k in was if was[k] != now[k]), [])
+        # As above: descriptions may be rewritten and inputs added; a tool's
+        # group and whether it changes the document stay (but for
+        # NOW_CHANGES), and no input goes.
+        self.assertEqual(sorted(k for k in was if was[k][3] != now[k][3]), [])
+        self.assertEqual(sorted(k for k in was if was[k][2] != now[k][2]), sorted(NOW_CHANGES))
+        for k in was:
+            self.assertEqual(set(was[k][1]["properties"]) - set(now[k][1]["properties"]), set(), f"{k}: an input went")
+            self.assertEqual(set(now[k][1].get("required", [])) - set(was[k][1].get("required", [])), set(), f"{k}: a new required input")
 
     def test_echo(self):
         import scanrulerfc.agentlink_families as fl

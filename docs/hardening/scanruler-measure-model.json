@@ -1,0 +1,1317 @@
+{
+ "tutorial": "No FreeCAD wiki tutorial covers measuring a scan (Mesh_to_Part.md, Mesh_FromPartShape.md, Inspection_Workbench.md and Reverse_Engineering_Workbench.md describe the commands, with no worked answer key). As the task asked, the model needs no scan file: the 'scan' is a known solid meshed through the tools — a 60 × 40 × 20 mm block with a Ø12 through bore at (20, 20) and, on the scanned copy only, a 10 × 10 × 1 mm pocket in the top at x 40–50, y 15–25 — so every fit, dimension, deviation and thickness has a worked-out answer. The unworn block is the deviation reference; the pocket is the 'wear'.",
+ "reference": null,
+ "expected": {
+  "block": {
+   "box_mm": [
+    60,
+    40,
+    20
+   ],
+   "volume_mm3": 45738.05,
+   "area_mm2": 9327.79
+  },
+  "worn": {
+   "volume_mm3": 45638.05,
+   "area_mm2": 9367.79,
+   "meshVolume_mm3": "about 45640 (72-sided bore)"
+  },
+  "bore": {
+   "centre": [
+    20,
+    20
+   ],
+   "diameter_mm": "11.99 to 12.00",
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "length_mm": 20
+  },
+  "planes": {
+   "top_z": 20,
+   "bottom_z": 0,
+   "pocketFloor_z": 19,
+   "left_x": 0,
+   "front_y": 0
+  },
+  "dimensions": {
+   "Height": 20.0,
+   "BoreDia": "11.99–12.00",
+   "BoreToLeft": "±20.0",
+   "PocketDepth": 1.0,
+   "TopFlat": 0.0,
+   "Square_deg": 90.0
+  },
+  "section_z10": {
+   "chains": 2,
+   "outlineLength_mm": 200.0,
+   "boreLength_mm": 37.69,
+   "lines": 4,
+   "arcs": 1
+  },
+  "heightmap": {
+   "levels_mm": [
+    20.0,
+    19.0
+   ],
+   "throughBore": "null cells"
+  },
+  "outline": {
+   "outerArea_mm2": 2400,
+   "holeRadius_mm": 6
+  },
+  "thickness": {
+   "min_mm": 10.0,
+   "why": "the pocket's wall at x 50 to the face at x 60; the bore's wall to the nearest face is 14"
+  },
+  "deviation": {
+   "min_mm": -1.0,
+   "max_mm": 0.0,
+   "withinTolerancePct": "about 99.2 at ±0.05",
+   "hotspot": {
+    "centroid": [
+     45,
+     20,
+     19
+    ],
+    "area_mm2": "100–115",
+    "volume_mm3": "95–110"
+   },
+   "volumeRegion": {
+    "kind": "excess",
+    "volume_mm3": "85–100"
+   }
+  },
+  "wear": {
+   "lost_mm": -1.0,
+   "afterRebuildLost_mm": 0.0
+  },
+  "fitScan": {
+   "scale": 1.0,
+   "contour_mm": 0.0,
+   "hole_mm": "under 0.01",
+   "features": {
+    "planes": 6,
+    "holes": 1
+   }
+  },
+  "alignDatum": {
+   "boxAfter": {
+    "min": [
+     -20,
+     0,
+     0
+    ],
+    "max": [
+     40,
+     40,
+     20
+    ]
+   }
+  },
+  "alignAuto": {
+   "boxAfter": {
+    "min": [
+     -30,
+     -20,
+     0
+    ],
+    "max": [
+     30,
+     20,
+     20
+    ]
+   }
+  },
+  "simulated": "Every number above was also read by running the add-on's own handlers in plain Python on a mesh of the same part built with numpy (boundary-vertex triangulation, then the add-on's densify). FreeCAD's mesher will place vertices differently: counts and areas marked 'about' move by a few per cent, the dimensions do not. The FreeCAD-only steps (meshing, scan_open { object }, the shadow, section_to_sketch, element_to_document, deviation_open_reference { body }, pack_write, manual_check, manual_render) were not run anywhere."
+ },
+ "conventions": {
+  "chunks": "Run in order, in chunks of 20; the comments in the patch notes mark seven natural chunks but any cut works — calls name elements, sections and bodies by the names they were given, never by an earlier answer's id.",
+  "<JOB>": "Only when a heavy read (scan_qa, scan_segment, scan_heightmap, section_fit, deviation_align, deviation_measure, deviation_set_target, deviation_hotspots, deviation_volume, deviation_export, thickness_measure, manual_check, manual_render) answers with status running instead of its result: the answer's job field fills <JOB> in job_status { job: \"<JOB>\", wait: 25 }. Inside a batch heavy reads run inline and no job id comes.",
+  "frame": "All coordinates are the CAD frame of the block until the align_ calls of chunk 6; each of those says the box it should leave.",
+  "builderCalls": "doc_new, part_primitive, part_boolean, part_transform, meshobj_from_shape, mesh_densify, mesh_use_edited and pd_pad belong to other families (arguments read from their schemas, not hardened here): if one answers differently, any way of getting a body Block, a body Worn and a mesh object labelled WornScan serves.",
+  "refusals": "A call whose expect starts REFUSED is meant to be refused: check the code and that the message says what to do next.",
+  "files": "Relative paths go in the session's output folder."
+ },
+ "calls": [
+  {
+   "tool": "doc_new",
+   "arguments": {
+    "name": "ScanMeasureModel"
+   },
+   "expect": "a new empty document"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     60,
+     40,
+     20
+    ],
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "name": "Block"
+   },
+   "expect": "volume 48000; box [60, 40, 20]"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "cylinder",
+    "radius": 6,
+    "height": 20,
+    "at": [
+     20,
+     20,
+     0
+    ],
+    "name": "BoreTool"
+   },
+   "expect": "volume 2261.95"
+  },
+  {
+   "tool": "part_boolean",
+   "arguments": {
+    "op": "cut",
+    "base": "Block",
+    "tools": "BoreTool"
+   },
+   "expect": "Block: volume 45738.05 (48000 − π·6²·20); sound"
+  },
+  {
+   "tool": "part_transform",
+   "arguments": {
+    "op": "move",
+    "body": "Block",
+    "by": [
+     0,
+     0,
+     0
+    ],
+    "copy": true,
+    "name": "Worn"
+   },
+   "expect": "a second body Worn, same volume 45738.05, same place"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     10,
+     10,
+     1
+    ],
+    "at": [
+     40,
+     15,
+     19
+    ],
+    "name": "PocketTool"
+   },
+   "expect": "volume 100"
+  },
+  {
+   "tool": "part_boolean",
+   "arguments": {
+    "op": "cut",
+    "base": "Worn",
+    "tools": "PocketTool"
+   },
+   "expect": "Worn: volume 45638.05 (Block less a 10 × 10 × 1 pocket in the top at x 40–50, y 15–25); sound"
+  },
+  {
+   "tool": "meshobj_from_shape",
+   "arguments": {
+    "body": "Worn",
+    "method": "standard",
+    "deflection": 0.01,
+    "angle": 5,
+    "name": "WornScan"
+   },
+   "expect": "a closed mesh (solid: true), a few hundred facets, volume about 45640 (the bore a polygon of about 72 sides), box [60, 40, 20]"
+  },
+  {
+   "tool": "scan_open",
+   "arguments": {
+    "object": "WornScan"
+   },
+   "expect": "opened { vertices, triangles (a few hundred), box.size [60, 40, 20], centre [30, 20, 10], area about 9367.8 }; shownAs says the mesh WornScan is hidden; no size warning"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "the same summary; elements 0, dimensions 0"
+  },
+  {
+   "tool": "scan_qa",
+   "arguments": {},
+   "expect": "tessellation { cad: true, sparse: true, densifyTo about 0.5 }; noise.median 0; rims.count 0; thickness p50 20 (p5 19); a note saying it is a sparse CAD tessellation to densify first. May answer through a job (heavy)."
+  },
+  {
+   "tool": "scan_noise",
+   "arguments": {},
+   "expect": "REFUSED invalid_input: a CAD tessellation has no scan noise"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "plane",
+    "at": {
+     "point": [
+      30,
+      20,
+      0
+     ]
+    },
+    "name": "TooSparse"
+   },
+   "expect": "either refused (failed) with the new 'Here that means: … mesh_densify first' words, or a plane on the two triangles' corners: both are the sparse-mesh case the description warns of. If it made an element, the next call removes it."
+  },
+  {
+   "tool": "element_remove",
+   "arguments": {
+    "element": "TooSparse"
+   },
+   "expect": "removed TooSparse — or not_found listing the elements (none yet) when the fit was refused"
+  },
+  {
+   "tool": "mesh_densify",
+   "arguments": {
+    "maxEdge": 1
+   },
+   "expect": "edit densify: about 137,000 triangles, none with an edge over 1 mm; mesh.open 0; volume unchanged (about 45640)"
+  },
+  {
+   "tool": "mesh_use_edited",
+   "arguments": {},
+   "expect": "the edited mesh becomes the scan: triangles about 137,000"
+  },
+  {
+   "tool": "scan_qa",
+   "arguments": {},
+   "expect": "tessellation { cad: true, sparse: false, spacing about 0.37 }; noise 0; thickness p5 19, p50 20, p95 20, tiltDeg 0; note: no noise, a CAD tessellation — read its numbers exactly. About 9 s in plain Python off the Mac."
+  },
+  {
+   "tool": "scan_nearest",
+   "arguments": {
+    "at": {
+     "point": [
+      30,
+      20,
+      25
+     ]
+    }
+   },
+   "expect": "a vertex on the top: point z 20, normal [0, 0, 1], distance 5.0 to 5.1"
+  },
+  {
+   "tool": "scan_query",
+   "arguments": {
+    "box": {
+     "min": [
+      -1,
+      -1,
+      19.99
+     ],
+     "max": [
+      61,
+      41,
+      20.01
+     ]
+    },
+    "fields": "count",
+    "mark": true
+   },
+   "expect": "matched about 15,900 (returned thinned, step > 1); bounds z 20 to 20; meanNormal about [0, 0, 1]; marked.points equals matched"
+  },
+  {
+   "tool": "element_fit_marked",
+   "arguments": {
+    "kind": "plane",
+    "marked": true,
+    "name": "Top"
+   },
+   "expect": "plane Top: center z 20, normal [0, 0, ±1], sigma 0, formError 0; source.markedPoints equals the count marked"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "plane",
+    "at": {
+     "point": [
+      30,
+      20,
+      0
+     ]
+    },
+    "name": "Bottom"
+   },
+   "expect": "plane: center z 0, normal [0, 0, -1], sigma 0; region.area about 2185–2290 (the face is 2287 mm²)"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "plane",
+    "at": {
+     "point": [
+      0,
+      20,
+      10
+     ]
+    },
+    "name": "Left"
+   },
+   "expect": "plane at x 0, normal [-1, 0, 0], sigma 0"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "plane",
+    "at": {
+     "point": [
+      30,
+      0,
+      10
+     ]
+    },
+    "name": "Front"
+   },
+   "expect": "plane at y 0, normal [0, -1, 0], sigma 0"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "cylinder",
+    "at": {
+     "point": [
+      26,
+      20,
+      10
+     ]
+    },
+    "side": "inside",
+    "name": "Bore"
+   },
+   "expect": "cylinder: center about [20, 20, 10], axis [0, 0, ±1], radius 5.994 to 6.000 (a 72-sided polygon reads a hair under 6), length 20, coverage about 360, sigma under 0.005"
+  },
+  {
+   "tool": "element_fit",
+   "arguments": {
+    "kind": "plane",
+    "at": {
+     "point": [
+      45,
+      20,
+      19
+     ]
+    },
+    "name": "PocketFloor"
+   },
+   "expect": "plane: center about [45, 20, 19], normal [0, 0, 1], sigma 0"
+  },
+  {
+   "tool": "element_construct",
+   "arguments": {
+    "kind": "point",
+    "method": "point-three-planes",
+    "refs": [
+     "Bottom",
+     "Left",
+     "Front"
+    ],
+    "name": "Corner"
+   },
+   "expect": "point at [0, 0, 0]"
+  },
+  {
+   "tool": "element_construct",
+   "arguments": {
+    "kind": "point",
+    "method": "point-line-plane",
+    "refs": [
+     "Bore",
+     "Bottom"
+    ],
+    "name": "BoreFoot"
+   },
+   "expect": "point at about [20, 20, 0]"
+  },
+  {
+   "tool": "element_construct",
+   "arguments": {
+    "kind": "line",
+    "method": "line-plane-plane",
+    "refs": [
+     "Bottom",
+     "Front"
+    ],
+    "name": "FrontEdge"
+   },
+   "expect": "line along ±x at y 0, z 0"
+  },
+  {
+   "tool": "element_construct",
+   "arguments": {
+    "kind": "plane",
+    "method": "plane-symmetry",
+    "name": "Mirror"
+   },
+   "expect": "plane with normal [0, ±1, 0] through y 20 (the part's only mirror plane); symmetry.rms about 0, matched equals sampled (4000)"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Top",
+     "Bottom"
+    ],
+    "name": "Height",
+    "limit": {
+     "kind": "band",
+     "nominal": 20,
+     "plus": 0.1,
+     "minus": 0.1
+    }
+   },
+   "expect": "type dist-plane-plane, value 20.000, verdict.pass true"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Bore"
+    ],
+    "type": "size-diameter",
+    "name": "BoreDia"
+   },
+   "expect": "value 11.99 to 12.00"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Bore",
+     "Left"
+    ],
+    "type": "dist-axis-plane",
+    "name": "BoreToLeft"
+   },
+   "expect": "value ±20.000 (signed: negative on the plane's inner side)"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Top",
+     "PocketFloor"
+    ],
+    "name": "PocketDepth"
+   },
+   "expect": "dist-plane-plane 1.000; a warning that the patches do not overlap"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Top"
+    ],
+    "type": "form-flatness",
+    "name": "TopFlat"
+   },
+   "expect": "value 0.000 (the query box was 0.02 mm thick, so only the top face's own points were taken)"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Left",
+     "Front"
+    ],
+    "type": "angle-plane-plane",
+    "name": "Square"
+   },
+   "expect": "90.00°"
+  },
+  {
+   "tool": "dimension_add",
+   "arguments": {
+    "refs": [
+     "Top",
+     "Left"
+    ],
+    "type": "orient-angularity",
+    "basic": 90,
+    "name": "Ang"
+   },
+   "expect": "family tolerance; value 0.000 mm; detail: 0.000° off the basic 90°"
+  },
+  {
+   "tool": "dimension_set_basic",
+   "arguments": {
+    "dimension": "Ang",
+    "basic": 89
+   },
+   "expect": "value about 1.05 mm (60 mm × tan 1°); detail: 1.000° off the basic 89°"
+  },
+  {
+   "tool": "dimension_set_limit",
+   "arguments": {
+    "dimension": "BoreDia",
+    "limit": {
+     "kind": "max",
+     "max": 11.9
+    }
+   },
+   "expect": "verdict.pass false, over about 0.09, alarm in words"
+  },
+  {
+   "tool": "dimension_set_limit",
+   "arguments": {
+    "dimension": "BoreDia",
+    "limit": null
+   },
+   "expect": "no limit, no verdict"
+  },
+  {
+   "tool": "dimension_remove",
+   "arguments": {
+    "dimension": "Ang"
+   },
+   "expect": "removed { name: Ang }"
+  },
+  {
+   "tool": "dimension_remove",
+   "arguments": {
+    "dimension": "Nope"
+   },
+   "expect": "REFUSED not_found, listing the dimensions by name (id)"
+  },
+  {
+   "tool": "element_rename",
+   "arguments": {
+    "element": "FrontEdge",
+    "name": "Edge1"
+   },
+   "expect": "the element named Edge1"
+  },
+  {
+   "tool": "element_unlink",
+   "arguments": {
+    "element": "Edge1"
+   },
+   "expect": "source.method line-coords, refs []"
+  },
+  {
+   "tool": "element_unlink",
+   "arguments": {
+    "element": "Top"
+   },
+   "expect": "REFUSED invalid_input: Top is not built from other elements"
+  },
+  {
+   "tool": "element_set_visible",
+   "arguments": {
+    "element": "Mirror",
+    "visible": false
+   },
+   "expect": "element { name: Mirror, visible: false }"
+  },
+  {
+   "tool": "element_remove",
+   "arguments": {
+    "element": "Edge1"
+   },
+   "expect": "removed [Edge1], dimensionsRemoved []"
+  },
+  {
+   "tool": "element_list",
+   "arguments": {},
+   "expect": "9 elements: Top, Bottom, Left, Front, Bore, PocketFloor, Corner, BoreFoot, Mirror"
+  },
+  {
+   "tool": "report_get",
+   "arguments": {
+    "format": "text"
+   },
+   "expect": "text naming each element and dimension; Bore diameter 11.99–12.00; the Mirror line shows plain numbers (no 'np.float64')"
+  },
+  {
+   "tool": "report_get",
+   "arguments": {},
+   "expect": "report.checks { checked: 1, pass: 1, fail: 0 } (Height); 9 elements, 6 dimensions"
+  },
+  {
+   "tool": "export_csv",
+   "arguments": {},
+   "expect": "path …/WornScan-measurements.csv, rows 15 (9 elements + 6 dimensions)"
+  },
+  {
+   "tool": "section_cut",
+   "arguments": {
+    "across": "XY",
+    "offset": 10,
+    "name": "Mid"
+   },
+   "expect": "section Mid: plane origin [30, 20, 10], normal [0, 0, 1]; chains 2"
+  },
+  {
+   "tool": "section_list",
+   "arguments": {},
+   "expect": "one section, Mid"
+  },
+  {
+   "tool": "section_get",
+   "arguments": {
+    "section": "Mid",
+    "limit": 40
+   },
+   "expect": "2 closed chains: length 200.0 (the 60 × 40 outline, bounds ±30, ±20) and about 37.69 (the bore, 2π·6); step > 1"
+  },
+  {
+   "tool": "section_fit",
+   "arguments": {
+    "section": "Mid",
+    "brief": true
+   },
+   "expect": "chain 0: 4 lines with world ends at the corners (0,0,10) (60,0,10) (60,40,10) (0,40,10); chain 1: one arc, radius 5.99–6.00, world centre [20, 20, 10]; sketch.add [30, 20]"
+  },
+  {
+   "tool": "section_cut",
+   "arguments": {
+    "across": {
+     "axis": "Bore",
+     "angleDeg": 0
+    },
+    "name": "Half"
+   },
+   "expect": "a plane holding the bore's axis (normal ±y through y 20): 2 closed chains, the solid either side of the bore"
+  },
+  {
+   "tool": "section_fit",
+   "arguments": {
+    "section": "Half",
+    "brief": true
+   },
+   "expect": "lines only: one chain of 4 (x 0–14, z 0–20) and one of 8 (x 26–60 with the pocket's 1 mm step at x 40–50, z 19–20)"
+  },
+  {
+   "tool": "section_remove",
+   "arguments": {
+    "section": "Half"
+   },
+   "expect": "removed; sections left: Mid"
+  },
+  {
+   "tool": "section_cut",
+   "arguments": {
+    "across": "XY",
+    "kind": "shadow",
+    "play": 0.5,
+    "name": "Foam"
+   },
+   "expect": "a shadow section: 1 chain (holes filled), shadow.areas about [2520–2560] (61 × 41 = 2501 plus the tolerance's margin); note. Needs FreeCAD's 2D offset: live only."
+  },
+  {
+   "tool": "section_to_sketch",
+   "arguments": {
+    "section": "Mid",
+    "name": "MidProfile"
+   },
+   "expect": "a new Body with sketch MidProfile: fitted chain 0 { lines 4 }, chain 1 { circles 1 }; wires: 2, both closed; frame.origin [0, 0, 10], normal [0, 0, 1]; health ok (an under-constrained sketch is expected, not an error)"
+  },
+  {
+   "tool": "pd_pad",
+   "arguments": {
+    "body": "Body",
+    "sketch": "MidProfile",
+    "length": 5
+   },
+   "expect": "a pad: volume about 11434 (5 × (2400 − π·6²)); proves the sketch is a usable profile. Body is the label section_to_sketch answered: use that if it differs."
+  },
+  {
+   "tool": "element_to_document",
+   "arguments": {
+    "elements": [
+     "Top",
+     "Bore",
+     "Corner",
+     "Mirror"
+    ],
+    "export": "worn-elements.step"
+   },
+   "expect": "group 'Scan elements' with 4 Part::Feature objects: Top a face, Bore a solid (radius about 5.997, length 20), Corner a vertex, Mirror a face; file worn-elements.step written; health ok"
+  },
+  {
+   "tool": "scan_segment",
+   "arguments": {},
+   "expect": "method vertices; the six large planes first: areas about 2235 (bottom), 2130 (top), 1157 × 2, 771 × 2, then the pocket floor about 98; many narrow planes after them are the bore's facets"
+  },
+  {
+   "tool": "scan_fit_surface",
+   "arguments": {
+    "box": {
+     "min": [
+      1,
+      1,
+      19.99
+     ],
+     "max": [
+      10,
+      39,
+      20.01
+     ]
+    }
+   },
+   "expect": "best: plane; every model rms 0; frame.normal [0, 0, 1]; curvature.shape flat"
+  },
+  {
+   "tool": "scan_draft",
+   "arguments": {
+    "pull": [
+     0,
+     0,
+     1
+    ]
+   },
+   "expect": "every patch draftDeg 0.0. On this densified CAD mesh the patches are narrow rings of the bore (round: true) and the flat walls do not gather — the uneven-sampling limit the description states, not a fault of the part."
+  },
+  {
+   "tool": "scan_pattern",
+   "arguments": {
+    "axis": "Bore",
+    "instances": false
+   },
+   "expect": "six heights, each count 1 with tried (no repeat: score under 0.5) and one ring of radius about 5.997"
+  },
+  {
+   "tool": "scan_heightmap",
+   "arguments": {
+    "axis": "-z",
+    "cell": 5
+   },
+   "expect": "cols 12, rows 8; grid 20.0 everywhere except null in the four cells over the bore (x 15–25, y 15–25) and 19.0 in the four over the pocket (x 40–50, y 15–25); min 19, max 20"
+  },
+  {
+   "tool": "scan_heightmap",
+   "arguments": {
+    "axis": "-z",
+    "cell": 2,
+    "levels": true
+   },
+   "expect": "levels: height 20.0 (about 96 %) with plane.normal [0, 0, 1], and height 19.0 (area 60–100 mm², box x 40–50); sloped 0; unassigned 0"
+  },
+  {
+   "tool": "scan_heightmap",
+   "arguments": {
+    "axis": "-z",
+    "cell": 1,
+    "grid": false,
+    "picture": true,
+    "path": "worn-height.png"
+   },
+   "expect": "picture.path …/worn-height.png written; no grid in the reply"
+  },
+  {
+   "tool": "scan_outline",
+   "arguments": {
+    "axis": "-z"
+   },
+   "expect": "2 loops: the outline, hole false, area 2400, points the four corners (0,0) (60,0) (60,40) (0,40); and hole true, a circle, center [20, 20], radius 5.99–6.00. The pocket leaves no loop (not seen through)."
+  },
+  {
+   "tool": "scan_cloud",
+   "arguments": {
+    "format": "xyz",
+    "path": "worn-cloud.xyz"
+   },
+   "expect": "file written; points equals the scan's vertex count (about 68,000)"
+  },
+  {
+   "tool": "scan_thread",
+   "arguments": {
+    "axis": {
+     "element": "Bore"
+    }
+   },
+   "expect": "verdict none, thread: false (a plain wall)"
+  },
+  {
+   "tool": "thickness_measure",
+   "arguments": {
+    "maxThickness": 25,
+    "maxPoints": 20000
+   },
+   "expect": "a job or its answer: stats.min 10.0 (the pocket's wall to the x 60 face), max under 25, mean 18–20; sampled { points: 20000 }; thinSpots.count 0 (limit 1 mm). About 20 s in plain Python off the Mac; if a job id comes back, job_status { job: \"<JOB>\" } gives it."
+  },
+  {
+   "tool": "thickness_settings",
+   "arguments": {
+    "limit": 12
+   },
+   "expect": "stats.belowLimit > 0 and thinSpots patches with minThickness 10.0 near x 50, z 19–20"
+  },
+  {
+   "tool": "deviation_open_reference",
+   "arguments": {
+    "body": "Block"
+   },
+   "expect": "reference { fileName: Block, volume about 45738–45741, no openEdges }; align null; map none"
+  },
+  {
+   "tool": "deviation_align",
+   "arguments": {
+    "mode": "points",
+    "pairs": [
+     {
+      "scan": [
+       0,
+       0,
+       0
+      ],
+      "reference": [
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "scan": [
+       60,
+       0,
+       0
+      ],
+      "reference": [
+       60,
+       0,
+       0
+      ]
+     },
+     {
+      "scan": [
+       60,
+       40,
+       0
+      ],
+      "reference": [
+       60,
+       40,
+       0
+      ]
+     },
+     {
+      "scan": [
+       0,
+       40,
+       20
+      ],
+      "reference": [
+       0,
+       40,
+       20
+      ]
+     }
+    ]
+   },
+   "expect": "align { source: points, rms about 0, converged true, matchedShare over 0.98, transform the identity (angleDeg 0, translation 0) }; stats min -1.0 (the pocket floor), max about 0, withinTolerancePct about 99; no warnings. A job or its answer."
+  },
+  {
+   "tool": "deviation_settings",
+   "arguments": {
+    "tolerance": 0.05,
+    "maxDistance": 3,
+    "range": 1
+   },
+   "expect": "settings { tolerance 0.05, maxDistance 3, maxDistanceAuto false, range 1 }"
+  },
+  {
+   "tool": "deviation_measure",
+   "arguments": {},
+   "expect": "the same stats: min -1.0, measuredPct over 99, withinTolerancePct about 99.2"
+  },
+  {
+   "tool": "deviation_hotspots",
+   "arguments": {},
+   "expect": "found 1: a patch at centroid about [45, 20, 19], mean -1.0, extreme -1.0, side inside, kind feature, area 100–115 mm², volume 95–110 mm³; far.count 0"
+  },
+  {
+   "tool": "deviation_volume",
+   "arguments": {},
+   "expect": "TRAP check: one region of kind \"excess\" (the reference has material the worn part lacks), volume 85–100 mm³ (the 100 mm³ pocket less the tolerance's skin), maxDepth 0.7–1.0, centroid about [45, 20, 19.4]; totals.missing 0; cell about 0.24, smallestSeen about 0.48; modelVolume 45650–45740. A job or its answer."
+  },
+  {
+   "tool": "deviation_export",
+   "arguments": {
+    "format": "report",
+    "path": "worn-deviation.txt"
+   },
+   "expect": "report text: min −1.0000 mm, max +0.0000 mm, within ±0.05 mm about 99.2 % of all scan points; file written"
+  },
+  {
+   "tool": "scan_heightmap",
+   "arguments": {
+    "axis": "-z",
+    "cell": 2,
+    "of": "deviation",
+    "levels": true
+   },
+   "expect": "levels: 0.0 (about 96 %) and -1.0 (box x 40–50, y 16–24)"
+  },
+  {
+   "tool": "deviation_set_target",
+   "arguments": {
+    "element": "Top"
+   },
+   "expect": "source element; stats min -1.0, max 0; measuredPct about 23 (only the surface facing the plane), withinToleranceOfMeasuredPct about 98"
+  },
+  {
+   "tool": "deviation_set_target",
+   "arguments": {
+    "element": null
+   },
+   "expect": "source reference again"
+  },
+  {
+   "tool": "wear_setup",
+   "arguments": {
+    "tolerance": 0.05,
+    "tag": [
+     {
+      "action": "set",
+      "name": "pocket",
+      "kind": "worn",
+      "region": {
+       "kind": "box",
+       "min": [
+        39,
+        14,
+        18
+       ],
+       "max": [
+        51,
+        26,
+        21
+       ]
+      }
+     }
+    ],
+    "reference": {
+     "source": "deviation"
+    }
+   },
+   "expect": "tags [pocket], reference { source: deviation, name: Block }"
+  },
+  {
+   "tool": "wear_diff",
+   "arguments": {},
+   "expect": "regions[0]: name pocket, lost -1.0, added 0, pointsLost several hundred; scatter 0"
+  },
+  {
+   "tool": "wear_rebuild",
+   "arguments": {
+    "path": "worn-repaired.stl"
+   },
+   "expect": "file written; largestMoveMm 1.0; after[0].lost 0, pointsLost 0"
+  },
+  {
+   "tool": "wear_prewarp",
+   "arguments": {
+    "path": "block-prewarp.stl"
+   },
+   "expect": "run 1; rms about 0.03 or less; stop true or false with why; file written"
+  },
+  {
+   "tool": "fit_scan_setup",
+   "arguments": {},
+   "expect": "settings { up: +z, band 1, slicer bambustudio }; three key maps"
+  },
+  {
+   "tool": "fit_scan_features",
+   "arguments": {},
+   "expect": "planes -X1 +X1 (area 800), -Y1 +Y1 (1200), -Z1 +Z1 (about 2287); circles: H1, a hole, center [20, 20], radius 6"
+  },
+  {
+   "tool": "fit_scan_measure",
+   "arguments": {
+    "calibrate": true
+   },
+   "expect": "poor false; scale x, y, z 1.000; contour about 0; hole under 0.01; readings { planes 6, circles 1 }; slicer.changes []; calibrated false with calibrateNext naming fit { action: \"calibrate\", hole, shaft } (this session keeps no calibration of its own) — or a calibration where the session has one"
+  },
+  {
+   "tool": "fit_scan_export",
+   "arguments": {
+    "what": "json",
+    "path": "fit-run.json"
+   },
+   "expect": "file written; changes []"
+  },
+  {
+   "tool": "align_datum",
+   "arguments": {
+    "primary": {
+     "element": "Bottom"
+    },
+    "secondary": {
+     "element": "Front"
+    },
+    "secondaryAxis": "y-",
+    "origin": {
+     "element": "BoreFoot"
+    }
+   },
+   "expect": "applied.translation [-20, 0, 0], rotationDeg 0; origin.set [x] with a note that the datums own y (the origin stands at y 20)"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "box min [-20, 0, 0], max [40, 40, 20]"
+  },
+  {
+   "tool": "deviation_measure",
+   "arguments": {},
+   "expect": "REFUSED invalid_state: the part was moved since the alignment — run deviation_align"
+  },
+  {
+   "tool": "align_datum",
+   "arguments": {
+    "origin": {
+     "element": "Top"
+    }
+   },
+   "expect": "REFUSED invalid_input: a plane gives no single zero point, with what origin takes and element_construct"
+  },
+  {
+   "tool": "align_clear",
+   "arguments": {},
+   "expect": "appliedAlignment null; the box back at min [0, 0, 0], max [60, 40, 20]"
+  },
+  {
+   "tool": "align_clear",
+   "arguments": {},
+   "expect": "REFUSED invalid_state: already in scan coordinates"
+  },
+  {
+   "tool": "align_auto",
+   "arguments": {},
+   "expect": "method planes; applied.translation [-30, -20, 0], rotationDeg 0; note: its largest face square to Z; square.largest.tiltDeg 0"
+  },
+  {
+   "tool": "align_symmetry",
+   "arguments": {},
+   "expect": "note: settled on the symmetry plane (mirror RMS about 0), Y turned 0° and moved 0 mm; box stays min [-30, -20, 0], max [30, 20, 20]"
+  },
+  {
+   "tool": "scan_scale",
+   "arguments": {
+    "references": [
+     {
+      "dimension": "BoreDia",
+      "true": 12
+     }
+    ],
+    "dryRun": true
+   },
+   "expect": "factor 1.0000 to 1.0010; dryRun true; size.before 74.83"
+  },
+  {
+   "tool": "scan_scale",
+   "arguments": {
+    "factor": 2
+   },
+   "expect": "size.after 149.67; scan.box.size [120, 80, 40]"
+  },
+  {
+   "tool": "scan_scale",
+   "arguments": {
+    "factor": 0.5
+   },
+   "expect": "back to box.size [60, 40, 20]"
+  },
+  {
+   "tool": "align_clear",
+   "arguments": {},
+   "expect": "box min [0, 0, 0], max [60, 40, 20] again"
+  },
+  {
+   "tool": "scanner",
+   "arguments": {
+    "action": "add",
+    "scanner": {
+     "name": "ModelTestScanner",
+     "noiseMm": 0.05
+    },
+    "use": true
+   },
+   "expect": "added; plan { sigmaMm 0.05, source profile, finestMm 0.15 }"
+  },
+  {
+   "tool": "scanner",
+   "arguments": {
+    "action": "list"
+   },
+   "expect": "the scanner listed; using ModelTestScanner"
+  },
+  {
+   "tool": "scanner",
+   "arguments": {
+    "action": "remove",
+    "name": "ModelTestScanner"
+   },
+   "expect": "removed, with the note that a project naming it keeps its copy"
+  },
+  {
+   "tool": "catalog_part",
+   "arguments": {
+    "dims": {
+     "d": 8.0,
+     "D": 22.0,
+     "B": 7.0
+    }
+   },
+   "expect": "named \"608 bearing\"; matches[0].worst 0"
+  },
+  {
+   "tool": "catalog_part",
+   "arguments": {
+    "designation": "M5 socket head"
+   },
+   "expect": "parts[0]: ISO 4762, dims { d 5, dk 8.5, k 5, s 4 }"
+  },
+  {
+   "tool": "catalog_links",
+   "arguments": {
+    "query": "608 bearing",
+    "sources": [
+     "traceparts"
+    ]
+   },
+   "expect": "one link with url and terms; nothing fetched"
+  },
+  {
+   "tool": "catalog_provenance",
+   "arguments": {
+    "action": "record",
+    "record": {
+     "file": "608.step",
+     "source": "traceparts",
+     "shareable": false
+    }
+   },
+   "expect": "files holds the record with today's date; path …/provenance.json"
+  },
+  {
+   "tool": "pack_setup",
+   "arguments": {
+    "title": "Worn block model",
+    "author": "Test",
+    "licence": "CC-BY-4.0",
+    "bodies": [
+     "Block"
+    ],
+    "renders": 1
+   },
+   "expect": "settings.licence CC-BY-4.0; bodies [Block]; upstream holds 608.step (from catalog_provenance) with redistribute false"
+  },
+  {
+   "tool": "pack_plan",
+   "arguments": {},
+   "expect": "ok true or false with problems; 608.step under leftOut or blocked (its source's terms do not allow passing it on)"
+  },
+  {
+   "tool": "pack_write",
+   "arguments": {
+    "path": "worn-pack.zip"
+   },
+   "expect": "when pack_plan was ok: a zip with models/Block.stl, .3mf, .step, images/iso.png, README.md, LICENSE; scrubbed lists what was changed. When not ok: REFUSED invalid_state listing why — both are right; the main session reads pack_plan first."
+  },
+  {
+   "tool": "manual_plan",
+   "arguments": {
+    "parts": [
+     {
+      "name": "Block",
+      "body": "Block"
+     },
+     {
+      "name": "Worn",
+      "body": "Worn"
+     }
+    ],
+    "steps": [
+     {
+      "id": "s1",
+      "place": [
+       {
+        "part": "Block"
+       }
+      ],
+      "text": "Put the block on the bench."
+     },
+     {
+      "id": "s2",
+      "place": [
+       {
+        "part": "Worn",
+        "move": [
+         0,
+         0,
+         -1
+        ]
+       }
+      ],
+      "text": "Put the worn block on the block."
+     }
+    ]
+   },
+   "expect": "2 parts, 2 steps; no problems"
+  },
+  {
+   "tool": "manual_check",
+   "arguments": {},
+   "expect": "step 1: Block clear; step 2: Worn overlapsInPlace true (the two bodies stand in the same place — the check's known answer for this model); blocked 1. A job or its answer."
+  },
+  {
+   "tool": "manual_render",
+   "arguments": {
+    "path": "worn-manual.html"
+   },
+   "expect": "file written; steps 2, pictures 2. A job or its answer."
+  },
+  {
+   "tool": "scan_snapshot_list",
+   "arguments": {},
+   "expect": "shots [] unless the person took one"
+  },
+  {
+   "tool": "scan_snapshot_latest",
+   "arguments": {},
+   "expect": "REFUSED not_found: no screenshot yet, ask the person to press the camera key — or the newest shot as a picture"
+  },
+  {
+   "tool": "scan_snapshot_wait",
+   "arguments": {
+    "timeout": 30
+   },
+   "expect": "at once (under a second): came false, waited 0, and next naming job_start { tool: \"scan_snapshot_wait\", …, wait: false } — the window is not held"
+  }
+ ],
+ "notCovered": [
+  "scan_open { path, units }: needs a file — after wear_rebuild, scan_open { path: \"worn-repaired.stl\", discard: true } opens one made by the model itself (it replaces the scan and its elements, so it is left out of the run); expect box.size [60, 40, 20] and min deviation about 0 after a new deviation_align",
+  "deviation_open_reference { path }: the same file serves; a STEP needs export first",
+  "deviation_align modes auto and local: auto took 32 s on this part in plain Python and, on this part, has two equal poses against the unworn block (top and bottom swap) — ambiguous: true is the right answer there; local needs vertices from scan_query { fields: \"ids\" }",
+  "deviation_hotspots { on: \"reference\" } and deviation_export { side: \"reference\" }: before the fix the reference-side reading took 1,419 s in plain Python on this part (1.8 million readings, nine times its own cap); with the cap honoured it should take a few minutes — run job_start { tool: \"deviation_hotspots\", arguments: { on: \"reference\" }, wait: false } once live to time it on the Mac: expect readings under 200,000, coveredPct 100, withinTolerancePct about 99, mostMissing -1.0 near [45, 20, 20], mostExcess 0",
+  "scan_noise's reading, scan_thread's match, a non-zero draft, a rotational pattern count, sheet / rims in scan_qa: a noise-free prismatic block has none of them — they need a real scan (the add-on's plain-Python tests cover them on synthetic noisy meshes)",
+  "element_fit kinds sphere, cone, torus, circle, point and knownDiameter; element_construct's other methods; dimension types on spheres and loc-coaxiality: no such feature on the block (covered by tests/test_fits.py, test_measuring_core.py)",
+  "fit_scan_export { what: \"stl\" | \"ini\" } and a non-zero printer error: the scan is the CAD itself, so every correction is zero",
+  "scan_snapshot_latest with a shot, scan_snapshot_wait as a job: only the person's camera key (Alt+Shift+S) makes a shot",
+  "manual_plan export / import, pack_setup files and upstream entries, scanner export / import, fit_scan_setup keymap: plain file round trips, covered by the plain-Python tests",
+  "The worker-thread hand-over (docstate.on_gui_thread): proven only on stand-ins; live, run deviation_align as a job (job_start { tool: \"deviation_align\", arguments: { mode: \"auto\" }, wait: false }) and watch that FreeCAD stays up and the scan object's Placement has followed once job_status says done"
+ ]
+}

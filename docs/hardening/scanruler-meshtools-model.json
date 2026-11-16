@@ -1,0 +1,591 @@
+{
+ "tutorial": "No FreeCAD wiki tutorial covers ScanRuler's Mesh Tools (Stefan Hermann's / CNC Kitchen's plugin, ported). The model follows the add-on's own guide (scanrulerfc/guides/mesh-tools.md: inspect, islands, cut, holes, smooth, reduce, use) on a block of known size built with Part and meshed with MeshPart as Mesh_to_Part.md / MeshPart_FromShape describe, so every volume has a worked-out answer and no real scan is needed.",
+ "reference": null,
+ "expected": {
+  "block": {
+   "size_mm": [
+    40,
+    30,
+    20
+   ],
+   "volume_mm3": 24000,
+   "meshTriangles": 12,
+   "meshVertices": 8,
+   "diagonal_mm": 53.85
+  },
+  "cutAtZ15": {
+   "volume_mm3": 18000
+  },
+  "boredBlock": {
+   "holeDiameter_mm": 10,
+   "volume_mm3": 22429.2,
+   "note": "24000 - pi x 5^2 x 20; a few mm³ more as a polygon"
+  },
+  "expanded1mm": {
+   "box_mm": [
+    42,
+    32,
+    22
+   ]
+  },
+  "hollow2mm": {
+   "cavity_mm": [
+    36,
+    26,
+    16
+   ],
+   "volume_mm3": 9024
+  },
+  "trimmedStub": {
+   "volume_mm3": 500,
+   "matingArea_mm2": 100
+  },
+  "wrapGap4": {
+   "shells": 1,
+   "volume_mm3": 24000,
+   "corners": 8
+  },
+  "where": "Every answer but mesh_reduce's, mesh_apply_reduced's and mesh_export's was produced by running the handlers in plain Python on this pass (a 12-triangle box as FreeCAD's mesher makes it; the Pin as an 80-sided prism). Nothing ran in FreeCAD."
+ },
+ "conventions": {
+  "session": "One scan session from scan_open to the end: run the chunks in order in the same document. Mesh Tools state is the session's, not the document's: FreeCAD's undo does not touch it.",
+  "placeholders": "None: no call needs a value from an earlier answer.",
+  "jobs": "mesh_inspect, mesh_cut, mesh_cut_preview, mesh_smooth, mesh_offset, mesh_reduce, mesh_shell, mesh_wrap and mesh_trim are declared heavy: outside a batch a call that passes 45 s answers with a job id (job_status { job, wait }); inside a batch they run inline. None should take more than a few seconds on this model.",
+  "tolerances": "Volumes after the boolean depend on how FreeCAD tessellates the cylinder at 0.01 mm: the ranges given allow for it."
+ },
+ "calls": [
+  {
+   "tool": "doc_new",
+   "arguments": {
+    "name": "ScanMeshModel"
+   },
+   "expect": "a new empty document"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     40,
+     30,
+     20
+    ],
+    "name": "Block"
+   },
+   "expect": "volume 24000; box [40, 30, 20]; a corner at the origin"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "cylinder",
+    "radius": 5,
+    "height": 30,
+    "at": [
+     20,
+     15,
+     -5
+    ],
+    "name": "Pin"
+   },
+   "expect": "volume 2356.19 (pi x 25 x 30); it runs through the block from z -5 to 25"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     2,
+     2,
+     2
+    ],
+    "at": [
+     60,
+     0,
+     0
+    ],
+    "name": "Speck"
+   },
+   "expect": "volume 8; apart from the block"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     2,
+     2,
+     2
+    ],
+    "at": [
+     10,
+     10,
+     10
+    ],
+    "name": "Inside"
+   },
+   "expect": "volume 8; wholly inside the block"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     10,
+     10,
+     10
+    ],
+    "at": [
+     35,
+     10,
+     5
+    ],
+    "name": "Stub"
+   },
+   "expect": "volume 1000; it reaches 5 mm into the block's +X side (x 35 to 45)"
+  },
+  {
+   "tool": "meshobj_from_shape",
+   "arguments": {
+    "body": "Block",
+    "name": "Block mesh"
+   },
+   "expect": "mesh 'Block mesh': points 8, facets 12, solid true, volume 24000"
+  },
+  {
+   "tool": "scan_open",
+   "arguments": {
+    "object": "Block mesh"
+   },
+   "expect": "opened: triangles 12, vertices 8, box size [40, 30, 20]; shownAs says 'Block mesh' is hidden"
+  },
+  {
+   "tool": "mesh_parts",
+   "arguments": {},
+   "expect": "scan { name 'Block mesh', triangles 12, edits [] }; edited, reduced, wrap, piece and undo all null"
+  },
+  {
+   "tool": "mesh_inspect",
+   "arguments": {},
+   "expect": "working 'scan'; vertices 8; triangles 12; open 0; bad 0; volume 24000; islands.pieces 1, islands.islands 0, islands.size 1 (a hundredth of the 53.85 diagonal, 1-2-5 rounded); holes.rims 0, holes.size 5"
+  },
+  {
+   "tool": "mesh_fill_holes",
+   "arguments": {},
+   "expect": "refused (invalid_state): the scan has no open rim"
+  },
+  {
+   "tool": "mesh_remove_islands",
+   "arguments": {
+    "size": 5
+   },
+   "expect": "refused: no piece is smaller than 5 mm, the smallest 53.85; names mesh_inspect"
+  },
+  {
+   "tool": "mesh_trim",
+   "arguments": {
+    "body": "Stub"
+   },
+   "expect": "refused: the scan nowhere lies more than 0.3 mm inside the body; the message says the break is read at the mesh's 8 vertices and to mesh_densify first"
+  },
+  {
+   "tool": "mesh_densify",
+   "arguments": {
+    "maxEdge": 2
+   },
+   "expect": "edit.trianglesBefore 12; edit.triangles 8192 (worked here on a 12-triangle box; FreeCAD's choice of face diagonals does not change the edge lengths, so the same is expected); edit.longest 1.875; mesh.working 'edited copy'; open 0; volume 24000 exactly"
+  },
+  {
+   "tool": "mesh_cut_preview",
+   "arguments": {
+    "plane": "XY",
+    "offset": 15,
+    "keep": "minus"
+   },
+   "expect": "plane 'XY plane, Z 15 mm'; cuts true; capped 1; bridged 0; open 0; nothing changed"
+  },
+  {
+   "tool": "mesh_cut",
+   "arguments": {
+    "plane": "XY",
+    "offset": 15,
+    "keep": "minus"
+   },
+   "expect": "the top 5 mm goes: mesh.bounds.max [40, 30, 15]; volume 18000 (40 x 30 x 15); open 0; report.capped 1, report.open 0"
+  },
+  {
+   "tool": "mesh_cut",
+   "arguments": {
+    "plane": "XY",
+    "offset": 50,
+    "keep": "minus"
+   },
+   "expect": "refused: the plane cuts nothing off; the message gives 'from offset 0 to 15 mm' and names mesh_cut_preview"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'cut at XY plane, Z 15 mm'; mesh.volume 24000; bounds.max [40, 30, 20]"
+  },
+  {
+   "tool": "mesh_boolean",
+   "arguments": {
+    "op": "subtract",
+    "solids": [
+     "Pin"
+    ]
+   },
+   "expect": "a Ø10 hole through the block: edit.volume about -1570 (pi x 25 x 20 = 1570.80; the cylinder is tessellated to 0.01 mm, so between -1566 and -1571); mesh.volume 22429 to 22434; open 0; bad 0"
+  },
+  {
+   "tool": "mesh_boolean",
+   "arguments": {
+    "op": "subtract",
+    "solids": [
+     "Inside"
+    ]
+   },
+   "expect": "refused: Inside lies wholly inside the mesh (it would seal a hollow)"
+  },
+  {
+   "tool": "mesh_boolean",
+   "arguments": {
+    "op": "subtract",
+    "solids": [
+     "Speck"
+    ]
+   },
+   "expect": "refused: Speck does not reach the mesh"
+  },
+  {
+   "tool": "mesh_boolean",
+   "arguments": {
+    "op": "add",
+    "solids": [
+     "Speck"
+    ]
+   },
+   "expect": "edit.volume +8; mesh.bounds.max [62, 30, 20]; open 0 (two pieces that do not touch)"
+  },
+  {
+   "tool": "mesh_inspect",
+   "arguments": {
+    "pieceSize": 5
+   },
+   "expect": "islands.pieces 2; islands.islands 1; islandTriangles 12; largestIsland 3.4641 (the 2 mm cube's diagonal); centres [[61, 1, 1]]"
+  },
+  {
+   "tool": "mesh_remove_islands",
+   "arguments": {
+    "size": 5
+   },
+   "expect": "report.islands 1, islandTriangles 12; mesh.bounds.max back to [40, 30, 20]; volume as after the subtract (22429 to 22434)"
+  },
+  {
+   "tool": "mesh_offset",
+   "arguments": {
+    "distance": 1,
+    "direction": "expand"
+   },
+   "expect": "every face 1 mm out: mesh.bounds about [-1, -1, -1] to [41, 31, 21] (within 0.02); report.maxMove 1.732 (a corner); volume about 28460 (42 x 32 x 22 = 29568 less a Ø8 hole 22 long, 1106); open 0"
+  },
+  {
+   "tool": "mesh_offset",
+   "arguments": {
+    "distance": 1,
+    "direction": "shrink",
+    "region": {
+     "box": {
+      "min": [
+       0,
+       0,
+       0
+      ],
+      "max": [
+       1,
+       1,
+       1
+      ]
+     }
+    }
+   },
+   "expect": "refused (invalid_input): a region is not ported — leave region out"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'expand by 1 mm'; volume back to 22429 to 22434"
+  },
+  {
+   "tool": "mesh_mirror",
+   "arguments": {
+    "plane": "YZ",
+    "mode": "symmetric",
+    "keep": "minus"
+   },
+   "expect": "edit.text 'make symmetric about YZ plane, X 20 mm'; the part is symmetric already, so bounds and volume stay (22429 to 22434); open 0"
+  },
+  {
+   "tool": "mesh_mirror",
+   "arguments": {
+    "plane": "XY"
+   },
+   "expect": "edit.text 'mirror across XY plane, Z 10 mm'; report.mode 'whole'; bounds and volume unchanged; volume still positive"
+  },
+  {
+   "tool": "mesh_flip_normals",
+   "arguments": {},
+   "expect": "report.triangles = every triangle; mesh.volume negative, the same size (about -22430)"
+  },
+  {
+   "tool": "mesh_flip_normals",
+   "arguments": {},
+   "expect": "mesh.volume positive again"
+  },
+  {
+   "tool": "mesh_delete_marked",
+   "arguments": {
+    "region": {
+     "box": {
+      "min": [
+       27,
+       9,
+       19
+      ],
+      "max": [
+       39,
+       21,
+       21
+      ]
+     }
+    }
+   },
+   "expect": "a patch of the top face goes (report.triangles about 160): mesh.open above 0 (36 here), volume null"
+  },
+  {
+   "tool": "mesh_delete_marked",
+   "arguments": {
+    "region": "marked"
+   },
+   "expect": "refused (invalid_input): 'marked' is the person's marking on screen — name a box, a sphere or vertices"
+  },
+  {
+   "tool": "mesh_inspect",
+   "arguments": {
+    "holeSize": 30
+   },
+   "expect": "holes.rims 1; holes.holes 1; largestHole about 15.9; centres about [[34, 15, 20]]; volume null"
+  },
+  {
+   "tool": "mesh_fill_holes",
+   "arguments": {
+    "at": [
+     33,
+     15,
+     20
+    ]
+   },
+   "expect": "refused (invalid_input): no open rim is smaller than 5 mm, the smallest about 15.9; says at does not lift the limit"
+  },
+  {
+   "tool": "mesh_fill_holes",
+   "arguments": {
+    "size": 30,
+    "patch": "flat",
+    "at": [
+     33,
+     15,
+     20
+    ]
+   },
+   "expect": "edit.text 'fill a hole'; report.filled 1, failed 0, left 0; mesh.open 0; volume back to what it was before the delete (22429 to 22434), the patch being flat"
+  },
+  {
+   "tool": "mesh_smooth",
+   "arguments": {
+    "size": 4,
+    "limit": 0.1
+   },
+   "expect": "report.settings { size 4, limit 0.1, keepEdges true }; maxMove under 0.1 (0.006 here: a CAD-exact mesh has nothing to smooth); atLimit 0; volume within 2 mm³ of before; open 0"
+  },
+  {
+   "tool": "mesh_discard_edited",
+   "arguments": {},
+   "expect": "mesh.working 'scan'; triangles 12; volume 24000"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'discard the edits'; mesh.working 'edited copy' with the hole through it again (volume 22428 to 22434)"
+  },
+  {
+   "tool": "mesh_reduce",
+   "arguments": {
+    "tolerance": 0.05,
+    "maxTriangles": 2000
+   },
+   "expect": "FreeCAD's decimation (not run on this pass): reduced.inputTriangles about 8800; reduced.triangles at most 2000; method 'FreeCAD Mesh.decimate'; max and backMax in mm; held true or false — READ it: flat faces should hold, the bore's wall may not at 0.05. The reply has no health (not a document change). Nothing applied: mesh_parts next shows it"
+  },
+  {
+   "tool": "mesh_parts",
+   "arguments": {},
+   "expect": "reduced is the report (not null); edited.triangles still about 8800; undo 'smooth' (the undo of the discard was itself taken off the stack)"
+  },
+  {
+   "tool": "mesh_export",
+   "arguments": {
+    "part": "reduced",
+    "path": "block-reduced"
+   },
+   "expect": "file.name 'block-reduced.stl' (the extension added) in the session's folder; format 'stl'; triangles = reduced.triangles; bytes = 84 + 50 x triangles; no health (a file write)"
+  },
+  {
+   "tool": "mesh_apply_reduced",
+   "arguments": {},
+   "expect": "edit.text 'apply the reduction'; mesh.working 'edited copy'; mesh.triangles = reduced.triangles; mesh.open 0 expected (a closed mesh decimated stays closed; if open is above 0 that is a finding)"
+  },
+  {
+   "tool": "mesh_discard",
+   "arguments": {
+    "what": "reduced"
+   },
+   "expect": "refused (invalid_state): no reduced mesh — applying it used it up"
+  },
+  {
+   "tool": "mesh_export",
+   "arguments": {
+    "part": "edited",
+    "to": "document"
+   },
+   "expect": "object 'Block mesh edited' (a Mesh::Feature in the document: object_list shows it); triangles as the copy's; health present (this one is a document change, one FreeCAD undo step)"
+  },
+  {
+   "tool": "mesh_export",
+   "arguments": {
+    "part": "piece"
+   },
+   "expect": "refused (invalid_state): no trimmed piece — mesh_trim makes one"
+  },
+  {
+   "tool": "mesh_use_edited",
+   "arguments": {},
+   "expect": "scan.triangles = the copy's; scan.edits lists every edit; note; scan_info would now read the reduced mesh"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'use the edited mesh for analysis'; mesh.working 'edited copy'; the scan in use is the 12-triangle block again"
+  },
+  {
+   "tool": "mesh_discard_edited",
+   "arguments": {},
+   "expect": "mesh.working 'scan'; triangles 12; volume 24000"
+  },
+  {
+   "tool": "mesh_densify",
+   "arguments": {
+    "maxEdge": 2
+   },
+   "expect": "8192 triangles again, volume 24000"
+  },
+  {
+   "tool": "mesh_trim",
+   "arguments": {
+    "body": "Stub"
+   },
+   "expect": "piece.name 'Stub'; piece.volume 499 (the 5 x 10 x 10 half outside the block, 500, less a 0.02 slab); matingArea 100; bodyVolume 1000; dropped 1; fit.max 0; status 'Trimmed Stub to the break'. mesh_parts would show piece { name Stub }"
+  },
+  {
+   "tool": "mesh_export",
+   "arguments": {
+    "part": "piece",
+    "format": "3mf",
+    "path": "stub-piece"
+   },
+   "expect": "file.name 'stub-piece.3mf'; format '3mf'; triangles about 490"
+  },
+  {
+   "tool": "mesh_shell",
+   "arguments": {
+    "thickness": 2
+   },
+   "expect": "edit.mode 'hollow'; cavities 1; removed about 14951 (exact for a 36 x 26 x 16 cavity: 14976; the grid's cell is 0.667); mesh.volume about 9049 (exact 9024); open 0; triangles about 76000"
+  },
+  {
+   "tool": "mesh_shell",
+   "arguments": {
+    "thickness": 2,
+    "mode": "thicken"
+   },
+   "expect": "refused (invalid_state): the mesh is closed — hollow it"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'hollow'; volume 24000"
+  },
+  {
+   "tool": "mesh_discard_edited",
+   "arguments": {},
+   "expect": "mesh.working 'scan'; 12 triangles (so the wrap below runs on 12 triangles and takes seconds)"
+  },
+  {
+   "tool": "mesh_wrap",
+   "arguments": {
+    "gap": 4
+   },
+   "expect": "wrap.shells 1; wrap.volume 24000 (within 1); volumeBefore 24000; bridgedArea 0; dropped 0; sharpCorners 8; cell 0.6667; triangles about 25500; status says a preview. May answer with a job id if it passes 45 s (2 s where it was tried): then job_status { job, wait: 25 }"
+  },
+  {
+   "tool": "mesh_wrap",
+   "arguments": {
+    "gap": 4,
+    "grow": 5
+   },
+   "expect": "refused: grow at most the gap, 4 mm"
+  },
+  {
+   "tool": "mesh_parts",
+   "arguments": {},
+   "expect": "wrap { triangles about 25500 }; piece { name 'Stub', triangles about 490 }; edited null"
+  },
+  {
+   "tool": "mesh_discard",
+   "arguments": {
+    "what": "wrap"
+   },
+   "expect": "discarded 'wrap' (this was refused as 'not ported' before the pass)"
+  },
+  {
+   "tool": "mesh_wrap",
+   "arguments": {
+    "gap": 4,
+    "edges": "smooth",
+    "grow": 1,
+    "preview": false
+   },
+   "expect": "applied at once: wrap.volume about 29468 (the block grown 1 mm with rounded edges: under 42 x 32 x 22 = 29568); sharpCorners 0; edit.text 'apply the wrap'; mesh.working 'edited copy'; mesh.bounds [-1, -1, -1] to [41, 31, 21]"
+  },
+  {
+   "tool": "mesh_apply_wrap",
+   "arguments": {},
+   "expect": "refused (invalid_state): there is no wrap"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'apply the wrap'; mesh.working 'scan'; volume 24000"
+  },
+  {
+   "tool": "mesh_inspect",
+   "arguments": {},
+   "expect": "as at the start: working 'scan', triangles 12, volume 24000, open 0"
+  }
+ ],
+ "notCovered": [
+  "mesh_boolean with a measured element as the solid (needs element_fit on a real cylinder wall: the other ScanRuler agent's family; the document-body path is covered)",
+  "mesh_cut / mesh_mirror across an element instead of a coordinate plane (same reason)",
+  "mesh_shell thicken on an open surface and mesh_wrap on a mesh with real gaps (bridgedArea above 0): no open or cracked mesh is built here",
+  "mesh_trim with region, offset and flip (offset 0.2 with flip: true gave volume 480 in plain Python)",
+  "a mesh large enough to answer as a job (the size statements in the descriptions were timed in a Linux container, not on the Mac)"
+ ]
+}

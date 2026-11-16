@@ -87,7 +87,7 @@ def bind(session):
                 before = len(w["tags"])
                 w["tags"] = [x for x in w["tags"] if x["name"] != t.get("name")]
                 if len(w["tags"]) == before:
-                    raise ToolError("not_found", f"No region {t.get('name')!r}.")
+                    raise ToolError("not_found", f"tag remove: no region {t.get('name')!r} — the regions: {', '.join(x['name'] for x in w['tags']) or 'none'}.")
             elif act == "clear":
                 w["tags"] = []
         ref = a.get("reference")
@@ -100,7 +100,7 @@ def bind(session):
             else:
                 d = D.dstate(session)
                 if d["reference"] is None or not d["align"]:
-                    raise ToolError("invalid_state", "deviation_open_reference, then deviation_align, first.")
+                    raise ToolError("invalid_state", "reference { source: deviation } is the deviation reference as the scan is aligned to it, and there is none yet: deviation_open_reference, then deviation_align, then wear_setup again.")
                 w["reference"] = {"source": "deviation", "name": d["reference"]["name"]}
         return {"settings": s, "tags": w["tags"], "reference": w["reference"]}
 

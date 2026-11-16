@@ -195,14 +195,31 @@ def find_feature(part, ref, what="feature"):
 
 
 def find_body(store, ref):
+    """A built body by its id, by the name the build gave it, or by the name
+    reverse_body_set gave it (the part's bodyStyles)."""
     briefs = store.builder.briefs() if store.builder else []
-    if isinstance(ref, (int, float)) and not isinstance(ref, bool):
+    if isinstance(ref, bool) or ref is None:
+        _invalid("Name the body: its id or its name — reverse_body_names lists them.")
+    if isinstance(ref, (int, float)):
         b = next((x for x in briefs if x["id"] == ref), None)
     else:
         b = next((x for x in briefs if _key(x["name"]) == _key(ref)), None)
+        if b is None:
+            styles = store.part().get("bodyStyles") or {}
+            b = next((x for x in briefs if _key((styles.get(str(x["id"])) or {}).get("name") or "") == _key(ref)), None)
     if b is None:
-        raise Refusal("not_found", f"No body is {ref!r} — reverse_body_names lists them.")
+        have = ", ".join(f"{x['id']:g} ({x['name']})" for x in briefs[:12]) or "none is built"
+        raise Refusal("not_found", f"No body is {ref!r} — the bodies built now: {have}. reverse_body_names lists them; a body made by a feature below the rollback bar, or by one that failed, is not built (reverse_feature_list).")
     return b
+
+
+def _body_ids(store, given):
+    """Bodies as the record keeps them (ids): a name looked up, an id kept."""
+    if isinstance(given, str):
+        return find_body(store, given)["id"]
+    if isinstance(given, list):
+        return [find_body(store, x)["id"] if isinstance(x, str) else x for x in given]
+    return given
 
 
 def _free_name(name, taken):
@@ -244,11 +261,12 @@ def _picks(store, body, given, what):
             if topo is None:
                 b = store.builder.body_by_id(body) if store.builder and body is not None else None
                 if b is None:
-                    raise Refusal("invalid_state", f"Body {body} is not built: give the picks as fingerprints, or build it first.")
+                    raise Refusal("invalid_state", f"{what}: body {body} is not built now, so an index has nothing to count on — reverse_body_names lists the bodies built (roll the bar down with reverse_feature_rollback {{}} or mend the feature that makes it), "
+                                  "then take the indices from reverse_body_describe; or give the picks as fingerprints.")
                 topo = store.builder.topology(b, 1)
             row = topo[what]
             if not 0 <= p < len(row):
-                _invalid(f"There is no {what[:-1]} {p} on body {body}: reverse_body_describe lists {len(row)}.")
+                _invalid(f"{what}: there is no {what[:-1]} {p} on body {body} as it is built now — reverse_body_describe {{ body: {body} }} lists {f"{len(row)}, numbered 0 to {len(row) - 1}" if row else "none"}. The numbers change with every build: read them again after each change.")
             out.append({"fingerprint": row[p]["fingerprint"]})
         elif isinstance(p, dict):
             out.append({"fingerprint": p.get("fingerprint", p)})
@@ -263,6 +281,10 @@ def _wrap(store, kind, given):
     body = init.get("body")
     if isinstance(body, str):
         init["body"] = body = find_body(store, body)["id"]
+    # The other fields that name bodies take a name as body does.
+    for field in ("tool", "bodies", "sheet", "target"):
+        if isinstance(init.get(field), (str, list)):
+            init[field] = _body_ids(store, init[field])
     for field in PICK_FIELDS:
         if field in init:
             init[field] = _picks(store, body, init[field], field)
@@ -280,6 +302,18 @@ def _wrap(store, kind, given):
         tools = init.pop("tool")
         init["tool"], init["moreTools"] = tools[0], tools[1:]
     return init
+
+
+def _index_picks(given):
+    """Whether these fields carry a pick by index (a whole number)."""
+    def whole(x):
+        return isinstance(x, int) and not isinstance(x, bool)
+
+    if not isinstance(given, dict):
+        return False
+    lists = [given.get(k) for k in PICK_FIELDS] + [[given.get("face")]] + [[v.get("edge")] for v in (given.get("variable") or []) if isinstance(v, dict)]
+    lists += [g.get("faces") for g in (given.get("groups") or []) if isinstance(g, dict)]
+    return any(whole(x) for lst in lists if isinstance(lst, list) for x in lst)
 
 
 def _bodies_for_drafts(store):
@@ -359,6 +393,31 @@ def build_answer(part, out, ids=None):
     return {"results": rows, "failed": failed, "bodies": [_body_out(b) for b in out["bodies"]], "steps": {k: out["steps"][k] for k in ("recomputed", "restored", "of") if k in (out.get("steps") or {})}}
 
 
+def _added_rows(part, out, made):
+    """What became of each feature just added: its build row; "rolledBack"
+    only when it lies below the rollback bar. A feature above the bar with
+    no row of its own is one the build plays nothing for (a sketch: the
+    feature that uses it tells whether its regions were found) — said so,
+    where it read as rolled back."""
+    rows = {r["id"]: r for r in out["results"]}
+    feats = part["features"]
+    bar = len(feats) if part.get("rolledTo") is None else part["rolledTo"]
+    place = {f["id"]: n for n, f in enumerate(feats)}
+    by_id = {f["id"]: f for f in feats}
+    added = []
+    for i in made:
+        f = by_id.get(i) or {}
+        row = {"id": i, "name": f.get("name"), "kind": f.get("kind")}
+        if rows.get(i):
+            row.update({k: v for k, v in rows[i].items() if k != "id" and v is not None})
+        elif place.get(i, 0) >= bar:
+            row["status"] = "rolledBack"
+        else:
+            row.update({"status": "ok", "note": "nothing is built for this feature alone; the feature that uses it shows whether it worked"})
+        added.append(row)
+    return added
+
+
 def _body_out(b):
     return {"id": b["id"], "name": b["name"], "volume": b["volume"], "closed": b["closed"], "surface": b["surface"], "faces": b["faces"], "box": b["box"]}
 
@@ -403,7 +462,7 @@ def handlers(session=None, store=None):
     def feature_add(a):
         given = a.get("features") if a.get("features") is not None else ([a["feature"]] if a.get("feature") is not None else None)
         if not given or (a.get("feature") is not None and a.get("features") is not None):
-            _invalid("Give feature, or features — one of them.")
+            _invalid("Give feature (one record: { kind, … }) or features (a list of them, added one after another) — one of the two, not both. reverse_feature_schema { kind } gives a kind's fields.")
         part = st.part()
         names = []
         for g in given:
@@ -429,8 +488,7 @@ def handlers(session=None, store=None):
             return p
 
         out = commit("add", given[-1].get("name") if isinstance(given[-1], dict) else None, change)
-        rows = {r["id"]: r for r in out["results"]}
-        return {"added": [{"id": i, **(rows.get(i) or {"status": "rolledBack"})} for i in made], "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
+        return {"added": _added_rows(st.part(), out, made), "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
 
     def feature_update(a):
         part = st.part()
@@ -448,9 +506,24 @@ def handlers(session=None, store=None):
             at = next(n for n, x in enumerate(p["features"]) if x["id"] == f["id"])
             old = p["features"][at]
             merged = {**old, **sets}
+            # Bodies by name and picks by index, as reverse_feature_add takes
+            # them: stored as ids and fingerprints (an index kept as it came
+            # would be read as a fingerprint by the build).
+            if isinstance(merged.get("body"), str):
+                merged["body"] = find_body(st, merged["body"])["id"]
+            for field in ("tool", "bodies", "sheet", "target"):
+                if field in sets and isinstance(sets[field], (str, list)):
+                    merged[field] = _body_ids(st, sets[field])
+            body = merged.get("body")
             for field in PICK_FIELDS:
                 if field in sets:
-                    merged[field] = [x["fingerprint"] for x in _picks(st, merged.get("body"), sets[field], field)]
+                    merged[field] = [x["fingerprint"] for x in _picks(st, body, sets[field], field)]
+            if "face" in sets and old["kind"] == "thread":
+                merged["face"] = _picks(st, body, [sets["face"]], "faces")[0]["fingerprint"]
+            if sets.get("variable"):
+                merged["variable"] = [{**v, "edge": _picks(st, body, [v["edge"]], "edges")[0]["fingerprint"]} for v in sets["variable"]]
+            if old["kind"] == "draft" and sets.get("groups"):
+                merged["groups"] = [{**g, "faces": [x["fingerprint"] for x in _picks(st, body, g["faces"], "faces")]} for g in sets["groups"]]
             if "suppressed" in sets and not sets["suppressed"]:
                 merged.pop("suppressed")
             try:
@@ -461,7 +534,13 @@ def handlers(session=None, store=None):
             return p
 
         out = commit("edit", f["name"], change)
-        return {"feature": next(x for x in st.part()["features"] if x["id"] == f["id"]), "result": next((r for r in out["results"] if r["id"] == f["id"]), None), "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
+        answer = {"feature": next(x for x in st.part()["features"] if x["id"] == f["id"]), "result": next((r for r in out["results"] if r["id"] == f["id"]), None), "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
+        if _index_picks(sets):
+            # The indices were read on the body as built before this edit,
+            # which already carried this feature's own work.
+            answer["note"] = ("Picks given by index were read on the body as it was built before this call — after this feature's own work — and are kept as fingerprints, found again on the body the feature starts from. "
+                              "Check result (a warning or a failure says when one was not found as meant); to pick on the body before the feature, reverse_feature_rollback to just above it, reverse_body_describe, update, then reverse_feature_rollback {}.")
+        return answer
 
     def feature_remove(a):
         part = st.part()
@@ -559,14 +638,17 @@ def handlers(session=None, store=None):
         return build_answer(st.part(), st.rebuild())
 
     def build_stop(a):
-        raise Refusal("unavailable", "Builds run in FreeCAD's own process here; the worker a build can be stopped in comes with build step 14 of the port.")
+        raise Refusal("unavailable", "Builds run in FreeCAD's own process here, so there is nothing to stop from outside: the worker a build can be stopped in comes with build step 14 of the port. "
+                      "A build that answered but takes too long: reverse_feature_suppress the slow feature (the reply's steps.played gives each feature's time) or reverse_feature_rollback { after } above it. "
+                      "A FreeCAD that no longer answers is Agent Link's to restart (app_force_restart).")
 
     # ---- parameters
     def _param(part, ref):
         ps = part.get("parameters") or []
         p = next((x for x in ps if (x["id"] == ref if isinstance(ref, (int, float)) and not isinstance(ref, bool) else x["name"] == ref)), None)
         if p is None:
-            raise Refusal("not_found", f"No parameter is {ref!r} — reverse_parameter_list lists them.")
+            have = ", ".join(x["name"] for x in ps[:20]) or "none yet"
+            raise Refusal("not_found", f"No parameter is {ref!r} (a name is matched exactly, capitals too; or give its id) — there are: {have}. reverse_parameter_list lists them.")
         return p
 
     def _readings(part):
@@ -694,12 +776,12 @@ def handlers(session=None, store=None):
 
         b = find_body(st, a.get("body"))
         if not any(k in a for k in ("name", "color", "visible")):
-            _invalid("Give name, color or visible.")
+            _invalid("Give at least one of name (a string), color (#rrggbb, #rgb or a swatch: " + ", ".join(SWATCHES) + ") or visible (true / false).")
         color = None
         if "color" in a:
             color = _color_of(a["color"])
             if color is None:
-                _invalid("A colour is #rgb, #rrggbb or a swatch's name.")
+                _invalid(f"color: {a['color']!r} is not a colour — give #rrggbb, #rgb or a swatch's name: " + ", ".join(SWATCHES) + ".")
 
         def change(p):
             styles = dict(p.get("bodyStyles") or {})
@@ -741,14 +823,14 @@ def handlers(session=None, store=None):
             with open(path, "rb") as f:
                 data = f.read()
         except OSError as e:
-            raise Refusal("not_found", f"{path} cannot be read ({e.strerror or e}).") from e
+            raise Refusal("not_found", f"path: {path} cannot be read ({e.strerror or e}) — give the STEP file's full path, or a name in the session's folder (where export writes: export {{ objects, path: \"part.step\" }} makes one).") from e
         base = os.path.basename(path)
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             text = data.decode("latin-1")
         if not text[:256].lstrip().startswith("ISO-10303-21") or not text[:256].lstrip()[len("ISO-10303-21"):].lstrip().startswith(";"):
-            _invalid(f"{base} is not a STEP file — it does not begin as one (ISO-10303-21).")
+            _invalid(f"{base} is not a STEP file — it does not begin as one (ISO-10303-21). Only STEP (.step, .stp) is brought in here: export a body as STEP first (export {{ objects, path: \"part.step\" }}); a mesh is opened with scan_open.")
         import re
 
         name = a.get("name") if isinstance(a.get("name"), str) and a["name"].strip() else re.sub(r"\.(step|stp)$", "", base, flags=re.I)
@@ -772,8 +854,7 @@ def handlers(session=None, store=None):
             return p
 
         out = commit("import", name, change)
-        rows = {r["id"]: r for r in out["results"]}
-        return {"added": [{"id": i, **(rows.get(i) or {"status": "rolledBack"})} for i in made], "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
+        return {"added": _added_rows(st.part(), out, made), "failed": out["failed"], "bodies": out["bodies"], "steps": out["steps"]}
 
     return {
         "reverse_feature_add": feature_add, "reverse_feature_update": feature_update, "reverse_feature_remove": feature_remove, "reverse_feature_move": feature_move,

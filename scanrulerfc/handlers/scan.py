@@ -146,7 +146,7 @@ def bind(session):
         else:
             d = Q.dominant_facing(g.N[:: max(1, len(V) // 60000)])
             if d is None:
-                raise ToolError("failed", "The scan has too few points to read a thickness axis off — give axis.")
+                raise ToolError("failed", "The scan has too few points to read a thickness axis off — give axis: \"x\", \"y\", \"z\" or a direction [x, y, z].")
             big = int(np.argmax(np.abs(d)))
             if d[big] < 0:
                 d = -d
@@ -220,7 +220,7 @@ def bind(session):
         if len(idx) > DRAFT_LIMIT:
             idx = idx[:: len(idx) // DRAFT_LIMIT + 1]
         if len(idx) < 3:
-            raise ToolError("invalid_input", "Too few scan points lie there to read a wall off.")
+            raise ToolError("invalid_input", f"Only {len(idx)} scan points lie there — a wall needs 3 at least: widen box, or leave it out for the whole scan.")
         split = None
         sp = a.get("split")
         if sp is not None:
@@ -235,7 +235,7 @@ def bind(session):
 
                     r = find_symmetry(scan)
                     if not r or not accepted(r):
-                        raise ToolError("failed", "The scan has no mirror plane that holds — give split a plane instead.")
+                        raise ToolError("failed", "split: \"symmetry\" found no mirror plane that holds on this scan — give split a plane instead: a plane element, \"XY\", \"YZ\", \"XZ\" or { point, normal }.")
                     split = {"point": list(r["point"]), "normal": list(r["normal"]), "from": "the scan's mirror plane", "rms": r.get("rms")}
             elif str(sp).upper() in ("XY", "YZ", "XZ"):
                 split = {"point": [0, 0, 0], "normal": {"XY": [0, 0, 1], "YZ": [1, 0, 0], "XZ": [0, 1, 0]}[str(sp).upper()], "from": str(sp).upper()}
@@ -281,7 +281,7 @@ def bind(session):
             el = M.find_element(st, ax)
             line = ref_axis(el["fit"]) if el.get("fit") and el["kind"] in ("cylinder", "cone", "line", "circle") else None
             if line is None:
-                raise ToolError("invalid_input", f"{el['name']} has no axis — choose a cylinder, cone, line or circle.")
+                raise ToolError("invalid_input", f"axis: {el['name']} is a {el['kind']} and has no axis — give a cylinder, cone, line or circle element, \"X\", \"Y\", \"Z\", or {{ origin, dir }}.")
             origin, d, name = line["origin"], line["dir"], el["name"]
         if not np.linalg.norm(d) > 1e-9:
             raise ToolError("invalid_input", "axis.dir: give a direction, not a zero vector.")
@@ -299,7 +299,7 @@ def bind(session):
             lo, hi = float(h.min()), float(h.max())
             heights = [round(lo + (i + 0.5) / PATTERN_HEIGHTS * (hi - lo), 3) for i in range(PATTERN_HEIGHTS)]
         if len(heights) > PATTERN_HEIGHTS_MAX:
-            raise ToolError("invalid_input", f"at: {PATTERN_HEIGHTS_MAX} heights at most.")
+            raise ToolError("invalid_input", f"at: {len(heights)} heights given, {PATTERN_HEIGHTS_MAX} at most in one call — fewer, or call again for the rest.")
         rad = a.get("radius") or {}
         out = []
         for h in heights:
@@ -440,7 +440,7 @@ def bind(session):
             if readings is None:
                 raise ToolError("invalid_state", "There is no deviation map to read — deviation_align measures one against the reference part, deviation_set_target one against an element.")
             if len(readings) != len(scan.V):
-                raise ToolError("internal", f"The map has {len(readings)} readings and the scan {len(scan.V)} vertices.")
+                raise ToolError("failed", f"The deviation map has {len(readings)} readings and the scan {len(scan.V)} vertices: the map is of the scan before it was edited — measure it again (deviation_align, or deviation_set_target {{ element }}), then of: \"deviation\".")
             dev = {"values": np.asarray(readings, float), "search": float(d["maxDistance"]), "source": d["source"], "range": float(d.get("range") or d["maxDistance"])}
         show_grid = a.get("grid", not want_levels)
         show_picture = a.get("picture", False) or a.get("grid") is False
@@ -656,7 +656,7 @@ def bind(session):
         scan = M.require_scan(st)
         limit = a.get("limit", SURFACE_LIMIT)
         if (a.get("vertices") is None) == (a.get("box") is None):
-            raise ToolError("invalid_input", "Give vertices or box — one of them.")
+            raise ToolError("invalid_input", "Give vertices (7 or more scan vertex numbers) or box ({ min, max }, mm) — one of them, not both and not neither. scan_query { box, fields: \"ids\" } lists a face's vertices.")
         g = scan.graph()
         if a.get("box"):
             _every, kept, _step = M.query(scan, a["box"], None, a.get("normal"), limit)
@@ -669,7 +669,7 @@ def bind(session):
             step = max(1, -(-len(vs) // limit))
             P = g.P[np.asarray(vs[::step], dtype=np.int64)]
         if len(P) < 7:
-            raise ToolError("invalid_input", f"Only {len(P)} scan points lie there — a surface needs 7 at least.")
+            raise ToolError("invalid_input", f"Only {len(P)} scan points lie there — a surface needs 7 at least: widen box, loosen or drop normal, or on a CAD tessellation mesh_densify first.")
         model = a.get("model", "best")
         r = HS.fit_models(P, HS.MODELS if model == "best" else [model])
         if not r:

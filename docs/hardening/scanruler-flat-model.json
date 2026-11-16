@@ -1,0 +1,739 @@
+{
+ "tutorial": "No FreeCAD wiki tutorial covers ScanRuler's 2D measuring (Stefan Hermann's / CNC Kitchen's, ported). Two known subjects stand in for a real scan and a real flatbed image: the middle section of a 40 x 30 x 20 plate with a Ø10 hole (built with Part as Part_Cut.md describes and meshed with MeshPart), and a 400 x 300 px synthetic PNG at 10 px/mm with a Ø16 disc and a 10 x 6 rectangle. Every expected value is worked out from those sizes.",
+ "reference": null,
+ "expected": {
+  "plateSection": {
+   "outline_mm": [
+    40,
+    30
+   ],
+   "outlineLength_mm": 140,
+   "boreDiameter_mm": 10,
+   "boreChainLength_mm": 31.416,
+   "sheetZero": "the plate's centre [20, 15]",
+   "width_mm": 30,
+   "boreToLeft_mm": 20,
+   "cornerToBore_mm": 25,
+   "angle_deg": 90
+  },
+  "image": {
+   "pixels": [
+    400,
+    300
+   ],
+   "pxPerMm": 10,
+   "sheet_mm": [
+    40,
+    30
+   ],
+   "disc": {
+    "centre_mm": [
+     12,
+     15
+    ],
+    "radius_mm": 8,
+    "area_mm2": 201.06
+   },
+   "rectangle": {
+    "x_mm": [
+     25,
+     35
+    ],
+    "y_mm": [
+     10,
+     16
+    ],
+    "area_mm2": 60,
+    "diagonal_mm": 11.662
+   }
+  },
+  "afterCalibrationTo32": {
+   "pxPerMm": 5,
+   "scaledBy": 2,
+   "disc_mm": 32,
+   "height_mm": 12
+  },
+  "where": "Every answer but flat_render's and the comb's was produced by running the handlers in plain Python on this pass (the section on a plate made with the add-on's own mesh boolean and an 64-sided hole; the image through the add-on's own PNG reader, not Qt's). Nothing ran in FreeCAD."
+ },
+ "conventions": {
+  "placeholders": {
+   "<BORE>": "the chain number of the bore in the flat_edges answer after section 'Mid': the chain whose length is about 31.4 (chains[1].chain when the outline is the longest; 1 where it was tried). Chain numbers are not the list's order."
+  },
+  "session": "Run in a fresh session (or after scan_open replaced the scan): the first flat_edges expects an empty sheet. Run the chunks in order in the same document.",
+  "image": "Before the call flat_open_image { path: \"flat-test.png\" }, write the PNG into the session's folder (session_state gives outDir; ~/AgentLink by default) with the script in notes.makePng: `python3 mkpng.py <outDir>/flat-test.png`. Plain Python 3, no packages.",
+  "jobs": "flat_open_image, flat_calibrate and flat_detect_edges are declared heavy: outside a batch a call past 45 s answers with a job id. This image takes a fraction of a second."
+ },
+ "notes": {
+  "makePng": "# Plain Python: a 400 x 300 px, 8-bit grey PNG at 10 px/mm (pHYs 10000 px/m): a white 40 x 30 mm sheet with a black\n# disc (centre [12, 15] mm, radius 8) and a black rectangle (x 25..35, y 10..16 mm). Sheet origin bottom-left, y up.\nimport struct, zlib, sys, os\ndef chunk(t, d): return struct.pack(\">I\", len(d)) + t + d + struct.pack(\">I\", zlib.crc32(t + d) & 0xFFFFFFFF)\ndef make(path, W=400, H=300, ppmm=10, phys=True):\n    rows = bytearray()\n    for r in range(H):                      # rows top first\n        y = (H - r - 0.5) / ppmm\n        rows.append(0)                      # filter 0\n        for c in range(W):\n            x = (c + 0.5) / ppmm\n            dark = (x - 12) ** 2 + (y - 15) ** 2 <= 64 or (25 <= x <= 35 and 10 <= y <= 16)\n            rows.append(0 if dark else 255)\n    png = b\"\\x89PNG\\r\\n\\x1a\\n\" + chunk(b\"IHDR\", struct.pack(\">IIBBBBB\", W, H, 8, 0, 0, 0, 0))\n    if phys: png += chunk(b\"pHYs\", struct.pack(\">IIB\", ppmm * 1000, ppmm * 1000, 1))\n    png += chunk(b\"IDAT\", zlib.compress(bytes(rows), 9)) + chunk(b\"IEND\", b\"\")\n    open(path, \"wb\").write(png)\nif __name__ == \"__main__\":\n    make(os.path.expanduser(sys.argv[1]), phys=(len(sys.argv) < 3))\n"
+ },
+ "calls": [
+  {
+   "tool": "doc_new",
+   "arguments": {
+    "name": "ScanFlatModel"
+   },
+   "expect": "a new empty document"
+  },
+  {
+   "tool": "flat_edges",
+   "arguments": {},
+   "expect": "refused (invalid_state): nothing is on the 2D sheet — flat_open_image, or cut a section (if an earlier model left a section on the sheet in this session, this lists it instead: start from a fresh session)"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "box",
+    "size": [
+     40,
+     30,
+     20
+    ],
+    "name": "Plate"
+   },
+   "expect": "volume 24000"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "cylinder",
+    "radius": 5,
+    "height": 30,
+    "at": [
+     20,
+     15,
+     -5
+    ],
+    "name": "Drill"
+   },
+   "expect": "volume 2356.19"
+  },
+  {
+   "tool": "part_boolean",
+   "arguments": {
+    "op": "cut",
+    "base": "Plate",
+    "tools": [
+     "Drill"
+    ]
+   },
+   "expect": "body Plate, volume 22429.20 (24000 - pi x 25 x 20): a 40 x 30 x 20 plate with a Ø10 hole through its middle at [20, 15]"
+  },
+  {
+   "tool": "meshobj_from_shape",
+   "arguments": {
+    "body": "Plate",
+    "deflection": 0.01,
+    "name": "Plate mesh"
+   },
+   "expect": "a closed mesh, volume 22429 to 22432 (the bore as a polygon within 0.01 mm), a few hundred facets"
+  },
+  {
+   "tool": "scan_open",
+   "arguments": {
+    "object": "Plate mesh"
+   },
+   "expect": "opened: box size [40, 30, 20]; centre [20, 15, 10]"
+  },
+  {
+   "tool": "section_cut",
+   "arguments": {
+    "across": "XY",
+    "name": "Sparse"
+   },
+   "expect": "section.plane.origin [20, 15, 10], normal [0, 0, 1], basisU [1, 0, 0], basisV [0, 1, 0]; chains 2 (the outline and the bore); the section is on the 2D sheet"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "box": {
+     "min": [
+      -19,
+      14
+     ],
+     "max": [
+      19,
+      16
+     ]
+    }
+   },
+   "expect": "refused (failed): too few edge points for a line; the message gives the count (a handful: the cut of a CAD-style mesh has a point only where it crosses a triangle edge) and says mesh_densify, mesh_use_edited, section_cut again — or points"
+  },
+  {
+   "tool": "mesh_densify",
+   "arguments": {
+    "maxEdge": 2
+   },
+   "expect": "tens of thousands of triangles; mesh.volume unchanged (22429 to 22432); open 0"
+  },
+  {
+   "tool": "mesh_use_edited",
+   "arguments": {},
+   "expect": "scan.edits ['densify']; the sections were cut again"
+  },
+  {
+   "tool": "section_cut",
+   "arguments": {
+    "across": "XY",
+    "name": "Mid"
+   },
+   "expect": "section 'Mid', offset 10, chains 2; it replaces 'Sparse' on the sheet (elements start empty)"
+  },
+  {
+   "tool": "flat_edges",
+   "arguments": {},
+   "expect": "units 'mm'; total 2; one closed chain of length 140.0 with bounds [-20, -15] to [20, 15] (the 40 x 30 outline; the sheet's zero is the plate's centre) and one closed chain of length 31.40 to 31.42 with bounds about [-5, -5] to [5, 5] (the bore: 2 pi x 5 = 31.416); each with a few hundred points now"
+  },
+  {
+   "tool": "flat_objects",
+   "arguments": {},
+   "expect": "refused (invalid_state): flat_objects reads a flatbed image"
+  },
+  {
+   "tool": "flat_calibrate",
+   "arguments": {
+    "mode": "distance",
+    "points": [
+     [
+      0,
+      0
+     ],
+     [
+      10,
+      0
+     ]
+    ],
+    "mm": 10
+   },
+   "expect": "refused (invalid_state): a section is in millimetres already"
+  },
+  {
+   "tool": "flat_detect_edges",
+   "arguments": {},
+   "expect": "chains 2; note: a section's cut is its edges"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "circle",
+    "box": {
+     "min": [
+      -6,
+      -6
+     ],
+     "max": [
+      6,
+      6
+     ]
+    },
+    "name": "Bore"
+   },
+   "expect": "element.fit: center within 0.01 of [0, 0]; radius 4.99 to 5.00 (the polygon's points lie on or just inside the circle); sigma under 0.01; usedPoints = the bore chain's points"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "box": {
+     "min": [
+      -19,
+      14
+     ],
+     "max": [
+      19,
+      16
+     ]
+    },
+    "name": "Top"
+   },
+   "expect": "fit.center [0, 15] (x within 1); dir [1, 0] or [-1, 0]; sigma 0; length 36 to 38"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "box": {
+     "min": [
+      -19,
+      -16
+     ],
+     "max": [
+      19,
+      -14
+     ]
+    },
+    "name": "Bottom"
+   },
+   "expect": "fit.center y -15; dir along x; sigma 0"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "points": [
+     [
+      -20,
+      -10
+     ],
+     [
+      -20,
+      10
+     ]
+    ],
+    "name": "Left"
+   },
+   "expect": "method flat-line-pick: picks [{ at [-20, -10], chain (the outline's), moved 0 }, { at [-20, 10], … }]; fit.center [-20, 0]; dir [0, 1]; length 20; usedPoints 2; sigma 0"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "point",
+    "method": "flat-point-intersect",
+    "refs": [
+     "Top",
+     "Left"
+    ],
+    "name": "Corner"
+   },
+   "expect": "fit.at [-20, 15]"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "point",
+    "method": "flat-point-center",
+    "refs": [
+     "Bore"
+    ],
+    "name": "Bore centre"
+   },
+   "expect": "fit.at within 0.01 of [0, 0]"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "arc",
+    "box": {
+     "min": [
+      0,
+      0
+     ],
+     "max": [
+      6,
+      6
+     ]
+    },
+    "name": "Quarter"
+   },
+   "expect": "kind arc; radius 4.99 to 5.01; start about 0; sweep about 1.57 (a quarter, pi/2)"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "method": "flat-line-seed",
+    "points": [
+     [
+      0,
+      15
+     ]
+    ]
+   },
+   "expect": "refused (invalid_input): the seed methods are not ported — use the edge method or pick points"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Top",
+     "Bottom"
+    ],
+    "name": "Width"
+   },
+   "expect": "type flat-dist-line-line; report line 'Top → Bottom — Line distance: 30.000 mm (Lines 0.00° apart)'"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Bore",
+     "Left"
+    ],
+    "name": "Bore to left"
+   },
+   "expect": "type flat-dist-point-line; 'Bore → Left — Distance to line: 20.000 mm' (within 0.01)"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Left",
+     "Bore"
+    ]
+   },
+   "expect": "refused (invalid_input): a line then a point make no dimension; the message lists the four types' orders and says to give the point first"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Top",
+     "Left"
+    ],
+    "type": "flat-angle-line-line",
+    "name": "Square"
+   },
+   "expect": "'Top → Left — Line angle: 90.00°'"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Corner",
+     "Bore centre"
+    ],
+    "name": "Diagonal"
+   },
+   "expect": "type flat-dist-point-point: Center distance 25.000 mm (sqrt(20² + 15²)), ΔX +20.000 · ΔY -15.000"
+  },
+  {
+   "tool": "flat_curvature",
+   "arguments": {
+    "element": "Bore"
+   },
+   "expect": "one stretch: kind arc, radius = the fit's (4.99 to 5.00), radiusMin = radiusMax; from 0 to just under 31.4; closed true; no health (a read)"
+  },
+  {
+   "tool": "flat_curvature",
+   "arguments": {
+    "chains": [
+     "<BORE>"
+    ]
+   },
+   "expect": "items[0]: closed true; one stretch, kind arc, radius 4.98 to 5.00, convex false (a bore is a hollow); scatter under 0.001"
+  },
+  {
+   "tool": "flat_curvature",
+   "arguments": {},
+   "expect": "refused (invalid_input): give chains or element — one of them"
+  },
+  {
+   "tool": "flat_profile",
+   "arguments": {
+    "chains": [
+     "<BORE>"
+    ],
+    "about": "Bore"
+   },
+   "expect": "about { kind radial, center about [0, 0] }; prominence 1.5 (the floor on a section); sides[0] { peaks 0, max and min both 4.99 to 5.01 }"
+  },
+  {
+   "tool": "flat_profile",
+   "arguments": {
+    "object": 1
+   },
+   "expect": "refused (invalid_state): no objects are numbered on this sheet — flat_objects (an image) or chains"
+  },
+  {
+   "tool": "flat_note_add",
+   "arguments": {
+    "text": "Ø10 bore",
+    "at": [
+     -4,
+     7
+    ]
+   },
+   "expect": "note { id 1, text 'Ø10 bore', at [-4, 7], visible true }"
+  },
+  {
+   "tool": "flat_set_alignment",
+   "arguments": {
+    "origin": [
+     -20,
+     -15
+    ],
+    "xAxis": [
+     20,
+     -15
+    ]
+   },
+   "expect": "alignment { origin [-20, -15], angleDeg 0 }; the 2D state's fits stay in the sheet's frame"
+  },
+  {
+   "tool": "flat_report",
+   "arguments": {},
+   "expect": "text: 'Mid: Plate mesh cut across XY plane, offset 10.0 mm'; 'Scale: millimetres of the 3D scan'; 'Coordinates: aligned — origin at -20.000, -15.000'; Bore Ø 9.98 to 10.00; Corner X 0.000 · Y 30.000; Bore centre X 20.000 · Y 15.000 (the bore's place from the plate's lower-left corner); the four dimensions; Notes: Ø10 bore"
+  },
+  {
+   "tool": "flat_edit",
+   "arguments": {
+    "element": "Quarter",
+    "name": "Quarter arc",
+    "visible": false
+   },
+   "expect": "the 2D state; the element is now named 'Quarter arc'"
+  },
+  {
+   "tool": "flat_edit",
+   "arguments": {
+    "note": 1,
+    "text": "Bore Ø10 H7"
+   },
+   "expect": "note { id 1, text 'Bore Ø10 H7', at [-4, 7] }"
+  },
+  {
+   "tool": "flat_edit",
+   "arguments": {},
+   "expect": "refused (invalid_input): give element, dimension or note"
+  },
+  {
+   "tool": "flat_export",
+   "arguments": {
+    "format": "dxf",
+    "path": "plate-mid"
+   },
+   "expect": "file.name 'plate-mid.dxf' (extension added) in the session's folder; format 'dxf'; units 'mm'; elements 6 (seven less the hidden arc); chains 2. In the file the bore's CIRCLE is centred at 20, 15 (the alignment's frame)"
+  },
+  {
+   "tool": "flat_export",
+   "arguments": {
+    "format": "svg"
+   },
+   "expect": "file.name 'Mid.svg'; elements 6; chains 2"
+  },
+  {
+   "tool": "flat_render",
+   "arguments": {
+    "path": "plate-mid-sheet",
+    "size": 600
+   },
+   "expect": "file.name 'plate-mid-sheet.png'; units 'mm'; width 600; height 449 or 450; map.unitsPerPx about 0.0667 (40 mm over 600 px), map.left -20, map.top 15; grid 5"
+  },
+  {
+   "tool": "flat_render",
+   "arguments": {
+    "frame": {
+     "min": [
+      100,
+      100
+     ],
+     "max": [
+      110,
+      110
+     ]
+    }
+   },
+   "expect": "refused (invalid_input): the frame lies off the sheet, which runs from [-20, -15] to [20, 15]"
+  },
+  {
+   "tool": "flat_curvature",
+   "arguments": {
+    "chains": [
+     "<BORE>"
+    ],
+    "comb": true,
+    "name": "Bore comb"
+   },
+   "expect": "as the reading above, plus comb { object 'Bore comb', teeth above 0, mmPerCurvature, spacing } and health: a Part::Feature of line segments at z 10 round [20, 15] in the document (object_list shows it); one FreeCAD undo step"
+  },
+  {
+   "tool": "flat_remove",
+   "arguments": {
+    "elements": [
+     "Top"
+    ],
+    "notes": [
+     1
+    ]
+   },
+   "expect": "removed { elements 1, dimensions 0, notes 1 }; invalidDimensions ['Width', 'Square'] (they stay and read invalid)"
+  },
+  {
+   "tool": "flat_set_alignment",
+   "arguments": {
+    "clear": true
+   },
+   "expect": "the 2D state, no alignment key"
+  },
+  {
+   "tool": "flat_open_image",
+   "arguments": {
+    "path": "no-such-image.png"
+   },
+   "expect": "refused (not_found): no such file"
+  },
+  {
+   "tool": "flat_open_image",
+   "arguments": {
+    "path": "flat-test.png"
+   },
+   "expect": "flat.image { fileName 'flat-test.png', width 400, height 300, decoder 'QImage' (or 'png (zlib)' without Qt) }; units 'mm'; calibration { source 'metadata', pxPerMm { x 10, y 10 } }; edges.chains 6 (the disc, the rectangle and four 2 mm specks at the disc's diagonals — a hard-edged synthetic image; the count may differ by a few under QImage); elements [] (the section's elements are gone)"
+  },
+  {
+   "tool": "flat_edges",
+   "arguments": {
+    "limit": 2
+   },
+   "expect": "total about 6; the two longest: length about 50.3 with bounds [4, 7] to [20, 23] (the disc: 2 pi x 8 = 50.27) and about 31.4 with bounds [25, 10] to [35, 16] (the rectangle's perimeter 32, its corners cut short)"
+  },
+  {
+   "tool": "flat_objects",
+   "arguments": {},
+   "expect": "threshold 127; dark true; count 2; object 1: area 201.08 (pi x 64 = 201.06), centroid [12, 15], equivalentDiameter 16.00, feret.min 16.0; object 2: area 60.0, box [25, 10] to [35, 16], centroid [30, 13], feret.max 11.66 (the diagonal), feret.min 6.0"
+  },
+  {
+   "tool": "flat_profile",
+   "arguments": {
+    "object": 1
+   },
+   "expect": "about { kind radial, center [12, 15] }; prominence 0.15 (1.5 px); sides[0]: peaks 0, max 7.99 to 8.01, min 7.9 to 8.0"
+  },
+  {
+   "tool": "flat_profile",
+   "arguments": {
+    "object": 2,
+    "kind": "axial"
+   },
+   "expect": "about { kind axial, origin [30, 13], dir [1, 0] }; two sides, each peaks 0, max = min = 2.95 (half the 6 mm height, to the pixel centres)"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "circle",
+    "box": {
+     "min": [
+      3,
+      6
+     ],
+     "max": [
+      21,
+      24
+     ]
+    },
+    "name": "Disc"
+   },
+   "expect": "center within 0.01 of [12, 15]; radius 7.99 to 8.01 (7.998 here); id 1 (ids start again on a new sheet)"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "box": {
+     "min": [
+      26,
+      15.5
+     ],
+     "max": [
+      34,
+      16.5
+     ]
+    },
+    "name": "Upper"
+   },
+   "expect": "center [30, 16.0] (within 0.05); dir along x"
+  },
+  {
+   "tool": "flat_fit",
+   "arguments": {
+    "kind": "line",
+    "box": {
+     "min": [
+      26,
+      9.5
+     ],
+     "max": [
+      34,
+      10.5
+     ]
+    },
+    "name": "Lower"
+   },
+   "expect": "center [30, 10.0] (within 0.05)"
+  },
+  {
+   "tool": "flat_dimension_add",
+   "arguments": {
+    "refs": [
+     "Upper",
+     "Lower"
+    ],
+    "name": "Height"
+   },
+   "expect": "'Upper → Lower — Line distance: 6.000 mm' (within 0.05); the report's scale line reads 'UNCALIBRATED — nominal 254 dpi from file metadata'"
+  },
+  {
+   "tool": "flat_note_add",
+   "arguments": {
+    "text": "disc",
+    "at": [
+     4,
+     26
+    ]
+   },
+   "expect": "note { id 1, at [4, 26] }"
+  },
+  {
+   "tool": "flat_calibrate",
+   "arguments": {
+    "mode": "diameter",
+    "points": [
+     [
+      20,
+      15
+     ],
+     [
+      12,
+      23
+     ],
+     [
+      4,
+      15
+     ]
+    ],
+    "mm": 32
+   },
+   "expect": "the Ø16 disc declared Ø32: calibration { source 'measured', pxPerMm { x 5, y 5 }, dpi 127 }; scaledBy 2; units 'mm'; chains about 6"
+  },
+  {
+   "tool": "flat_report",
+   "arguments": {},
+   "expect": "'Scale: CALIBRATED, 5.0000 px/mm'; Disc Ø 31.99 (twice 15.996); Upper → Lower 12.000 mm; Notes: disc"
+  },
+  {
+   "tool": "flat_edit",
+   "arguments": {
+    "note": 1,
+    "visible": true
+   },
+   "expect": "note.at [8, 52] — the note kept its place on the image (it stayed at [4, 26] before the pass)"
+  },
+  {
+   "tool": "flat_profile",
+   "arguments": {
+    "object": 1
+   },
+   "expect": "refused (invalid_state): the calibration cleared the object numbers — flat_objects first (before the pass this read the old outline in the old units)"
+  },
+  {
+   "tool": "flat_detect_edges",
+   "arguments": {
+    "sensitivity": 0.8
+   },
+   "expect": "chains about 6 (a synthetic image has no faint edges to gain)"
+  },
+  {
+   "tool": "flat_export",
+   "arguments": {
+    "format": "dxf"
+   },
+   "expect": "file.name 'flat-test.dxf'; units 'mm'; elements 3; chains about 6"
+  }
+ ],
+ "notCovered": [
+  "flat_fit pick methods for a circle and an arc, and flat-point-midpoint / flat-circle-centers (three picked points on the disc gave centre [12, 15], radius 8 exactly in plain Python)",
+  "flat_profile with real teeth (peaks above 0, pitch): neither subject has any; a gear outline would need a larger synthetic image",
+  "flat_calibrate mode distance (proved in the add-on's own tests: tests/test_flat.py Hardened)",
+  "a JPEG, a 16-bit or an uncalibrated image (units 'px'), and an image large enough to answer as a job",
+  "flat_curvature on an edge with a straight, a transition and an arc in turn (a filleted outline); the plate's outline read straight / transition at each corner in plain Python"
+ ]
+}

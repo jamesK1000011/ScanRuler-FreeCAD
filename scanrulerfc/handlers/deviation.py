@@ -199,7 +199,7 @@ def reference_reading(session):
     V, F = np.asarray(ref["V"], dtype=float), np.asarray(ref["F"], dtype=np.int64)
     area = 0.5 * float(np.linalg.norm(np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]), axis=1).sum())
     spacing = on_reference.wanted_spacing(d["tolerance"], area)
-    centres, normals, pieces, areas = on_reference.cut(V, F, spacing)
+    centres, normals, pieces, areas, spacing = on_reference.cut_within(V, F, spacing)
     values = on_reference.read(centres, normals, scan.V, scan.F, float(d["maxDistance"]))
     got = {"key": key, "centres": centres, "normals": normals, "pieces": pieces, "area": areas, "values": values, "spacing": spacing}
     d["onReference"] = got
@@ -392,16 +392,16 @@ def bind(session):
             if mode == "points":
                 pairs = a.get("pairs")
                 if not pairs:
-                    raise ToolError("invalid_input", "points needs pairs.")
+                    raise ToolError("invalid_input", "mode points needs pairs: three or more [{ scan: [x, y, z], reference: [x, y, z] }], the same places on the scan and on the reference, not in one line (scan_nearest reads a place on the scan). mode auto needs none.")
                 res = align_from_pairs(surface, scan.V, N, [(np.array(p["scan"], float), np.array(p["reference"], float)) for p in pairs])
             elif mode == "local":
                 if not d["align"]:
-                    raise ToolError("invalid_state", "There is no alignment to refine — run deviation_align first.")
+                    raise ToolError("invalid_state", "mode local refines an alignment, and there is none — run deviation_align (mode auto or points) first.")
                 verts = a.get("vertices")
                 if not verts:
-                    raise ToolError("invalid_input", "local needs vertices — the surface to refine on.")
+                    raise ToolError("invalid_input", "mode local needs vertices — the scan vertices of the surface to refine on (scan_query { box, fields: \"ids\" } lists them; three at least).")
                 if max(verts) >= len(scan.V):
-                    raise ToolError("invalid_input", f"The scan has {len(scan.V)} vertices.")
+                    raise ToolError("invalid_input", f"vertices: {max(verts)} is past the scan's {len(scan.V)} vertices (numbered from 0) — scan_query lists the ones on a surface.")
                 dist = a.get("searchDistance", d["maxDistance"])
                 res = align_local(surface, scan.V, N, verts, R.identity(), dist)
             elif mode == "auto":
@@ -441,7 +441,7 @@ def bind(session):
         scan = S.scan_of(session)
         d = dstate(session)
         if "element" not in a:
-            raise ToolError("invalid_input", "element: the element, or null for the reference part.")
+            raise ToolError("invalid_input", "element: a plane, cylinder, sphere or torus element by id or name, or null to go back to the reference part.")
         ref = a["element"]
         if ref is None:
             d["target"] = None
@@ -451,7 +451,7 @@ def bind(session):
         fit = dict(fit)
         fit.setdefault("kind", kind)
         if fit.get("kind") not in ("plane", "cylinder", "sphere", "torus"):
-            raise ToolError("invalid_input", f"A {fit.get('kind')} has no surface to measure against.")
+            raise ToolError("invalid_input", f"element: {name} is a {fit.get('kind')}, which has no surface to measure against — a plane, cylinder, sphere or torus element, or null for the reference part.")
         N = vertex_normals(scan.V, scan.F)
         try:
             side = {"outward": 1, "inward": -1}[a["side"]] if a.get("side") else detect_material_side(fit, scan.V, N, d["maxDistance"])

@@ -9,6 +9,52 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Hardening pass on the reverse, meshtools and flat tools (16 Nov 2026;
+  nothing here ran on FreeCAD when written). Descriptions rewritten with
+  inputs, traps, size limits and what the reply holds; `workbench`,
+  `commands` and `words` added for Agent Link's tool index. Fixed:
+  a Reverse engineer body emptied itself when a recompute reached it before
+  its container had built in this session (a reopened document and
+  `recompute { force: true }`); `reverse_body_set`'s name and colour were
+  never put on an existing body's object, and the name could not be used to
+  find the body; `reverse_feature_update` kept a body's name and picks by
+  index as they came; an added sketch was reported `rolledBack`; a failed
+  feature now turns Agent Link's health check red. `mesh_export { to:
+  "document" }` and `flat_curvature { comb: true }` are declared as the
+  document changes they are, and `mesh_export`, `flat_export`, `flat_render`
+  as writers of their path; `mesh_discard { what: "wrap" }` was refused as
+  not ported; `mesh_mirror` without offset took the scan's middle, not the
+  edited copy's; `flat_calibrate` left notes, the alignment and
+  `flat_objects`' outlines in the old units, and an image opened again under
+  the same name kept the old elements; `flat_export` wrote a path without
+  its extension as given. `mesh_inspect`, `mesh_cut`, `mesh_cut_preview`,
+  `mesh_smooth`, `mesh_offset`, `mesh_reduce`, `flat_open_image`,
+  `flat_calibrate` and `flat_detect_edges` are declared heavy.
+
+- Hardening pass on the scan, elements, align, dimensions, sections,
+  deviation, thickness, wear, fit-scan, scan-cad, scan-noise, scan-thread,
+  snapshot, catalog, pack and manual tools (16 Nov 2026; nothing here ran on
+  FreeCAD when written). Descriptions and refusals rewritten; `workbench`,
+  `commands` and `words` added. Fixed: `fit_scan_measure { calibrate: true }`
+  no longer needs a session `fit` (it answers `calibrated: false` and the
+  `fit` call to make); `scan_snapshot_wait` no longer holds the window it
+  waits on (on the GUI thread it answers at once with the `job_start` call
+  that waits beside it); `scan_heightmap { of: "deviation" }` refused with a
+  code the format does not have; the text report printed `np.float64(…)`;
+  `element_to_document` with no document crashed; the reference-side
+  deviation map ignored its cap on readings (its `spacing` now opens until
+  the cap holds). `scan_cloud`, `scan_heightmap`, `export_csv`,
+  `deviation_export`, `wear_rebuild`, `wear_prewarp`, `fit_scan_export`,
+  `manual_render` and `pack_write` are declared writers of their path, and
+  five more tools heavy.
+
+- A tool that Agent Link runs as a job (on a worker thread) never writes
+  the FreeCAD document from that thread: the ScanRuler state, and the scan
+  object's Placement after `deviation_align`, are handed to the GUI thread
+  when a window is up (they land a moment after the answer), and without a
+  window are written by the next ScanRuler call (both passes' fixes, made
+  one: `docstate.on_gui_thread`).
+
 - The ScanRuler tab of Agent Link's panel is registered with
   `own_credit=True` (and its page widget says `own_credit`), as Agent
   Link's hooks.md describes: the page's foot already credits Stefan Hermann

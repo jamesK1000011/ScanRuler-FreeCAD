@@ -9,6 +9,8 @@
 # without it they read the add-on's own store. A picture rides as "_png",
 # the way Agent Link hands a picture to the agent.
 
+import threading
+
 from ..errors import ToolError
 from .marks import composite, pins_of
 from .store import STORE, file_name
@@ -67,19 +69,38 @@ def scan_snapshot_latest(ctx, args=None):
             "file": file_name(s, marked), "_png": png}
 
 
+def holds_window():
+    """True on the GUI thread of a FreeCAD with its window up: a wait here
+    stops the window the person is to press the camera key in, so no shot
+    can come while it lasts."""
+    if threading.current_thread() is not threading.main_thread():
+        return False
+    try:
+        import FreeCAD
+    except ImportError:
+        return False
+    return bool(getattr(FreeCAD, "GuiUp", False))
+
+
 def scan_snapshot_wait(ctx, args=None):
     """Wait (120 s by default, 600 at most) for the next shot or finished
-    mark-up, then answer what scan_snapshot_list says of it."""
+    mark-up, then answer what scan_snapshot_list says of it. On the GUI
+    thread nothing is waited for (holds_window): the answer says how to
+    wait beside the window."""
     args = args or {}
     t = args.get("timeout", args.get("timeoutSeconds", WAIT_DEFAULT))
     try:
         t = float(t)
     except (TypeError, ValueError):
-        raise SnapshotError("invalid_input", "timeout: seconds, 1 to 600.")
+        raise SnapshotError("invalid_input", "timeout (or timeoutSeconds): seconds to wait, a number from 1 to 600 (120 when left out).")
     t = max(0.0, min(float(WAIT_MAX), t))
+    if holds_window():
+        return {"came": False, "waited": 0,
+                "note": "Not waited: this call runs on FreeCAD's own thread, and waiting here would hold the window still — the person could not press the camera key in it.",
+                "next": f"job_start {{ tool: \"scan_snapshot_wait\", arguments: {{ timeoutSeconds: {t:g} }}, wait: false }} waits beside the window; job_status {{ job }} reads it once the person has taken the shot. Or ask the person to take it, then scan_snapshot_latest."}
     got = _store(ctx).wait_next(t)
     if got is None:
-        return {"came": False, "note": f"No screenshot in {t:g} s."}
+        return {"came": False, "note": f"No screenshot in {t:g} s — ask the person to press the camera key (ScanRuler toolbar, or Alt+Shift+S), then scan_snapshot_latest or wait again."}
     return {"came": True, **about(got, 0), "next": "scan_snapshot_latest shows it."}
 
 
