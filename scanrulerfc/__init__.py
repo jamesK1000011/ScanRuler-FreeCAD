@@ -7,7 +7,7 @@ scanrulerfc.agentlink families it loads) imports it, and Agent Link alone
 imports that module."""
 
 # The add-on's version, as package.xml has it.
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 # Shown wherever ScanRuler's work loads (Agent Link's panel and tool groups,
 # this add-on's own panels): whose work it is.

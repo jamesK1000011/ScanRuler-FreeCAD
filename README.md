@@ -70,9 +70,14 @@ Pick one, not two.
 - **With Agent Link's Claude Desktop extension.** It installs this add-on
   for you into FreeCAD's `Mod` folder as `ScanRulerFC`, at the commit its
   tests passed with.
-- **By hand.** Put this folder in FreeCAD's `Mod` folder (find it with
-  `FreeCAD.getUserAppDataDir()` in FreeCAD's Python console) and restart
-  FreeCAD.
+- **By hand.** Download a release from
+  [Releases](https://github.com/jamesK1000011/ScanRuler-FreeCAD/releases)
+  (or the current
+  [main as a zip](https://github.com/jamesK1000011/ScanRuler-FreeCAD/archive/refs/heads/main.zip)),
+  unzip it into FreeCAD's `Mod` folder (find it with
+  `FreeCAD.getUserAppDataDir()` in FreeCAD's Python console), rename the
+  folder to `ScanRulerFC` and restart FreeCAD. A `git clone` into
+  `Mod/ScanRulerFC` works too.
 
 Then pick **ScanRuler** from the workbench list and use **ScanRuler ▸ Open
 Scan…**.
