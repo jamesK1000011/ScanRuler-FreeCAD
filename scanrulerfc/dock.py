@@ -167,6 +167,21 @@ def _session_from(panel=None):
     return (own[0] if own else None), None
 
 
+def follow_width(w):
+    """w takes the panel's width and asks for none of its own: its size
+    policy Ignored across (its height as it was). A QScrollArea's size hint
+    is its page's, up to 36 lines wide (about 640 px on the Mac), and a
+    wrapped label's is its text on one long line: as hints they set the
+    dock's width when FreeCAD lays the docks out, and the 3D view was left
+    a strip. Their minimum widths stay small (keys, six-letter lists,
+    wrapped labels), so the panel fits 354 px with nothing cut."""
+    from PySide import QtWidgets
+
+    p = w.sizePolicy()
+    w.setSizePolicy(QtWidgets.QSizePolicy.Ignored, p.verticalPolicy())
+    return w
+
+
 class Dock:
     """The dock's widget tree; `widget` is what goes in a QDockWidget or a tab."""
 
@@ -191,6 +206,7 @@ class Dock:
         lay.setContentsMargins(kit.MARGIN, kit.MARGIN, kit.MARGIN, kit.MARGIN)
         self.head = QtWidgets.QLabel()
         self.head.setWordWrap(True)
+        follow_width(self.head)
         lay.addWidget(self.head)
         # "Unsaved changes" on a line of its own (header_html), so a narrow
         # panel never breaks it in two.
@@ -203,11 +219,14 @@ class Dock:
             # grids and rows reflow (pages/kit.reflow).
             holder.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
             holder.setMinimumWidth(0)
+            follow_width(holder)
             self.slots[wid] = holder
             self.stack.addWidget(holder)
+        follow_width(self.stack)
         lay.addWidget(self.stack, 1)
         foot = QtWidgets.QLabel(W.CREDIT)
         foot.setWordWrap(True)
+        follow_width(foot)
         lay.addWidget(foot)
         self.widget.setToolTip(W.WORKBENCH_TIP)
         self.timer = QtCore.QTimer(self.widget)

@@ -320,9 +320,29 @@ def state_object(doc, make=True):
         vo = getattr(o, "ViewObject", None)
         if vo is not None:
             vo.Proxy = 0
-            if "ShowInTree" in getattr(vo, "PropertiesList", []):
-                vo.ShowInTree = False
+    if o is not None:
+        hide_from_tree(o)
     return o
+
+
+def hide_from_tree(o):
+    """The state object off the model tree (its ViewObject's ShowInTree, a
+    property every document object's view has, listed or not), so nobody
+    deletes it by accident; not drawn either. Set again on each write: a
+    document opened without the GUI, or an older one, gets it then. True
+    when it is off the tree."""
+    vo = getattr(o, "ViewObject", None)
+    if vo is None:
+        return False
+    try:
+        if getattr(vo, "ShowInTree", True):
+            vo.ShowInTree = False
+        if getattr(vo, "Visibility", False):
+            vo.Visibility = False
+        return not vo.ShowInTree
+    except Exception as e:  # noqa: BLE001 — an older FreeCAD: it shows, and still works
+        _report(f"the ScanRuler state object could not be taken off the tree: {e}")
+        return False
 
 
 def role_object(doc, role):

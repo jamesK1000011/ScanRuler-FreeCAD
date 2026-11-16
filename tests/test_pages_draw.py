@@ -169,5 +169,104 @@ class FitsTheWidth(unittest.TestCase):
         qw.QWidget.return_value.setMinimumWidth.assert_any_call(0)
 
 
+def recording_pyside():
+    """fake_pyside, with a fresh mock for every QLabel, QComboBox,
+    QPushButton and QScrollArea made, kept by class name."""
+    mods = fake_pyside()
+    qw = mods["PySide.QtWidgets"]
+    made = {}
+
+    def maker(cls):
+        def make(*a, **k):
+            w = mock.MagicMock(name=cls)
+            w.text_ = a[0] if a and isinstance(a[0], str) else ""
+            made.setdefault(cls, []).append(w)
+            return w
+        return make
+
+    for cls in ("QLabel", "QComboBox", "QPushButton", "QScrollArea", "QStackedWidget", "QCheckBox"):
+        getattr(qw, cls).side_effect = maker(cls)
+    qw.QSizePolicy.Ignored = "Ignored"
+    qw.QComboBox.AdjustToMinimumContentsLengthWithIcon = "AdjustToMinimumContentsLengthWithIcon"
+    return mods, made
+
+
+PANEL = 354  # the dock's width beside the tree on the Mac (GUI pass)
+CHAR_PX, KEY_PAD = 7, 24  # an average character of the panel's font; a key's frame and padding
+
+
+class FitsThePanelWithAScan(unittest.TestCase):
+    """Live check: with a scan open the dock came up about 640 px wide,
+    the 3D view a strip. Nothing in any workspace may ask for more than the
+    panel's 354 px: lists shrink to eight letters, labels wrap, no row of
+    keys is wider than the panel, and the dock's own parts ask for no width
+    of their own (dock.follow_width)."""
+
+    def test_every_workspace_fits(self):
+        from scanrulerfc.pages import kit
+
+        st = list(states())[1]
+        room = PANEL - 2 * kit.MARGIN - sum(kit.GROUP_MARGINS[::2]) - 2 * kit.MARGIN
+        for name in PAGES:
+            mods, made = recording_pyside()
+            with mock.patch.dict(sys.modules, mods):
+                page = importlib.import_module("scanrulerfc.pages." + name)
+                page.widget(page.build(st), on_key=lambda *a: None)
+            with self.subTest(page=name):
+                for c in made.get("QComboBox", []):
+                    c.setSizeAdjustPolicy.assert_called_with("AdjustToMinimumContentsLengthWithIcon")
+                    n = c.setMinimumContentsLength.call_args[0][0]
+                    self.assertLessEqual(n, 8)
+                for lab in made.get("QLabel", []):
+                    lab.setWordWrap.assert_called_with(True)
+                for b in made.get("QPushButton", []):
+                    self.assertLessEqual(len(b.text_) * CHAR_PX + KEY_PAD, room, b.text_)
+                for cb in made.get("QCheckBox", []):
+                    self.assertLessEqual(len(cb.text_) * CHAR_PX + KEY_PAD, room, cb.text_)
+
+    def test_toggle_rows_fit(self):
+        from scanrulerfc.pages import kit
+
+        st = list(states())[1]
+        room = PANEL - 4 * kit.MARGIN - sum(kit.GROUP_MARGINS[::2])
+
+        def walk(secs):
+            for s in secs:
+                yield s
+                yield from walk(s.get("children", []))
+
+        for name in PAGES:
+            page = importlib.import_module("scanrulerfc.pages." + name)
+            for s in walk(page.build(st)["sections"]):
+                for fd in s.get("fields", []):
+                    if fd.get("kind") == "toggle":
+                        w = sum(len(kit.button_text(o["label"])) * CHAR_PX + KEY_PAD for o in fd["options"])
+                        with self.subTest(page=name, field=fd["id"]):
+                            self.assertLessEqual(w, room)
+
+    def test_the_docks_parts_ask_for_no_width(self):
+        from scanrulerfc import dock
+
+        mods, made = recording_pyside()
+        with mock.patch.dict(sys.modules, mods):
+            d = dock.Dock.__new__(dock.Dock)
+            real = dock.Dock.refresh
+            dock.Dock.refresh = lambda self, force=False: None
+            try:
+                dock.Dock.__init__(d, session_fn=lambda: (None, None))
+            finally:
+                dock.Dock.refresh = real
+                dock._dock.pop("live", None)
+                from scanrulerfc import commands as C
+
+                C.set_ui(None)
+        parts = made["QLabel"] + made["QScrollArea"] + made["QStackedWidget"]
+        self.assertEqual(len(made["QScrollArea"]), len(dock.ORDER))
+        for w in parts:
+            self.assertEqual(w.setSizePolicy.call_args[0][0], "Ignored", w)
+        for lab in made["QLabel"]:
+            lab.setWordWrap.assert_called_with(True)
+
+
 if __name__ == "__main__":
     unittest.main()

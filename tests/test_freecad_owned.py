@@ -95,6 +95,7 @@ class InTheDocument(unittest.TestCase):
         self.assertIsNotNone(state)
         self.assertEqual(state.Credit, D.CREDIT)
         self.assertFalse(state.ViewObject.ShowInTree)  # hidden from the tree
+        self.assertFalse(state.ViewObject.Visibility)
         scan = D.role_object(self.doc, "scan")
         self.assertEqual((scan.TypeId, scan.Label), ("Mesh::Feature", "box.stl"))
         rev = state.Revision
@@ -102,6 +103,16 @@ class InTheDocument(unittest.TestCase):
         self.assertEqual(state.Revision, rev)
         self.run("element_rename", {"element": "Top", "name": "Lid"})
         self.assertEqual(state.Revision, rev + 1)
+
+    def test_off_the_tree_even_when_its_view_does_not_list_it(self):
+        # Live check: "ScanRuler state" showed in the tree; ShowInTree is
+        # set whether or not the view lists it, and again on each write.
+        state = D.find_state(self.doc)
+        state.ViewObject.PropertiesList = ["Visibility"]
+        state.ViewObject.ShowInTree = True
+        self.run("element_rename", {"element": "Top", "name": "Lid"})
+        self.assertFalse(state.ViewObject.ShowInTree)
+        self.assertFalse(D.hide_from_tree(types.SimpleNamespace(ViewObject=None)))
 
     def test_reopened_document_reads_it_back(self):
         self.run("align_datum", {"primary": "Top"})
