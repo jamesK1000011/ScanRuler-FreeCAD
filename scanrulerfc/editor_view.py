@@ -443,6 +443,7 @@ class Overlay:
                     pass
                 return False
 
+        self._widget_dpr()  # the click slop and the grips' pick reach in device pixels
         try:
             self.watch = Watch()
             w.installEventFilter(self.watch)
@@ -715,6 +716,15 @@ class Overlay:
         if self.motion(x, y):
             cb.setHandled()
 
+    def _widget_dpr(self):
+        """The 3D view widget's device pixel ratio (2 on a Retina Mac)."""
+        w = view_widget(self.view, self.qt)
+        try:
+            self.dpr = float(w.devicePixelRatioF()) or 1.0
+        except Exception:  # noqa: BLE001 — no widget: the ratio last read
+            pass
+        return self.dpr or 1.0
+
     def qt_pressed(self, qx, qy, modified=False):
         """A left press on the view's widget, in Qt's logical pixels."""
         self.qt_press = None if modified else (qx, qy)
@@ -741,7 +751,10 @@ class Overlay:
             except Exception:  # noqa: BLE001
                 return
             self.pressed_at = None
-            self.click(*qt_to_coin(qx, qy, height, self.dpr))
+            # Qt's points are logical, Coin's device pixels: both axes
+            # scaled by the widget's own ratio, then flipped on the device
+            # height (self.dpr is only read once the grip field is made).
+            self.click(*qt_to_coin(qx, qy, height, self._widget_dpr()))
 
         self.env.get("later", lambda fn: fn())(after)
 

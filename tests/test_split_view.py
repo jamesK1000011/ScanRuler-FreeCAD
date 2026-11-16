@@ -219,14 +219,59 @@ class OutsideDeviation(unittest.TestCase):
         said = []
         with unittest.mock.patch.object(C, "_say", said.append):
             why = DK.split_view_key("ViewSplit", True, lambda: s, "reverse")
-        self.assertIn("Surface Deviation", why)
-        self.assertEqual(said, [f"ScanRuler: Split view: {why}"])
+        self.assertEqual(why, "Split view needs a scan and a reference in Surface Deviation.")
+        self.assertEqual(said, ["ScanRuler: Split view needs a scan and a reference in Surface Deviation."])
         self.assertFalse(C._state["view"]["ViewSplit"])
         self.assertFalse(SV._live["split"].open)
         self.assertIn(why, DK.header_html({**DK.header({}), "error": why}))
         # In Surface Deviation with both open, it opens.
         self.assertIsNone(DK.split_view_key("ViewSplit", True, lambda: s, "deviation"))
         self.assertTrue(SV._live["split"].open)
+
+    def test_a_refused_press_says_why_once_and_does_not_recurse(self):
+        # Live on FreeCAD 1.1.3: letting the key up (setChecked(False))
+        # fired the action's toggled signal, FreeCAD ran the command again,
+        # a run is a press, refused again: ~400 lines, then RecursionError.
+        spec = next(x for x in _view_specs() if x["command"] == "ScanRuler_ViewSplit")
+        cmd = C.ViewCommand(spec)
+        no_ref = session(reference=False)
+        SV._live["split"] = SV.SplitView(Gui(), stand_in_coin(), QT, lambda: no_ref)
+        self.addCleanup(SV._live.__setitem__, "split", None)
+        self.addCleanup(C._state["view"].pop, "ViewSplit", None)
+        C._state["view"].pop("ViewSplit", None)
+
+        class Action:
+            """FreeCAD's action: setChecked emits toggled, which runs the
+            command with the new state, unless its signals are blocked."""
+
+            def __init__(self):
+                self.checked, self.blocked, self.runs = False, False, 0
+
+            def blockSignals(self, b):  # noqa: N802
+                was, self.blocked = self.blocked, b
+                return was
+
+            def setChecked(self, on):  # noqa: N802
+                if on == self.checked:
+                    return
+                self.checked = on
+                if not self.blocked:
+                    self.runs += 1
+                    if self.runs > 50:
+                        raise RecursionError("the key pressed itself")
+                    cmd.Activated(on)
+
+        action = Action()
+        said = []
+        panel = lambda key, *a: DK.split_view_key(a[0], a[1], lambda: no_ref, "reverse")  # noqa: E731
+        with unittest.mock.patch.object(C, "_actions", lambda name: [action]), \
+                unittest.mock.patch.object(C, "_to_panel", panel), \
+                unittest.mock.patch.object(C, "_say", said.append):
+            cmd.Activated(0)  # run by name: a press
+        self.assertEqual(said, ["ScanRuler: Split view needs a scan and a reference in Surface Deviation."])
+        self.assertEqual(action.runs, 0)
+        self.assertFalse(action.checked)
+        self.assertFalse(C._state["view"]["ViewSplit"])
 
     def test_the_command_is_active_everywhere(self):
         spec = next(x for x in _view_specs() if x["command"] == "ScanRuler_ViewSplit")

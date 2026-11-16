@@ -503,6 +503,34 @@ class FilletPicks(unittest.TestCase):
         self.ov.click(390, 300)
         self.assertIn("is not a Reverse engineer body", self.warned[-1])
 
+    def test_a_retina_view_converts_both_axes(self):
+        # FreeCAD 1.1.3 on a Retina Mac: a 496 x 825 logical view, Coin's
+        # viewport 992 x 1650 device pixels. The press and release both
+        # swallowed, the click at logical (194, 396.9) must reach Coin's
+        # (388, 856.2), not (194, 1253).
+        class Retina(BodyView):
+            def __init__(self):
+                super().__init__()
+                self.asked = []
+
+            def getSize(self):  # noqa: N802
+                return (992, 1650)
+
+            def getObjectInfo(self, pos):  # noqa: N802
+                self.asked.append(pos)
+                return super().getObjectInfo(pos)
+
+        widget = _Widget()
+        widget.devicePixelRatioF = lambda: 2.0
+        self.ov.detach()
+        self.view = Retina()
+        self.view.widget = widget
+        self.ov = V.Overlay(self.ed, self.view, self.coin, None, _Vec, self.ov.env)
+        self.ov.qt_pressed(194.0, 396.9)
+        self.ov.qt_released(194.0, 396.9)
+        self.run_later()
+        self.assertEqual(self.view.asked, [(388, 856)])  # whole pixels, as getObjectInfo takes them
+
     def test_nearest_body_and_the_qt_point(self):
         self.assertEqual(V.nearest_body([(1, 0.5), (2, 0.0), (3, None)], 0.01), 2)
         self.assertIsNone(V.nearest_body([(1, 0.5)], 0.01))

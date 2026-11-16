@@ -350,6 +350,20 @@ def _actions(name):
         return []
 
 
+def set_checked(name, on):
+    """The command's actions shown pressed or not, with their signals held:
+    FreeCAD runs a checkable command from its action's toggled signal, so a
+    setChecked from inside the command ran it again (a refused Split view
+    let up, pressed again, refused again: a RecursionError)."""
+    for a in _actions(name):
+        held = a.blockSignals(True) if hasattr(a, "blockSignals") else None
+        try:
+            a.setChecked(on)
+        finally:
+            if held is not None:
+                a.blockSignals(held)
+
+
 def _restyle_switcher(mw, QtWidgets):
     """The active workspace's key shows its caps label beside the icon, the
     others only their icon, as the original's tab strip does."""
@@ -449,16 +463,14 @@ class ViewCommand(_Base):
         native = self.spec.get("native")
         if native == CLIP_COMMAND:
             on = toggle_section()
-            for a in _actions(self.spec["command"]):
-                a.setChecked(on)
+            set_checked(self.spec["command"], on)
         elif native:
             try:
                 _gui().runCommand(native)
             except Exception as e:  # noqa: BLE001 — FreeCAD's command; say why it did not run
                 _say(f"ScanRuler: {native}: {e}")
         _state["view"][self.spec["key"]] = on
-        for a in _actions(self.spec["command"]):
-            a.setChecked(on)
+        set_checked(self.spec["command"], on)
         return _to_panel("view", self.spec["key"], on)
 
 
