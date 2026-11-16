@@ -94,7 +94,12 @@ class Registry(unittest.TestCase):
         now = _declared()
         self.assertEqual(sorted(set(now) - set(base)), ADDED)
         self.assertEqual(set(base) - set(now), set())
-        self.assertEqual(sorted(k for k in base if base[k] != now[k]), [])
+        # Edited since on purpose: the boolean and the trim no longer need
+        # FreeCAD's Mesh booleans (meshbool), and their descriptions say so.
+        edited = {"mesh_boolean", "mesh_trim"}
+        self.assertEqual(sorted(k for k in base if base[k] != now[k] and k not in edited), [])
+        for k in edited:
+            self.assertEqual({f: v for f, v in base[k].items() if f != "description"}, {f: v for f, v in now[k].items() if f != "description"})
 
     def test_a_refusal_is_the_add_ons(self):
         # Imported here: other tests load scanrulerfc afresh.

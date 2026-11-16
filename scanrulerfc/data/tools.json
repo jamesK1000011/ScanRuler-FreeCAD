@@ -3119,7 +3119,7 @@
   },
   "mesh_boolean": {
    "group": "meshtools",
-   "description": "Make the mesh and solids one: subtract them from it, add them to it, or intersect (keep what both hold). The solids: the cylinders, cones and spheres measured (elements, by id or name, at their assumed diameter), or solid bodies in the FreeCAD document (by Name or Label). Several go as one, their union. The mesh must be closed (mesh_inspect; mesh_fill_holes first). For a bore the scanner could not see to the bottom of: fit a cylinder to its wall, make it longer than the bore and out through the surface, and subtract it. FreeCAD's Mesh booleans do the cut (unavailable outside FreeCAD). Edits the copy. Returns the edit (the volume change) and the mesh after it.",
+   "description": "Make the mesh and solids one: subtract them from it, add them to it, or intersect (keep what both hold). The solids: the cylinders, cones and spheres measured (elements, by id or name, at their assumed diameter), or solid bodies in the FreeCAD document (by Name or Label). Several go as one, their union. The mesh must be closed (mesh_inspect; mesh_fill_holes first). For a bore the scanner could not see to the bottom of: fit a cylinder to its wall, make it longer than the bore and out through the surface, and subtract it. The cut works on dense scans as they are (no decimating): every triangle the solids do not touch is kept. Edits the copy. Returns the edit (the volume change) and the mesh after it.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -3254,7 +3254,7 @@
   },
   "mesh_trim": {
    "group": "meshtools",
-   "description": "Mend a broken part: cut a body — the missing piece modelled to the part's nominal shape and a few millimetres too long at the break — with the scanned fracture, to print and glue in. The body: a solid body in the FreeCAD document (Name or Label), or a measured cylinder, cone or sphere. The break is where the scan lies deeper in the body than depth (0.3 mm to start); region names it instead. offset sets the mating face back from the break (0 cuts on it, a tenth or two leaves room for glue); flip keeps the other side. FreeCAD's Mesh booleans do the cut (unavailable outside FreeCAD). The piece is made beside the scan, not an edit of it. Returns the piece: its volume, mating face, and how far that face is from the part.",
+   "description": "Mend a broken part: cut a body — the missing piece modelled to the part's nominal shape and a few millimetres too long at the break — with the scanned fracture, to print and glue in. The body: a solid body in the FreeCAD document (Name or Label), or a measured cylinder, cone or sphere. The break is where the scan lies deeper in the body than depth (0.3 mm to start); region names it instead. offset sets the mating face back from the break (0 cuts on it, a tenth or two leaves room for glue); flip keeps the other side. The piece is made beside the scan, not an edit of it. Returns the piece: its volume, mating face, and how far that face is from the part.",
    "inputSchema": {
     "type": "object",
     "properties": {

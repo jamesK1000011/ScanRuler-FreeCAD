@@ -193,6 +193,7 @@ scanrulerfc/meshtools/boolean.py
 scanrulerfc/meshtools/densify.py
 scanrulerfc/meshtools/grid.py
 scanrulerfc/meshtools/handlers.py
+scanrulerfc/meshtools/meshbool.py
 scanrulerfc/meshtools/shell.py
 scanrulerfc/meshtools/solids.py
 scanrulerfc/meshtools/trim.py
@@ -341,6 +342,7 @@ tests/test_manual.py
 tests/test_measure3d_page.py
 tests/test_measuring_core.py
 tests/test_measuring_tools.py
+tests/test_meshbool.py
 tests/test_meshtools.py
 tests/test_meshtools_added.py
 tests/test_noise.py

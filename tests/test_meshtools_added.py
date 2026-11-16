@@ -3,7 +3,7 @@
 # thicken), Wrap and Trim to scan — with ScanRuler's own test cases where it
 # has them (plugins/mesh-tools/tests: densify, meshBoolean, measuredSolids,
 # meshOffset, wrap, breakSurface, extendRim, trimToScan), on small meshes.
-# The boolean and the trim need FreeCAD's Mesh booleans: those cases skip
+# The boolean and the trim cut with meshbool (numpy only): they run with or
 # without FreeCAD.
 import math
 import os
@@ -172,11 +172,11 @@ class Boolean(unittest.TestCase):
         with self.assertRaisesRegex(M.MeshError, r"^Bore did not come out as a closed mesh"):
             BO.boolean_mesh(V, F, [(cv, cf[1:], "Bore")], "subtract")
 
-    @unittest.skipIf(HAVE_FREECAD, "FreeCAD is here: the kernel runs")
-    def test_needs_freecad_without_it(self):
+    def test_runs_without_freecad(self):
         V, F = box_mesh(20, 20, 20, 8)
-        with self.assertRaises(BO.NeedsKernel):
-            BO.boolean_mesh(V, F, [(*cylinder(3, -5, 15), None)], "subtract")
+        V2, F2, _, rep = BO.boolean_mesh(V, F, [(*cylinder(3, -5, 15), None)], "subtract")
+        self.assertEqual(shut(V2, F2), {"open": 0, "bad": 0})
+        self.assertLess(rep["volumeAfter"], 8000)
 
     def test_names_a_solid_that_misses_and_carries_the_vertices(self):
         # A kernel that knows only solids apart: nothing is taken, nothing
@@ -229,8 +229,7 @@ class Boolean(unittest.TestCase):
         self.assertAlmostEqual(BO.winding(V, F, [0, 0, 0]), 1, 6)
         self.assertAlmostEqual(BO.winding(V, F, [0, 0, 30]), 0, 6)
 
-    @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
-    def test_bore_boss_and_common_with_freecad(self):
+    def test_bore_boss_and_common(self):
         V, F = box_mesh(20, 20, 20, 8)
         n = SO.segments_for(3, 0.05)
         ngon = n / 2 * 9 * math.sin(2 * math.pi / n)
@@ -500,12 +499,9 @@ class Break(unittest.TestCase):
         _, _, rep = TR.extend_rim(FV, FF, self.body, 0.4, deep)
         self.assertEqual(rep["bays"], 1)
 
-    @unittest.skipIf(HAVE_FREECAD, "FreeCAD is here: the kernel runs")
-    def test_the_cut_needs_freecad(self):
+    def test_the_body_is_checked_closed(self):
         body = TR.prepare_body(*box_mesh(20, 20, 20, 8), "Box")
         self.assertAlmostEqual(body[3], 8000, 3)
-        with self.assertRaises(BO.NeedsKernel):
-            TR.trim_to_scan(*sheet(), body, 0.3, 0.15)
         with self.assertRaisesRegex(M.MeshError, r"^Box did not come out as a closed mesh"):
             V, F = box_mesh(20, 20, 20, 8)
             TR.prepare_body(V, F[1:], "Box")
@@ -585,7 +581,6 @@ class Break(unittest.TestCase):
         V2, F2 = BO.outward(*cracked_box([0, 0, 0], [2, 3, 4], 4, True, False))
         self.assertAlmostEqual(BO.volume(V2, F2), 24, 6)
 
-    @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
     def test_a_box_trimmed_to_a_flat_sheet(self):
         body = TR.prepare_body(*box_mesh(20, 20, 20, 8), "Box")
         for offset, flip in ((0.15, False), (0.15, True)):
@@ -599,7 +594,6 @@ class Break(unittest.TestCase):
                 self.fail(diagnostic)
 
 
-    @unittest.skipUnless(HAVE_FREECAD, "needs FreeCAD's Mesh booleans")
     def test_a_hollow_box_trimmed_keeps_its_inner_wall(self):
         void = cuboid([-4, -4, 2], [4, 4, 6], 4)
         body = TR.prepare_body(*joined(box_mesh(20, 20, 20, 8), (void[0], void[1][:, ::-1])), "Box")
@@ -651,13 +645,13 @@ class Handlers(unittest.TestCase):
         with self.assertRaises(Exception) as c:
             H.HANDLERS["mesh_boolean"](s, {"op": "subtract", "solids": ["Cylinder 9"]})
         self.assertEqual(c.exception.code, "not_found")
-        if not HAVE_FREECAD:
-            with self.assertRaises(Exception) as c:
-                H.HANDLERS["mesh_boolean"](s, {"op": "subtract", "solids": ["Bore 1", 1]})
-            self.assertEqual(c.exception.code, "unavailable")
-            with self.assertRaises(Exception) as c:
-                H.HANDLERS["mesh_trim"](Session(*sheet()), {"body": "Bore 1"})
-            self.assertIn(c.exception.code, ("not_found", "unavailable", "failed"))
+        out = H.HANDLERS["mesh_boolean"](s, {"op": "subtract", "solids": ["Bore 1", 1]})
+        self.assertEqual(out["edit"]["solid"], "Bore 1")
+        self.assertEqual((out["mesh"]["open"], out["mesh"]["bad"]), (0, 0))
+        self.assertLess(out["mesh"]["volume"], 8000)
+        with self.assertRaises(Exception) as c:
+            H.HANDLERS["mesh_trim"](Session(*sheet()), {"body": "Bore 1"})
+        self.assertIn(c.exception.code, ("not_found", "failed"))
         s2 = Session(V, F[1:])
         S.state(s2)["elements"] = S.state(s)["elements"]
         with self.assertRaises(Exception) as c:

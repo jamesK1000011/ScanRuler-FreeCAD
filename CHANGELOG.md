@@ -9,6 +9,23 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Boolean (mesh_boolean) and Trim to scan now cut with meshbool, a boolean
+  written for this add-on in numpy alone, in place of FreeCAD's Mesh
+  booleans. On a 140,698-triangle scan minus a 5,212-triangle cutter
+  (an M18 shell test drive) Mesh.difference came back with 2,607 open
+  edges and 7,417 bad ones, and the result was then turned inside out patch
+  by patch (volume −133,160 mm³); with a Part solid as the cutter it removed
+  515 mm³ of ~100,000. meshbool decides every crossing by one orientation
+  sign computed once for each set of four points, so the edges two
+  triangles share always agree; it splits only the triangles the other
+  surface crosses (the rest keep their exact points and indices, in order)
+  and keeps or drops each piece by its winding number. The same cut is now
+  closed: 319,977.8 → 218,258.6 mm³ in about 3 s, subtract + intersect
+  adding back to the scan exactly. Works without FreeCAD (no "unavailable"
+  any more), needs no decimating, refuses rather than hands back a result
+  that is not closed. A solid inside an App::Part container is now placed
+  with the container's placement too.
+
 - Section cards in the ScanRuler panel no longer open an empty band of
   about 20 px above their caps header (Model, Alignment, Create Element…)
   in FreeCAD Dark and Studio Light, seen on the Mac after the translucent

@@ -8,24 +8,25 @@
 # put back, a part trimmed to a box. Several solids go as one, their union.
 #
 # ScanRuler's boolean is Manifold's (Apache-2.0, in WebAssembly). Here the
-# kernel is FreeCAD's own Mesh booleans (Mesh.unite / difference /
-# intersect), imported only when a boolean runs; without FreeCAD the tool
-# refuses, saying it needs FreeCAD. Everything round the kernel is the
-# original's: both meshes must be closed, and it says so up front; the
-# result is an edit like any other — the scan's own vertices that are left
-# keep their order and come first, believed only where a position came back
-# exactly (FreeCAD keeps points in single precision, so "exactly" is to the
-# float32 the scan's own point rounds to); and a solid that does nothing
-# anyone would want — taken away but never reaching the mesh, or lying wholly
-# inside it and sealing a hollow there; added wholly inside it — is refused,
-# naming it. As in the original, that is read off how much of each piece's
-# surface is in the result (none of a piece taken away that missed or of one
-# added inside, all of one taken away from inside). Manifold tags each
-# result triangle with the solid it came from; FreeCAD's booleans keep no
-# such tag, so a result triangle is the piece's when it lies on the piece's
-# surface and not on the mesh's. A kernel that drops a shell meeting nothing
-# leaves none of the piece either way; then one of its points, inside the
-# mesh or not, tells which.
+# kernel is meshbool.py, in numpy alone: every crossing decided once by one
+# orientation sign, so the seam is closed by construction and a dense scan
+# keeps every triangle the solid does not touch. (It was FreeCAD's Mesh
+# booleans — Mesh.unite / difference / intersect — until they came back open
+# and inside out on a 140,698-triangle scan minus a 5,212-triangle cutter;
+# freecad_kernel and outward stay for a caller that asks for them.)
+# Everything round the kernel is the original's: both meshes must be closed,
+# and it says so up front; the result is an edit like any other — the scan's
+# own vertices that are left keep their order and come first; and a solid
+# that does nothing anyone would want — taken away but never reaching the
+# mesh, or lying wholly inside it and sealing a hollow there; added wholly
+# inside it — is refused, naming it. As in the original, that is read off how
+# much of each piece's surface is in the result (none of a piece taken away
+# that missed or of one added inside, all of one taken away from inside).
+# Manifold tags each result triangle with the solid it came from; the kernel
+# here keeps no such tag, so a result triangle is the piece's when it lies on
+# the piece's surface and not on the mesh's. A kernel that drops a shell
+# meeting nothing leaves none of the piece either way; then one of its
+# points, inside the mesh or not, tells which.
 
 import numpy as np
 
@@ -36,6 +37,21 @@ SHARE_NONE = 1e-4
 
 class NeedsKernel(M.MeshError):
     """No boolean kernel here: the tool needs FreeCAD."""
+
+
+def mesh_kernel():
+    """meshbool's boolean as kernel(op, (V, F), (V, F)) -> (V, F): numpy
+    only, closed and faced outward, or a MeshError saying why not."""
+    from . import meshbool as MB
+
+    def run(op, a, b):
+        try:
+            V, F, _, _ = MB.boolean(a[0], a[1], b[0], b[1], op)
+        except MB.BooleanError as e:
+            raise M.MeshError(f"The boolean did not come out closed ({e}) — a solid that only grazes the mesh can do this; move it a little and try again.")
+        return V, F
+
+    return run
 
 
 def freecad_kernel():
@@ -274,7 +290,7 @@ def boolean_mesh(V, F, tools, op, kernel=None):
     """The subject (V, F) and the tool solids [(V, F, name)] made one by op —
     subtract, add or intersect — their union taken away, added, or kept
     where the mesh is: (V, F, vertex map, report). kernel defaults to
-    FreeCAD's Mesh booleans."""
+    meshbool's (mesh_kernel)."""
     if not tools:
         raise M.MeshError("No solid to make one with the mesh.")
     V = np.asarray(V, dtype=float)
@@ -285,9 +301,7 @@ def boolean_mesh(V, F, tools, op, kernel=None):
         raise M.MeshError(msg)
     solids = [closed_tool(tv, tf, name) for tv, tf, name in tools]
     names = [name for _, _, name in tools]
-    kernel = kernel or freecad_kernel()
-    if kernel is None:
-        raise NeedsKernel("A boolean needs FreeCAD's Mesh booleans, and FreeCAD is not loaded here — run it inside FreeCAD (through Agent Link).")
+    kernel = kernel or mesh_kernel()
 
     union = solids[0]
     for s in solids[1:]:
