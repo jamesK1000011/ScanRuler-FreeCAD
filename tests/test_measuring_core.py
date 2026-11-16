@@ -269,6 +269,22 @@ class Session(unittest.TestCase):
         V = st["scan"].V
         self.assertAlmostEqual(V[:, 0].min() + V[:, 0].max(), 0, delta=0.05)
 
+    def test_a_plane_that_mirrors_most_of_the_part_says_so(self):
+        # Found live (16 Nov 2026): a block with a pocket in its top only
+        # answered its mid-height plane with rms 0 and 3,968 of 4,000
+        # matched, and nothing said the 32 were a feature on one side.
+        from scanrulerfc import symmetry as SY
+
+        note = SY.partial_note({"rms": 0.0, "matched": 3968, "sampled": 4000})
+        self.assertIn("32 of 4000 samples (0.8 %)", note)
+        self.assertIn("seed", note)
+        self.assertIsNone(SY.partial_note({"rms": 0.0, "matched": 4000, "sampled": 4000}))
+        self.assertIsNone(SY.partial_note({"rms": 0.01, "matched": 3995, "sampled": 4000}))   # a few stray samples: a scan's edge
+        # Through the search: an exact mirror plane gets no note, a loose one keeps its own.
+        r = M.element_construct(self.st, {"kind": "plane", "method": "plane-symmetry", "seed": "YZ", "name": "MirrorNote"})
+        if r["symmetry"]["matched"] == r["symmetry"]["sampled"]:
+            self.assertNotIn("note", r["symmetry"])
+
     def test_query_and_refusals(self):
         st = self.st
         every, kept, step = M.query(st["scan"], box={"min": [-1, -1, 19.9], "max": [41, 31, 20.1]}, normal={"dir": [0, 0, 1]}, limit=100)
