@@ -63,6 +63,12 @@ class Picks(unittest.TestCase):
         self.assertEqual((f["body"], f["edges"]), (3, [FRONT]))
         self.assertIs(K.toggled({"kind": "extrude"}, 2, FRONT)["kind"], "extrude")
 
+    def test_the_picked_edges_lines(self):
+        self.assertEqual(K.picked_polylines(self.b, 2, [BACK, {"fingerprint": dict(FRONT)}]), [[[0, 10, 10], [10, 10, 10]], [[0, 0, 10], [10, 0, 10]]])
+        self.assertEqual(K.picked_polylines(self.b, 2, [{**FRONT, "mid": [5, 5, 5]}]), [])  # no such edge now
+        self.assertEqual(K.picked_polylines(self.b, 9, [FRONT]), [])
+        self.assertEqual(K.picked_polylines(None, 2, [FRONT]), [])
+
     def test_the_editor_takes_the_click(self):
         ed = Editor()
         ed.open_new("shell", {"features": [], "nextFeatureId": 2}, [{"id": 2, "surface": False, "box": None}])

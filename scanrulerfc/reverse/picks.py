@@ -107,6 +107,25 @@ def toggled(record, body_id, fp):
     return {**record, field: kept if len(kept) < len(have) else have + [fp]}
 
 
+def picked_polylines(builder, body_id, fps):
+    """The picked edges' lines on the body as built, each a list of points,
+    for the view to draw them (bodyPicks.ts lights a picked edge along its
+    whole run); a fingerprint no edge of the body matches is left out."""
+    body = builder.body_by_id(body_id) if builder is not None and body_id is not None else None
+    if body is None or not fps:
+        return []
+    edges = builder.topology(body, 1)["edges"]
+    out = []
+    for fp in fps:
+        fp = fp.get("fingerprint", fp)
+        e = next((e for e in edges if _same(e["fingerprint"], fp)), None)
+        pl = (e or {}).get("polyline") or []
+        pts = [list(pl[i:i + 3]) for i in range(0, len(pl) - 2, 3)]
+        if len(pts) >= 2:
+            out.append(pts)
+    return out
+
+
 def sketch_frame_of(record, features):
     sk = next((f for f in features if f.get("kind") == "sketch" and f.get("id") == record.get("sketchId")), None)
     return sk.get("frame") if sk else None

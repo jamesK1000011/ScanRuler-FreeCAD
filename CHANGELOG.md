@@ -10,6 +10,19 @@ never tagged: the first tagged release is being prepared.
 ## [Unreleased]
 
 - The 2D sheet's SVG labels name Helvetica only, so Qt no longer warns of a missing "Sans-serif" in the Report view.
+- Feature editor grips read on any body: a white fill (an axis grip keeps
+  its own colour) inside a near-black rim drawn under it, lit amber on
+  hover and while held, no longer the ghost's own colour; sizes unchanged.
+- A fillet's or chamfer's picked edges are drawn along their whole run
+  (a thick line in the original editor's pick green, #3cb371, over a dark
+  rim, above the body), from the body's topology as built; a pick let go
+  or the box closed takes its line away.
+- A click for the box leaves FreeCAD's selection as it was on every route:
+  the selection is read at the press, before FreeCAD selects on the press
+  or the release, so the swallowed press and release (231481b, 98355c0)
+  no longer leave the last picked edge selected; a miss puts it back too,
+  and Create or Cancel takes out any element the box's clicks left
+  selected.
 
 The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
