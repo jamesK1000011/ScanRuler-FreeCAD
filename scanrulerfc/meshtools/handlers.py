@@ -64,6 +64,20 @@ def _get(x, *keys):
     return None
 
 
+def outer_placement(o):
+    """The placement of the containers round a document object (an App::Part
+    it sits in), as a 4 x 4 matrix, or None when there is none. A mesh's
+    Topology and a shape's tessellation already stand at the object's own
+    Placement; a container's is on top of that."""
+    try:
+        extra = o.getGlobalPlacement().multiply(o.Placement.inverse())
+        if extra.isIdentity():
+            return None
+        return np.array(extra.toMatrix().A, dtype=float).reshape(4, 4)
+    except Exception:
+        return None
+
+
 def solid_named(session, ref):
     """A solid on offer by key or name: a cylinder, cone or sphere measured
     in 3D Measure (an element, by id or name, at its assumed Ø), or a body
@@ -101,6 +115,9 @@ def solid_named(session, ref):
             else:
                 raise ToolError("invalid_input", f"{o.Label} is not a solid body.")
             V = np.array([[p.x, p.y, p.z] for p in pts], dtype=float).reshape(-1, 3)
+            outer = outer_placement(o)
+            if outer is not None:
+                V = V @ outer[:3, :3].T + outer[:3, 3]
             return f"body:{o.Name}", o.Label, V, np.array(tris, dtype=np.int64).reshape(-1, 3)
     raise ToolError("not_found", f"There is no solid {ref!r} on offer — a cylinder, cone or sphere measured (element_list), or a solid body in the document.")
 
@@ -206,9 +223,10 @@ def mesh_apply_wrap(session, a):
     return out
 
 
-# Trim to scan cuts with FreeCAD's mesh booleans; on since 5be1e43 passed in
-# real FreeCAD 1.0, 1.1 and newest. Off again here if FreeCAD's mesh kernel
-# ever stops giving the original's result.
+# Trim to scan cuts with meshbool's boolean (FreeCAD's mesh booleans until
+# the boolean moved off them); on since 5be1e43 passed in real FreeCAD 1.0,
+# 1.1 and newest. Off again here if the cut ever stops giving the original's
+# result.
 TRIM_READY = True
 TRIM_NOT_READY = ("Trim to scan isn't ready in FreeCAD yet: its cut with FreeCAD's mesh booleans doesn't "
                   "give the original's result. Use Cut with a plane, or Boolean subtract, for now.")

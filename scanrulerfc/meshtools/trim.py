@@ -18,11 +18,11 @@
 # Finding the break and carrying it out are pure numpy here, as the original
 # is pure TypeScript. The cut is a boolean: ScanRuler's Manifold tells the
 # slab's two skins apart by a vertex property carried through the cut; here
-# the kernel is FreeCAD's Mesh booleans (behind a lazy import — without
-# FreeCAD the trim refuses), and each triangle of the result is told apart
+# the kernel is meshbool's (numpy only, as the Boolean's; FreeCAD's Mesh
+# booleans before it), and each triangle of the result is told apart
 # by where it lies: on the body's own surface, on the slab's front skin, on
 # its back skin, or on its rim wall. A hollow's inner wall stays with the
-# solid round it, as Manifold's pieces keep it; where FreeCAD's kernel drops
+# solid round it, as Manifold's pieces keep it; where a kernel drops
 # a sealed shell the slab never meets, it is put back.
 
 import numpy as np
@@ -447,7 +447,7 @@ def _cut_body(kernel, BV, BF, body_volume, SV, SF, n_front, flip):
     try:
         RV, RF = kernel("subtract", (BV, BF), (SV, SF))
     except Exception as e:  # the kernel's own failure, in its words
-        raise M.MeshError(f"FreeCAD's mesh boolean would not take the break as a slab to cut with ({e}). A larger offset can help, or the break smoothed first — Smooth on a marked region.")
+        raise M.MeshError(f"The mesh boolean would not take the break as a slab to cut with ({e}). A larger offset can help, or the break smoothed first — Smooth on a marked region.")
     RV = np.asarray(RV, dtype=float)
     RF = np.asarray(RF, dtype=np.int64).reshape(-1, 3)
     LAST_CUT.update({"result": (len(RV), len(RF)), "resultVolume": B.volume(RV, RF), "resultClosed": M.closedness(RF, len(RV))})
@@ -550,9 +550,7 @@ def trim_to_scan(SV, SF, body, depth=DEFAULT_BREAK_DEPTH, offset=0.0, flip=False
     FV, FF, _verts, deep, brep = find_break(SV, SF, bsurf, depth, marked, default_break_speck(bsurf.bbox_diagonal))
     EV, EF, erep = extend_rim(FV, FF, bsurf, M.MAX_STRETCH * half + CLEARANCE, deep)
     slabV, slabF, _vm, _ = thicken_mesh(EV, EF, 2 * half, "both")
-    kernel = kernel or B.freecad_kernel()
-    if kernel is None:
-        raise B.NeedsKernel("Trim to scan cuts the body with a boolean, which needs FreeCAD's Mesh booleans — FreeCAD is not loaded here; run it inside FreeCAD (through Agent Link).")
+    kernel = kernel or B.mesh_kernel()
     V, F, mating, mating_area, pieces, volume, dropped, specks = _cut_body(kernel, BV, BF, bvol, slabV, slabF, len(EF), flip)
     gap = _gap_to_break(V, F, mating, FV, FF, NominalSurface(SV, SF), half, flip)
     report = {"offset": offset, "slab": 2 * half, "break": brep, "extend": erep, "pieces": pieces, "volume": volume, "dropped": dropped, "specks": specks,
