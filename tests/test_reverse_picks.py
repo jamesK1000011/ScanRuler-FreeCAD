@@ -48,6 +48,8 @@ class Picks(unittest.TestCase):
         self.assertEqual(K.pick_on_body(self.b, 2, [3, 0.4, 9.8], "edges"), FRONT)
         self.assertEqual(K.pick_on_body(self.b, 2, [3, 9.5, 10], "edges"), BACK)
         self.assertIsNone(K.pick_on_body(self.b, 2, [5, 5, 10], "edges"))  # the middle of the top: no edge in reach
+        self.assertIsNone(K.pick_on_body(self.b, 2, [5, 3, 10], "edges"))  # 3 mm in: past EDGE_REACH_MM
+        self.assertEqual(K.pick_on_body(self.b, 2, [5, 3, 10], "edges", reach=4), FRONT)  # within a reach the view widened
         self.assertEqual(K.pick_on_body(self.b, 2, [5, 5, 10], "faces"), TOP)
         self.assertEqual(K.pick_on_body(self.b, 2, [5, 0, 3], "faces"), SIDE)
         self.assertIsNone(K.pick_on_body(self.b, 9, [5, 0, 3], "faces"))
