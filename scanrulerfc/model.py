@@ -21,6 +21,7 @@ from . import construct as C
 from . import dimensions as D
 from . import grow as G
 from . import segment as SEG
+from . import segment_sparse as SEGS
 from .linalg import FitError, normalize
 from .shapes import circle_from_points, seed_off
 
@@ -1074,13 +1075,13 @@ def scan_segment(st, a):
     if box and not all(box["min"][k] <= box["max"][k] for k in range(3)):
         raise Refusal("invalid_input", "The box’s min lies past its max.")
     diag = 2 * model_size(scan)
-    opts = {"box": box, "minArea": a.get("minArea", (0.02 * diag) ** 2), "maxRms": a.get("maxRms", 0.05), "maxDeg": a.get("maxDeg", 15)}
+    opts = {"box": box, "minArea": a.get("minArea", (0.02 * diag) ** 2), "maxRms": a.get("maxRms", 0.05), "maxDeg": a.get("maxDeg", 15), "method": a.get("method", "auto")}
     key = (scan.version, repr(opts))
     cache = st.get("segCache")
     if cache and cache[0] == key:
         res = cache[1]
     else:
-        res = SEG.segment_planes(scan.graph(), opts["minArea"], opts["maxRms"], opts["maxDeg"], box)
+        res = SEGS.segment(scan.graph(), opts["minArea"], opts["maxRms"], opts["maxDeg"], box, opts["method"])
         st["segCache"] = (key, res)
     regions = res["regions"]
     mark = a.get("mark")
@@ -1091,7 +1092,11 @@ def scan_segment(st, a):
 
     def row(i):
         r = regions[i]
-        return js({"id": i + 1, "normal": js(r["normal"], 5), "point": js(r["point"], 4), "sigma": round(r["sigma"], 4), "area": round(r["area"], 1), "box": {"min": js(r["min"], 2), "max": js(r["max"], 2)}, "vertices": r["count"], "neighbours": [{"id": nb["id"], "deg": round(nb["deg"], 1)} for nb in r["neighbours"] if nb["id"] <= shown or nb["deg"] <= SEG.SMOOTH_DEG]})
+        if r.get("kind") == "cylinder":
+            shape = {"kind": "cylinder", "axis": js(r["axis"], 5), "point": js(r["point"], 4), "radius": round(r["radius"], 4), "length": round(r["length"], 3), "bore": r["bore"]}
+        else:
+            shape = {"kind": "plane", "normal": js(r["normal"], 5), "point": js(r["point"], 4)}
+        return js({"id": i + 1, **shape, "sigma": round(r["sigma"], 4), "area": round(r["area"], 1), "box": {"min": js(r["min"], 2), "max": js(r["max"], 2)}, "vertices": r["count"], "neighbours": [{"id": nb["id"], "deg": round(nb["deg"], 1)} for nb in r["neighbours"] if nb["id"] <= shown or nb["deg"] <= SEG.SMOOTH_DEG]})
 
     if ids:
         missing = [i for i in ids if i > len(regions) or i < 1]
@@ -1101,7 +1106,9 @@ def scan_segment(st, a):
         st["marked"] = {"vertices": pts, "from": f"scan_segment region{'s' if len(ids) > 1 else ''} {', '.join(map(str, ids))}"}
         marked = {"points": int(len(pts)), "from": st["marked"]["from"]}
     listed = not marked or a.get("list") is True
-    out = {"found": len(regions), "considered": res["considered"], "claimed": res["claimed"], "maxRms": opts["maxRms"]}
+    out = {"found": len(regions), "method": res["method"], "considered": res["considered"], "claimed": res["claimed"], "maxRms": opts["maxRms"]}
+    if res.get("why"):
+        out["why"] = res["why"]
     if listed and shown < len(regions):
         out["shown"] = shown
     if marked:

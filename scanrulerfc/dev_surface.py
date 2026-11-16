@@ -24,6 +24,8 @@ LEAF = 16
 NODE = 16
 # Queries times leaves held at once while ordering the leaves.
 _BLOCK = 3_000_000
+# Rays cast together against the leaves near them (raycast_first).
+RAY_RUN = 256
 
 
 def closest_on_triangles(P, A, B, C):
@@ -352,29 +354,67 @@ class NominalSurface:
     def raycast_first(self, O, D, near, far):
         """The first triangle each ray O + t D meets, either side, with
         near <= t <= far: (t, face), t inf and face -1 for none. Leaves are
-        opened best-first by where the ray enters their box."""
+        opened best-first by where the ray enters their box. Rays of finite
+        reach (all of wall thickness's) go in runs of RAY_RUN with origins
+        close together (along a Morton curve), each run tried against only
+        the leaves whose boxes meet the box its segments sweep: the same
+        first hit, without ordering every leaf of a big scan for every ray."""
         O = np.asarray(O, dtype=float).reshape(-1, 3)
         D = np.asarray(D, dtype=float).reshape(-1, 3)
         near = np.broadcast_to(np.asarray(near, dtype=float), (len(O),))
         far = np.broadcast_to(np.asarray(far, dtype=float), (len(O),))
         t_out = np.full(len(O), np.inf)
         f_out = np.full(len(O), -1, dtype=np.int64)
-        K = len(self.leaf_tris)
-        block = max(1, _BLOCK // K)
+        if len(O) == 0:
+            return t_out, f_out
+        if len(O) > RAY_RUN and np.isfinite(far).all():
+            lo, hi = O.min(axis=0), O.max(axis=0)
+            q = np.clip((O - lo) / np.maximum(hi - lo, 1e-12) * 1023, 0, 1023)
+            order = np.argsort(_morton(q), kind="stable")
+            for s in range(0, len(O), RAY_RUN):
+                idx = order[s : s + RAY_RUN]
+                ends = O[idx] + D[idx] * far[idx, None]
+                blo = np.minimum(O[idx], ends).min(axis=0)
+                bhi = np.maximum(O[idx], ends).max(axis=0)
+                cand = self._leaves_in_box(blo, bhi)
+                if len(cand):
+                    t_out[idx], f_out[idx] = self._cast_blocks(O[idx], D[idx], near[idx], far[idx], cand)
+            return t_out, f_out
+        return self._cast_blocks(O, D, near, far, None)
+
+    def _leaves_in_box(self, lo, hi):
+        """The leaves whose boxes meet the box (lo, hi), by way of the nodes."""
+        pad = 1e-9 * max(self.bbox_diagonal, 1.0)
+        lo, hi = lo - pad, hi + pad
+        nodes = np.nonzero(np.all((self.node_lo <= hi) & (self.node_hi >= lo), axis=1))[0]
+        if not len(nodes):
+            return np.zeros(0, dtype=np.int64)
+        leaves = self.node_leaves[nodes].ravel()
+        leaves = leaves[leaves >= 0]
+        meet = np.all((self.leaf_lo[leaves] <= hi) & (self.leaf_hi[leaves] >= lo), axis=1)
+        return leaves[meet]
+
+    def _cast_blocks(self, O, D, near, far, leaves):
+        t_out = np.full(len(O), np.inf)
+        f_out = np.full(len(O), -1, dtype=np.int64)
+        K = len(self.leaf_tris) if leaves is None else len(leaves)
+        block = max(1, _BLOCK // max(1, K))
         for s in range(0, len(O), block):
             e = min(len(O), s + block)
-            t_out[s:e], f_out[s:e] = self._cast(O[s:e], D[s:e], near[s:e], far[s:e])
+            t_out[s:e], f_out[s:e] = self._cast(O[s:e], D[s:e], near[s:e], far[s:e], leaves)
         return t_out, f_out
 
-    def _cast(self, O, D, near, far):
+    def _cast(self, O, D, near, far, leaves=None):
         m = len(O)
+        L = np.arange(len(self.leaf_lo)) if leaves is None else np.asarray(leaves, dtype=np.int64)
+        leaf_lo, leaf_hi = self.leaf_lo[L], self.leaf_hi[L]
         flat = np.abs(D) < 1e-12
         inv = 1.0 / np.where(flat, 1.0, D)
-        tn = np.full((m, len(self.leaf_lo)), -np.inf)
-        tf = np.full((m, len(self.leaf_lo)), np.inf)
+        tn = np.full((m, len(L)), -np.inf)
+        tf = np.full((m, len(L)), np.inf)
         for k in range(3):
-            lo = self.leaf_lo[None, :, k] - O[:, k : k + 1]
-            hi = self.leaf_hi[None, :, k] - O[:, k : k + 1]
+            lo = leaf_lo[None, :, k] - O[:, k : k + 1]
+            hi = leaf_hi[None, :, k] - O[:, k : k + 1]
             t1 = lo * inv[:, k : k + 1]
             t2 = hi * inv[:, k : k + 1]
             # A ray square to an axis never leaves its slab, or never enters.
@@ -401,7 +441,7 @@ class NominalSurface:
                 break
             keep = live.any(axis=1)
             rows, live = rows[keep], live[keep]
-            leaves = order[rows, cols][live]
+            leaves = L[order[rows, cols][live]]
             qrow = np.repeat(rows, live.sum(axis=1))
             tris = self.leaf_tris[leaves]
             pv = self.leaf_valid[leaves].ravel()

@@ -43,6 +43,7 @@ A scan is a cloud of noisy samples of a surface. Every number you give rests on 
 - **Regions by hand:** `scan_query { box | near, normal }` returns the vertices facing a direction; `element_fit_marked` fits exactly those. Use it for a face the seeded fit leaks off — and take the whole face.
 - **Designed sizes:** `assumed` keeps a nominal diameter beside the fit; it is still reported as measured. **Known balls:** `knownDiameter` holds a gauge ball's diameter and fits the centre alone.
 - **Constructions:** `element_construct` — midplanes, offsets, intersections, circles where a plane cuts a cylinder, planes from numbers.
+- **All the flat faces at once:** `scan_segment` lists the planar regions, largest first; `mark` a region's id and `element_fit_marked { marked: true }` fits it. The answer's `method` says how they were found: `vertices` is ScanRuler's growing, for a dense scan; `faces` groups the triangles, for a sparse CAD-style mesh (an STL from CAD, a cylinder's cap a fan with vertices only on its rim), and also reports the cylinders it finds (`kind: "cylinder"`, axis, radius, `bore`). Under the default `method: "auto"` faces runs only when the vertex growing found nothing on a sparse mesh (`why` says so); `method: "faces"` asks for it on a CAD mesh whose flats the vertex growing misses beside finely tessellated curves.
 - `scan_nearest` checks a place lies on the scan before fitting there. Runs of fits and probes go in one `batch`.
 
 ## 4. Dimensions and checks
@@ -85,6 +86,7 @@ A scan is a cloud of noisy samples of a surface. Every number you give rests on 
 ## 7. Wall thickness
 
 - `thickness_settings` then `thickness_measure`. `method: "ray"` shoots along the inward normal to the far wall; `"sphere"` takes the largest sphere that fits — the true wall at corners and ribs. `maxThickness` just over the thickest wall expected.
+- A scan of more than `maxPoints` vertices (300,000 by default) is measured at that many, spread evenly, the others taking the thinnest reading beside them; `thickness.sampled` says so and the statistics are over the points measured. `maxPoints: 0` measures every vertex. `thickness_measure`, `deviation_measure`, `deviation_set_target`, `deviation_volume` and `scan_segment` are heavy: on a big scan Agent Link may answer with a job — `job_status { job, wait: 25 }` gives its answer.
 - Read min, mean and the share under the limit. Thin readings along open rims are rays escaping, not thin walls: check a thin patch with `view_render { map: "thickness", zoom }` and a `section_cut` through it before reporting it.
 
 ## 7a. Noise to plan with
