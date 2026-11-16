@@ -950,7 +950,7 @@ def build_svg(r):
         out += [f"      {s}" for s in shapes(el["fit"])]
         out.append("    </g>")
     out.append("  </g>")
-    out.append(f"  <g id=\"labels\" font-family=\"system-ui, -apple-system, 'Segoe UI', sans-serif\" font-size=\"{n(font)}\">")
+    out.append(f"  <g id=\"labels\" font-family=\"Helvetica\" font-size=\"{n(font)}\">")
     for el in r["elements"]:
         lx, ly = at(label_spot(el["fit"], diag))
         out.append(f'    <text x="{n(lx)}" y="{n(ly)}" fill="{_esc(el["color"])}"><tspan x="{n(lx)}" dy="-1.2em">{_esc(el["name"])}</tspan><tspan x="{n(lx)}" dy="1.2em">{_esc(el["value"])}</tspan></text>')

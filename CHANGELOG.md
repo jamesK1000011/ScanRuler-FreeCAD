@@ -9,6 +9,8 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- The 2D sheet's SVG labels name Helvetica only, so Qt no longer warns of a missing "Sans-serif" in the Report view.
+
 The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
