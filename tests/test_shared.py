@@ -12,7 +12,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-SKIP = {".git", "__pycache__", "tests", "build", "dist", "node_modules"}
+# agentlink-addon and workshop-addons: the other add-ons CI checks out inside
+# this one (.github/workflows/ci.yml), whose own copies are not ScanRuler's.
+SKIP = {".git", "__pycache__", "tests", "build", "dist", "node_modules", "agentlink-addon", "workshop-addons"}
 
 
 def agentlink():
