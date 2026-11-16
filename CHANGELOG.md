@@ -13,6 +13,13 @@ The ScanRuler workbench as FreeCAD's design guide asks it, Reverse engineer
 built to the end of ScanRuler's feature list, and the add-on ready for the
 Addon Manager.
 
+- Library Pack as a service: Agent Link's `library_pack` hook service
+  (scanrulerfc/pack_service.py) takes Workshop Documents' `library_pack`
+  arguments (bodies, name, description, license, author, credits,
+  formats, path) and runs ScanRuler's own pack_setup, pack_plan and
+  pack_write (Stefan Hermann's library-pack plugin, CNC Kitchen), answering
+  with the files written, `by: "ScanRuler"` and the credit. Each add-on
+  packs alone; with both installed, ScanRuler's makes it.
 - The ScanRuler panel fits 354 px again with a scan open: its scroll
   areas, header and credit ask for no width of their own (a scroll area's
   size hint is its page's, about 640 px on the Mac, and set the dock's

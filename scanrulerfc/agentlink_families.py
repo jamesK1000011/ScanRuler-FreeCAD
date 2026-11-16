@@ -172,17 +172,22 @@ def _thread_reader():
 def _register():
     # ScanRuler's assembly manual for whoever owns a Manual tab (Workshop
     # Documents asks hooks.service("manual_maker")), the line that tells the
-    # agent of a new screenshot (hooks.service("notice")), and the add-on
-    # told it runs under Agent Link (its own dock stays away).
+    # agent of a new screenshot (hooks.service("notice")), the library pack
+    # for whoever owns a Library Pack command (Documents asks
+    # hooks.service("library_pack") and, when it is offered, leaves its own
+    # library_pack tool unlisted), and the add-on told it runs under Agent
+    # Link (its own dock stays away).
     scanrulerfc._hosted = True
     from agentlink import hooks
 
     from .manual_maker import ManualMaker
+    from .pack_service import LibraryPack
     from .snapshot.handlers import notice
 
     if hasattr(hooks, "provide"):
         hooks.provide("manual_maker", ManualMaker())
         hooks.provide("notice", notice)
+        hooks.provide("library_pack", LibraryPack())
 
 
 def _tab():

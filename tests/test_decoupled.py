@@ -241,6 +241,9 @@ class SameAnswers(unittest.TestCase):
 
         self.assertTrue(scanrulerfc._hosted)
         self.assertIsInstance(hooks.service("manual_maker"), ManualMaker)
+        from scanrulerfc.pack_service import LibraryPack
+
+        self.assertIsInstance(hooks.service("library_pack"), LibraryPack)
         self.assertEqual(fl.CREDIT, scanrulerfc.CREDIT)
 
     def test_refusals_cross_the_boundary_unchanged(self):
