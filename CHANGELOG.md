@@ -9,6 +9,35 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- The ScanRuler panel follows FreeCAD Light and Studio Light: it no longer
+  stays a near-black slab with grey key text that read as disabled. Its
+  sheet held `palette(window)` and `palette(window-text)`, which Qt
+  resolves against the application's palette, not the light theme's; the
+  colours are now worked out in scanrulerfc/theme.py (ScanRuler's own copy
+  of the add-ons' theme rule) from the palette of the dock or Agent Link tab
+  the panel stands in: the page on the theme's window, section cards a
+  shade off it (lighter in dark themes, darker in light), text and keys from
+  WindowText and Button/ButtonText, each checked at 4.5:1 or better on its
+  surface (a palette whose text fails its own window snaps to plain ink),
+  disabled keys from the palette's Disabled group and plainly dimmer, (i)
+  dots in a muted ring, the theme accent (ThemeAccentColor1, else the
+  highlight) on a checked or hovered key, and CNC Kitchen blue (#1877c0,
+  Stefan Hermann's ScanRuler accent) kept on primary keys and links,
+  lightened in dark themes only as far as a link needs to read. Colours
+  only on keys: the theme keeps their shape. Restyled on PaletteChange,
+  StyleChange and a move into another dock or tab; the dark look is the
+  theme's window and text as before. With no scan, 3D Measure's
+  Alignment, Create element, Create dimensions and GD&T keys are disabled
+  and read so; Open…, the Reverse engineer's Create feature keys, + Add
+  and Play are enabled and read so.
+- A file path given to any ScanRuler tool (reverse_import_step, scan_open,
+  deviation_open_reference, flat_open_image, manual_plan's import and
+  export, pack_setup's files, every export's path) is taken as Agent
+  Link's export_file takes one: ~ expanded, a relative name in the
+  session's output folder (Agent Link's outDir, ~/AgentLink by default;
+  the add-on's own runner's folder alone), else the working folder.
+  "rev_box.step" and "~/AgentLink/rev_box.step" failed with "cannot be
+  read" (scanrulerfc/paths.py, applied where the handlers are bound).
 - The 2D sheet's SVG labels name Helvetica only, so Qt no longer warns of a missing "Sans-serif" in the Report view.
 - Feature editor grips read on any body: a white fill (an axis grip keeps
   its own colour) inside a near-black rim drawn under it, lit amber on

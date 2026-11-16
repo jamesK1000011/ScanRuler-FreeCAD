@@ -30,7 +30,11 @@ def bound(ctx, family=None):
     """{tool name: fn(args)} for one context: one family's (a module or its
     name), or every family's."""
     mods = [module(m) for m in MODULES] if family is None else [module(family) if isinstance(family, str) else family]
+    from .. import paths
+
     out = {}
     for m in mods:
-        out.update(_bind.bound(ctx, m.bind))
+        # A file path as Agent Link's export_file takes one: ~ expanded, a
+        # relative name in the session's output folder (paths.resolve).
+        out.update({k: paths.resolving(fn, ctx) for k, fn in _bind.bound(ctx, m.bind).items()})
     return out

@@ -139,25 +139,20 @@ class FitsTheWidth(unittest.TestCase):
         self.assertEqual(kit.head_row({}), [])
 
     def test_page_follows_the_theme(self):
-        """Backgrounds and text from the palette (it stayed dark in FreeCAD
-        Light); the only fixed colour is CNC Kitchen blue, on primary keys
-        and links; a disabled primary key gets the theme's dimmed text."""
-        import re
-
+        """The sheet carries concrete colours worked out from the palette
+        (never palette(...), which Qt resolves against the app's palette:
+        the panel stayed near-black in FreeCAD Light on the Mac); the only
+        fixed colour is CNC Kitchen blue, on primary keys and links."""
         from scanrulerfc import workspaces as W
         from scanrulerfc.pages import kit
 
-        q = kit.page_qss()
-        self.assertIn("background: palette(window)", q)
-        self.assertIn("color: palette(window-text)", q)
-        self.assertIn("palette(base)", q)
-        fixed = set(re.findall(r"#[0-9a-fA-F]{6}\b", q))
-        self.assertEqual(fixed, {W.ACCENT})
+        q = kit.page_qss({"window": "#efefef", "window_text": "#000000", "button": "#f5f5f5", "button_text": "#000000",
+                          "highlight": "#3d7fd6"})
+        self.assertNotIn("palette(", q)
         for line in q.splitlines():
             if W.ACCENT in line:
-                self.assertTrue("primary" in line or " a " in line, line)
-        self.assertIn(":disabled", q)
-        self.assertIn("placeholder-text", q)
+                self.assertIn("primary", line)
+        self.assertIn('QPushButton[primary="true"]:disabled', q)
 
     def test_labels_wrap(self):
         mods = fake_pyside()

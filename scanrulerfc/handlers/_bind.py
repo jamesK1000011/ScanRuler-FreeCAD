@@ -25,7 +25,9 @@ def bound(ctx, bind):
 
 
 def _call(bind, name, ctx, args):
-    return bound(ctx, bind)[name](args)
+    from .. import paths
+
+    return bound(ctx, bind)[name](paths.resolve_args(ctx, args))
 
 
 def table(bind, names):
