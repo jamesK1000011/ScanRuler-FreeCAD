@@ -333,12 +333,83 @@ def model(kind, low, high, *, colormap=CM.DEFAULT, bands=None, units="mm", value
 
 # ---------------------------------------------------------------- Coin
 
-def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
+# What SoText2 draws: Coin's own font may lack a glyph past ASCII, and a
+# string it cannot read is drawn as nothing or as stray marks. The words in
+# the window keep their meaning in plain ASCII (the model keeps the
+# original's strings).
+ASCII = {MINUS: "-", "\u00b7": ",", "\u00b0": " deg", "\u00d8": "dia ", "\u2713": "OK", "\u2717": "NG", "\u00b1": "+/-",
+         "\u00d7": "x", "\u00b2": "2", "\u00b3": "3", "\u2026": "...", "\u00a0": " ", "\u2009": " ", "\u2014": "-", "\u2013": "-"}
+
+
+def coin_text(s):
+    """s as SoText2 can draw it: plain ASCII ("\u2212" to "-", "\u00b0" to " deg")."""
+    out = []
+    for ch in str(s):
+        out.append(ch if ord(ch) < 128 else ASCII.get(ch, "?"))
+    return "".join(out).replace(" , ", ", ")
+
+
+# Where the legend stands in the 3D view, as shares of the view (its
+# camera maps the unit square onto the whole view): against the right
+# edge, clear of a part framed in the middle. Window review round 6: at
+# x 0.80 it stood over the part's right side.
+PLACE = {"x": 0.86, "y": 0.24, "w": 0.03, "h": 0.52}
+CARD_RGB = (246, 246, 244)
+TEXT_RGB = (30, 30, 30)
+ZERO_RGB = (46, 125, 70)
+
+
+def text_rows(m):
+    """The words the legend draws, as data (the answer's facts and the
+    tests): its title, the low, middle and high tick, and how many ticks."""
+    t = m.get("ticks") or []
+    mid = t[len(t) // 2]["text"] if t else None
+    return {"title": coin_text(m.get("caption") or ""), "min": coin_text(t[0]["text"]) if t else None,
+            "mid": coin_text(mid) if mid is not None else None, "max": coin_text(t[-1]["text"]) if t else None, "ticks": len(t)}
+
+
+def stat_lines(stats):
+    """How many lines the stats card takes (two figures a line, a wide
+    one a line of its own), as coin_nodes lays them."""
+    places = stat_places(stats)
+    return (max(p[0] for p in places) + 1) if places else 0
+
+
+def stat_places(stats):
+    """(line, column) of each stats row: two figures a line, a wide one on
+    a line of its own (it no longer lands on a half-filled line, over the
+    figure before it)."""
+    out, line, col = [], 0, 0
+    for row in stats or []:
+        if row["wide"]:
+            if col:
+                line, col = line + 1, 0
+            out.append((line, 0))
+            line += 1
+            continue
+        out.append((line, col))
+        if col:
+            line, col = line + 1, 0
+        else:
+            col = 1
+    return out
+
+
+def coin_nodes(m, x=None, y=None, w=None, h=None, coin=None, font_size=None):
     """The legend as a Coin overlay: an SoAnnotation holding an orthographic
-    camera over the unit square, the ramp as quads (with its caps), tick and
-    caption text, histogram bars and the stats card. Draws in view_render
-    pictures and saved images too, which a Qt overlay would not. coin: the
-    module to build with (pivy's by default; the tests hand a stand-in)."""
+    camera over the unit square, a light card behind it (the words read on
+    any background), the ramp as quads (with its caps), the title above it
+    (what is mapped, its unit), the value of every tick beside it (low,
+    middle and high among them), histogram bars and the stats card. Draws
+    in view_render pictures and saved images too, which a Qt overlay would
+    not. coin: the module to build with (pivy's by default; the tests hand
+    a stand-in). font_size: the words' size in the view's device pixels
+    (SoFont); None leaves Coin's default (10, half of that on a Retina
+    screen: window review round 6 could read none of them)."""
+    x = PLACE["x"] if x is None else x
+    y = PLACE["y"] if y is None else y
+    w = PLACE["w"] if w is None else w
+    h = PLACE["h"] if h is None else h
     if coin is None:
         from pivy import coin  # lazy: only inside FreeCAD's GUI
 
@@ -355,6 +426,10 @@ def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
     lm = coin.SoLightModel()
     lm.model = coin.SoLightModel.BASE_COLOR
     root.addChild(lm)
+    if font_size:
+        font = coin.SoFont()
+        font.size = float(font_size)
+        root.addChild(font)
 
     def quad(x0, y0, x1, y1, rgb):
         sep = coin.SoSeparator()
@@ -369,7 +444,7 @@ def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
         sep.addChild(fs)
         return sep
 
-    def text(s, tx, ty, rgb=(30, 30, 30)):
+    def text(s, tx, ty, rgb=TEXT_RGB, right=False):
         sep = coin.SoSeparator()
         col = coin.SoBaseColor()
         col.rgb = tuple(c / 255.0 for c in rgb)
@@ -378,10 +453,20 @@ def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
         tr.translation = (tx, ty, 0)
         sep.addChild(tr)
         t = coin.SoText2()
-        t.string = s
+        t.string = coin_text(s)
+        if right and getattr(coin.SoText2, "RIGHT", None) is not None:
+            t.justification = coin.SoText2.RIGHT
         sep.addChild(t)
         return sep
 
+    cap = 0.02
+    stats = m.get("stats") or []
+    rows = stat_lines(stats)
+    wide_left = bool(stats or m.get("ends") or m.get("histogram"))
+    left = x - 0.11 if wide_left else x - 0.015
+    bottom = (y - cap - 0.075 - 0.03 * rows) if stats else (y - cap - 0.05 if m.get("ends") else y - cap - 0.02)
+    # The card first: SoAnnotation draws in order, without the depth test.
+    root.addChild(quad(left, bottom, 0.995, y + h + cap + 0.065, CARD_RGB))
     if m["bands"] and m["bands"] >= 2:
         for a, b, rgb in m["ramp"]:
             root.addChild(quad(x, y + a * h, x + w, y + b * h, rgb))
@@ -389,27 +474,24 @@ def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
         r = m["ramp"]
         for (a, ca), (b, _cb) in zip(r, r[1:]):
             root.addChild(quad(x, y + a * h, x + w, y + b * h, ca))
-    cap = 0.02
     root.addChild(quad(x, y + h, x + w, y + h + cap, m["caps"]["high"]["rgb"]))
     root.addChild(quad(x, y - cap, x + w, y, m["caps"]["low"]["rgb"]))
     for t in m["ticks"]:
-        root.addChild(text(t["text"], x + w + 0.008, y + t["fraction"] * h,
-                           (46, 125, 70) if t["zero"] else (30, 30, 30)))
-    root.addChild(text(m["caption"], x + w, y + h + cap + 0.035))
+        root.addChild(text(t["text"], x + w + 0.008, y + t["fraction"] * h - 0.008,
+                           ZERO_RGB if t["zero"] else TEXT_RGB))
+    # The title: what is mapped and its unit, over the ramp, its right end
+    # at the card's.
+    root.addChild(text(m["caption"], 0.985, y + h + cap + 0.03, right=True))
     if m["ends"]:
-        root.addChild(text(m["ends"]["high"]["caption"], x - 0.1, y + h + cap + 0.012))
-        root.addChild(text(m["ends"]["low"]["caption"], x - 0.1, y - cap - 0.025))
+        root.addChild(text(m["ends"]["high"]["caption"], x - 0.1, y + h + cap + 0.005))
+        root.addChild(text(m["ends"]["low"]["caption"], x - 0.1, y - cap - 0.035))
     if m["histogram"]:
         hw = 0.06
         for row in m["histogram"]["rows"]:
             if row["count"]:
                 root.addChild(quad(x - 0.004 - hw * row["width"], y + row["lo"] * h,
                                    x - 0.004, y + row["hi"] * h, (150, 150, 150)))
-    if m["stats"]:
-        sy = y - cap - 0.06
-        for i, row in enumerate(m["stats"]):
-            col = 0 if row["wide"] else i % 2
-            root.addChild(text(f"{row['caption']}  {row['value']}", x - 0.1 + col * 0.1, sy))
-            if row["wide"] or col == 1:
-                sy -= 0.025
+    if stats:
+        for row, (line, col) in zip(stats, stat_places(stats)):
+            root.addChild(text(f"{row['caption']}  {row['value']}", x - 0.1 + col * 0.1, y - cap - 0.07 - 0.03 * line))
     return root

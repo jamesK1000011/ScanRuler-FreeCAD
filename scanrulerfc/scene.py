@@ -29,13 +29,31 @@ import numpy as np
 from . import colormap as CM
 from . import scanstate as S
 
-# Colours, RGB 0..1: the panel's own accents (colormap.PALETTE).
-ELEMENT = CM.hex_rgb(CM.PALETTE[0])          # blue: an element as it stands
-NEW = CM.hex_rgb(CM.PALETTE[1])              # orange: what this call made or changed
-DIMENSION = CM.hex_rgb(CM.PALETTE[2])        # green: dimension lines and values
-SECTION = CM.hex_rgb(CM.PALETTE[3])          # magenta: section curves
-MARKED = CM.hex_rgb(CM.PALETTE[4])           # amber: marked points, nearest point, hot spots
-GHOST = CM.hex_rgb(CM.PALETTE[5])            # teal: a preview beside the mesh (wrap, reduce)
+
+def rgb01(h):
+    """'#1877c0' as RGB 0..1 (0.094, 0.467, 0.753): what Coin's colour
+    fields take. colormap.hex_rgb gives 0..255; handed to Coin as it was
+    (window review round 6), Coin packed the colour into 32 bits with each
+    channel past 1 overflowing into its neighbour, and #1877c0 (blue) came
+    out #febf40 (orange) and #e8590c (orange) came out #58aff4 (blue): new
+    and old swapped in every picture."""
+    return tuple(c / 255.0 for c in CM.hex_rgb(h))
+
+
+def hex_of(rgb):
+    """RGB 0..1 as '#rrggbb' (the answer's facts)."""
+    return "#" + "".join(f"{int(round(max(0.0, min(1.0, float(c))) * 255)):02x}" for c in rgb[:3])
+
+
+# Colours, RGB 0..1: the panel's own accents (colormap.PALETTE). Blue is
+# CNC Kitchen blue, Stefan Hermann's ScanRuler accent (palette[0]): an
+# element as it stands; what this call made is the palette's orange.
+ELEMENT = rgb01(CM.PALETTE[0])               # blue #1877c0: an element as it stands
+NEW = rgb01(CM.PALETTE[1])                   # orange #e8590c: what this call made or changed
+DIMENSION = rgb01(CM.PALETTE[2])             # green: dimension lines and values
+SECTION = rgb01(CM.PALETTE[3])               # magenta: section curves
+MARKED = rgb01(CM.PALETTE[4])                # amber: marked points, nearest point, hot spots
+GHOST = rgb01(CM.PALETTE[5])                 # teal: a preview beside the mesh (wrap, reduce)
 EDITED = (0.78, 0.78, 0.74)                  # the edited copy: the scan's own grey
 SEGMENT_GREY = tuple(c / 255.0 for c in CM.UNMEASURED_RGB)
 
@@ -365,7 +383,7 @@ def segments_layer(st, scan):
     for i, r in enumerate(regions):
         m = np.asarray(r.get("members", []), dtype=np.int64)
         m = m[(m >= 0) & (m < len(rgb))]
-        rgb[m] = CM.hex_rgb(CM.palette_color(i))
+        rgb[m] = rgb01(CM.palette_color(i))  # 0..1, as the grey: 0..255 here saturated every region
     return {"kind": "segments", "rgb": rgb, "count": len(regions), "key": ("segments", id(cache), len(regions))}
 
 
