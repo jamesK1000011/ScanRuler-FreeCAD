@@ -48,6 +48,28 @@ class Lint(unittest.TestCase):
         self.assertIn("word", self.rules("Tighten the grub screw.", st))
 
 
+class WayIn(unittest.TestCase):
+    def test_a_part_that_overlaps_where_it_sits_is_said_to(self):
+        # Found live (run 2, measure model call 114): Worn stands in the
+        # same place as Block, 20 mm tall, brought in 22 mm from above —
+        # it read "blockedShortBy 19.25", the first place of the sweep
+        # where the two touch, not that it overlaps in place.
+        calls = []
+
+        def same_place(t):
+            calls.append(t)
+            return t < 20.0  # overlapping until backed off its whole height
+
+        self.assertEqual(MC.way_in(same_place, 22.0), ("overlaps", 0.0))
+        self.assertEqual(calls, [0.0])  # the way in is not swept
+
+    def test_blocked_on_the_way_and_clear(self):
+        how, t = MC.way_in(lambda t: 5.0 < t < 12.0, 22.0)  # something in the way between 5 and 12 mm out
+        self.assertEqual(how, "blocked")
+        self.assertAlmostEqual(t, 22.0 * 8 / 16)  # the first contact coming in, at a sixteenth of the travel
+        self.assertEqual(MC.way_in(lambda t: False, 22.0), ("clear", None))
+
+
 class Plan(unittest.TestCase):
     def test_checks_and_bom(self):
         plan = {"settings": {}, "parts": [{"name": "Plate", "body": "Plate"}, {"name": "Peg", "body": "Peg"}, {"name": "Screw A", "designation": "M3x10 ISO 4762", "kind": "hardware"},

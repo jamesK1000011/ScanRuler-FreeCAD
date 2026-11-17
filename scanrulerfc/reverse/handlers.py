@@ -420,7 +420,15 @@ def _added_rows(part, out, made):
 
 
 def _body_out(b):
-    return {"id": b["id"], "name": b["name"], "volume": b["volume"], "closed": b["closed"], "surface": b["surface"], "faces": b["faces"], "box": b["box"]}
+    # The volume to a millionth of a mm³: 999.9999999999998 is 1000.
+    return {"id": b["id"], "name": b["name"], "volume": _mm3(b["volume"]), "closed": b["closed"], "surface": b["surface"], "faces": b["faces"], "box": b["box"]}
+
+
+def _mm3(v):
+    try:
+        return round(float(v), 6)
+    except (TypeError, ValueError):
+        return v
 
 
 def feature_row(f, results, rolled):
@@ -763,8 +771,15 @@ def handlers(session=None, store=None):
         b, body = _built(a.get("body"))
         k = st.builder.kernel
         shape = body["shape"]
-        return {"body": b["id"], "name": b["name"], "closed": k.is_closed_solid(shape), "valid": k.is_valid(shape), "solids": k.solid_count(shape),
-                "shells": k.shells_per_solid(shape) if hasattr(k, "shells_per_solid") else None, "volume": b["volume"], "surface": b["surface"]}
+        out = {"body": b["id"], "name": b["name"], "closed": k.is_closed_solid(shape), "valid": k.is_valid(shape), "solids": k.solid_count(shape),
+               "shells": k.shells_per_solid(shape) if hasattr(k, "shells_per_solid") else None, "volume": _mm3(b["volume"]), "surface": b["surface"]}
+        # A body renamed with reverse_body_set keeps the name its feature
+        # gave it (name) and is shown under the new one: both, so a body
+        # asked for as "Dowel" is not answered as "Peg" alone (found live).
+        shown = ((st.part().get("bodyStyles") or {}).get(str(b["id"])) or {}).get("name")
+        if shown and shown != b["name"]:
+            out["shownAs"] = shown
+        return out
 
     def body_clearance(a):
         x, bx = _built(a.get("a"))

@@ -184,6 +184,37 @@ def prewarp(TV, TF, printed, gain=1.0, smooth=2, max_mm=2.0):
     return out, {"rms": r3(rms), "largest": r3(largest), "unread": int(n - known.sum())}
 
 
+def seen_from_print(target, PV, max_mm, sample=20000):
+    """The print's error read the other way round: from the print's own
+    points to the target's surface — {"largest", "rms"} over the points
+    with the target within max_mm. prewarp reads the error at the target's
+    vertices only, and a target tessellated from CAD has them on its edges
+    and rims: an error in the middle of a face is between them."""
+    PV = np.asarray(PV, float)
+    if len(PV) > sample:
+        PV = PV[np.linspace(0, len(PV) - 1, sample).astype(np.int64)]
+    h = target.closest(PV, max_mm)
+    known = h.found & (h.distance <= max_mm)
+    if not known.any():
+        return {"largest": 0.0, "rms": 0.0}
+    d = h.distance[known]
+    return {"largest": r3(d.max()), "rms": r3(np.sqrt((d ** 2).mean()))}
+
+
+def blind_target(res, seen, tolerance, vertices):
+    """Words for a pre-warp whose target cannot see the print's error, or
+    None: the print's own points lie further from the target than the
+    tolerance, and several times further than anything read at the
+    target's vertices. Found live (run 2): a print 1 mm low over a pocket
+    read rms 0, largest 0 and "stop: the print is within 0.05 mm" — the
+    target, a CAD tessellation of 648 triangles, had no vertex there."""
+    if seen["largest"] <= tolerance or seen["largest"] <= 3 * max(res["largest"], 1e-9):
+        return None
+    return (f"The print's own points lie up to {seen['largest']:g} mm from the target, but at the target's {vertices} vertices the error reads {res['largest']:g} mm at most: "
+            "the error is between the target's vertices (a CAD tessellation has them on its edges and rims only), so this pre-warp does not correct it and its rms does not show it. "
+            "Open the target again as a mesh fine enough to carry the error (its edges no longer than the features to correct), align, and run again with fresh: true.")
+
+
 def stop_rule(runs, tolerance, max_runs=3):
     """Whether to run the pre-warp again."""
     if not runs:

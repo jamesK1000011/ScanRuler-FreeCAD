@@ -94,6 +94,34 @@ class Core(unittest.TestCase):
         self.assertIn("less than a fifth", W.stop_rule(runs, 0.01)["why"])
         self.assertTrue(W.stop_rule([{"n": 1, "rms": 0.005}], 0.01)["stop"])
 
+    def test_a_target_with_vertices_on_its_edges_only_is_said_to_be_blind(self):
+        # Found live (run 2, measure model call 86): the print 1 mm low
+        # over a 10 x 10 pocket in the top face, the target the CAD's own
+        # tessellation (vertices on its edges only): rms 0, largest 0,
+        # "stop: the print is within 0.05 mm RMS of the target".
+        TV, TF = box_mesh(60, 40, 20, n=1)  # the target: 12 triangles
+        PV, PF = box_mesh(60, 40, 20, n=40)  # the print, scanned densely
+        PV = np.asarray(PV, float).copy()
+        top = np.abs(PV[:, 2] - PV[:, 2].max()) < 1e-9
+        pocket = top & (np.abs(PV[:, 0] - 15) <= 5) & (np.abs(PV[:, 1]) <= 5)
+        self.assertGreater(pocket.sum(), 20)
+        PV[pocket, 2] -= 1.0
+        _V1, res = W.prewarp(TV, TF, W.surface(PV, PF), 1.0, 2, 2.0)
+        self.assertEqual((res["rms"], res["largest"]), (0.0, 0.0))  # what its vertices see
+        seen = W.seen_from_print(W.surface(TV, TF), PV, 2.0)
+        self.assertAlmostEqual(seen["largest"], 1.0, places=6)
+        words = W.blind_target(res, seen, 0.05, len(TV))
+        self.assertIn("up to 1 mm from the target", words)
+        self.assertIn("8 vertices", words)
+        self.assertIn("fresh: true", words)
+        # A target that sees the error (the swell above) gets no such words.
+        TV2, TF2 = box_mesh(30, 20, 10, n=20)
+        swollen = np.asarray(TV2, float) * 1.01
+        _V, res2 = W.prewarp(TV2, TF2, W.surface(swollen, TF2), 1.0, 2, 2.0)
+        self.assertIsNone(W.blind_target(res2, W.seen_from_print(W.surface(TV2, TF2), swollen, 2.0), 0.01, len(TV2)))
+        # Nor a print within the tolerance.
+        self.assertIsNone(W.blind_target({"largest": 0.0}, {"largest": 0.02, "rms": 0.01}, 0.05, 8))
+
     def test_stl(self):
         V, F = box_mesh(10, 10, 10, n=2)
         p = os.path.join(tempfile.mkdtemp(), "b.stl")

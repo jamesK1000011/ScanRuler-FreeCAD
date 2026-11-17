@@ -254,7 +254,7 @@
   {
    "tool": "scan_qa",
    "arguments": {},
-   "expect": "tessellation { cad: true, sparse: true, densifyTo about 0.5 }; noise.median 0; rims.count 0; thickness p50 20 (p5 19); a note saying it is a sparse CAD tessellation to densify first. May answer through a job (heavy)."
+   "expect": "tessellation { cad: true, sparse: true, densifyTo about 0.5 }; noise.median 0; rims.count 0; thickness p50 about 20 (20.05 live, p5 14: the axis is read off few large triangles and leans about 4° — exact after the densify, call 16); a note saying it is a sparse CAD tessellation to densify first. May answer through a job (heavy)."
   },
   {
    "tool": "scan_noise",
@@ -298,7 +298,7 @@
   {
    "tool": "scan_qa",
    "arguments": {},
-   "expect": "tessellation { cad: true, sparse: false, spacing about 0.37 }; noise 0; thickness p5 19, p50 20, p95 20, tiltDeg 0; note: no noise, a CAD tessellation — read its numbers exactly. About 9 s in plain Python off the Mac."
+   "expect": "tessellation { cad: true, sparse: false, spacing 0.29 to 0.37 (0.292 live on the Mac's 219,600 triangles) }; noise 0; thickness p5 19, p50 20, p95 20, tiltDeg 0; note: no noise, a CAD tessellation — read its numbers exactly. About 9 s in plain Python off the Mac."
   },
   {
    "tool": "scan_nearest",
@@ -833,7 +833,7 @@
     "format": "xyz",
     "path": "worn-cloud.xyz"
    },
-   "expect": "file written; points equals the scan's vertex count (about 68,000)"
+   "expect": "file written; points equals the scan's vertex count (about 68,000 on the numpy-built mesh, 109,800 live)"
   },
   {
    "tool": "scan_thread",
@@ -921,7 +921,7 @@
      }
     ]
    },
-   "expect": "align { source: points, rms about 0, converged true, matchedShare over 0.98, transform the identity (angleDeg 0, translation 0) }; stats min -1.0 (the pocket floor), max about 0, withinTolerancePct about 99; no warnings. A job or its answer."
+   "expect": "align { source: points, rms about 0, converged true, matchedShare over 0.9 (0.914 live: on an exact CAD scan the fit's cut at 3 × the median distance, floor 0.00075 mm, leaves the bore polygon's 0.001 mm and the pocket out; no warning), transform the identity (angleDeg 0, translation 0) }; stats min -1.0 (the pocket floor), max about 0, withinTolerancePct about 99; no warnings. A job or its answer."
   },
   {
    "tool": "deviation_settings",
@@ -935,7 +935,7 @@
   {
    "tool": "deviation_measure",
    "arguments": {},
-   "expect": "the same stats: min -1.0, measuredPct over 99, withinTolerancePct about 99.2"
+   "expect": "the same stats: min -1.0, measuredPct over 99, withinTolerancePct 99.2 to 99.5 (99.5 live)"
   },
   {
    "tool": "deviation_hotspots",
@@ -953,7 +953,7 @@
     "format": "report",
     "path": "worn-deviation.txt"
    },
-   "expect": "report text: min −1.0000 mm, max +0.0000 mm, within ±0.05 mm about 99.2 % of all scan points; file written"
+   "expect": "report text: min −1.0000 mm, max +0.0000 mm, within ±0.05 mm 99.2 to 99.5 % of all scan points; file written"
   },
   {
    "tool": "scan_heightmap",
@@ -1026,7 +1026,7 @@
    "arguments": {
     "path": "block-prewarp.stl"
    },
-   "expect": "run 1; rms about 0.03 or less; stop true or false with why; file written"
+   "expect": "run 1; rms about 0.03 or less; stop true or false with why; file written Since run 2: on this target (the block's own CAD tessellation, no vertex over the pocket) rms and largest read 0 and the reply must carry warning (the print's points lie up to 1 mm from the target, between its vertices), seenFromPrint.largest 1.0 and stop false."
   },
   {
    "tool": "fit_scan_setup",
@@ -1106,7 +1106,7 @@
   {
    "tool": "align_symmetry",
    "arguments": {},
-   "expect": "note: settled on the symmetry plane (mirror RMS about 0), Y turned 0° and moved 0 mm; box stays min [-30, -20, 0], max [30, 20, 20]"
+   "expect": "It settles on the newest plane-symmetry element, Mirror (call 28). Where call 28 answered the y 20 plane: Y turned 0° and moved 0 mm, the box stays min [-30, -20, 0], max [30, 20, 20]. Where it answered the mid-height plane (live on the Mac, 3,968 of 4,000 matched): Z turned 0°, the zero point moved 10 mm, box z -10 to 10 — and since run 2 the note says it is not a mirror of the whole part (0.8 % of the samples have no mirror image) and symmetry.matchedShare reads 0.992."
   },
   {
    "tool": "scan_scale",
@@ -1126,19 +1126,19 @@
    "arguments": {
     "factor": 2
    },
-   "expect": "size.after 149.67; scan.box.size [120, 80, 40]"
+   "expect": "size.after 149.67; scan.box.size [120, 80, 40] The alignment stays: the box is the aligned one doubled."
   },
   {
    "tool": "scan_scale",
    "arguments": {
     "factor": 0.5
    },
-   "expect": "back to box.size [60, 40, 20]"
+   "expect": "back to box.size [60, 40, 20] — in the aligned frame it had before call 100 (live in run 2 it came back in scan coordinates, min [0, 0, 0]: the alignment had been lost, fixed since)"
   },
   {
    "tool": "align_clear",
    "arguments": {},
-   "expect": "box min [0, 0, 0], max [60, 40, 20] again"
+   "expect": "ok: appliedAlignment null (a scan_scale leaves the alignment in place, so there is one to clear — refused live in run 2, fixed since); scan_info then reads box min [0, 0, 0], max [60, 40, 20]"
   },
   {
    "tool": "scanner",
@@ -1276,7 +1276,7 @@
   {
    "tool": "manual_check",
    "arguments": {},
-   "expect": "step 1: Block clear; step 2: Worn overlapsInPlace true (the two bodies stand in the same place — the check's known answer for this model); blocked 1. A job or its answer."
+   "expect": "step 1: Block clear; step 2: Worn overlapsInPlace true (the two bodies stand in the same place — the check's known answer for this model); blocked 1. A job or its answer. (live in run 2 it read blockedShortBy 19.25 instead: the place is read first since)"
   },
   {
    "tool": "manual_render",

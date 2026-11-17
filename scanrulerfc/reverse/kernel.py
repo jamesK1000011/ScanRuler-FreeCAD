@@ -140,6 +140,18 @@ OCCT_CALLS = {
 # ReKernel's operations (kernel.ts and the kernel*.ts beside it) by their
 # original names: the Kernel method each is, or None where a later build
 # step brings it (with the step).
+# A body of at most this many faces has its box read off its geometry
+# (exact); above it, off its triangulation (getBoundingBox).
+EXACT_BOX_FACES = 400
+
+
+def _box_number(v):
+    """A box coordinate without the kernel's rounding dust: 40.0000001 and
+    -1.0000000355e-07 are 40 and 0 (a tenth of a micrometre kept)."""
+    v = round(float(v), 7)
+    return 0.0 if v == 0 else v
+
+
 KERNEL_OPS = {
     "face": "face", "extrude": "extrude", "revolve": "revolve", "screw": "screw", "sheet": "sheet", "surfaceThrough": "surface_through",
     "sweep": "sweep", "loft": "loft", "loftFold": "loft_fold", "pattern": "pattern", "split": "split", "distanceToPoint": "distance_to_point",
@@ -883,8 +895,28 @@ class Occt:
         return [sum(s.CenterOfMass[i] * s.Volume for s in solids) / total for i in range(3)]
 
     def getBoundingBox(self, shape, options=None):
-        b = shape.optimalBoundingBox() if (options or {}).get("precise", True) else shape.BoundBox
-        return {"xmin": b.XMin, "ymin": b.YMin, "zmin": b.ZMin, "xmax": b.XMax, "ymax": b.YMax, "zmax": b.ZMax}
+        if not (options or {}).get("precise", True):
+            b = shape.BoundBox
+        else:
+            # optimalBoundingBox() with nothing reads the box off the
+            # shape's triangulation once it has one (a body shown in the
+            # view has), grown by that triangulation's deflection: a block
+            # with a bore read z -0.036 to 20.036, a ring of radius 15
+            # x -15.109 (found live, run 2). (False, False) reads it off
+            # the geometry itself (FreeCAD 1.1 source:
+            # src/Mod/Part/App/TopoShapePyImp.cpp, BRepBndLib::AddOptimal:
+            # useTriangulation, useShapeTolerance), which is exact but
+            # slow on a body of many freeform faces — those keep the
+            # triangulation's box.
+            try:
+                exact = len(shape.Faces) <= EXACT_BOX_FACES
+            except Exception:  # noqa: BLE001
+                exact = False
+            try:
+                b = shape.optimalBoundingBox(False, False) if exact else shape.optimalBoundingBox()
+            except Exception:  # noqa: BLE001 — a shape the exact reading fails on
+                b = shape.optimalBoundingBox()
+        return {"xmin": _box_number(b.XMin), "ymin": _box_number(b.YMin), "zmin": _box_number(b.ZMin), "xmax": _box_number(b.XMax), "ymax": _box_number(b.YMax), "zmax": _box_number(b.ZMax)}
 
     def meshShape(self, shape, options=None):
         d = (options or {}).get("linearDeflection", 0.1)

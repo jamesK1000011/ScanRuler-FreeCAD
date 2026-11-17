@@ -116,6 +116,26 @@ def check_plan(plan):
     return problems, unplaced
 
 
+def way_in(overlap_at, travel, samples=16):
+    """How a part gets to its place along its move: ("overlaps", 0) when
+    it overlaps a part already there where it sits — read first, since
+    such a part is in the way of itself at every place near its own, and
+    "runs into a part 19 mm short" would send the reader looking for
+    another way in when the fault is where the part stands (found live,
+    run 2: two bodies in the same place read blockedShortBy 19.25);
+    ("blocked", t) when it is clear in place but meets one t mm short of
+    it, the first contact on the way in; ("clear", None) otherwise.
+    overlap_at(t) -> True when the part, backed off t mm along its way
+    in, overlaps what is there."""
+    if overlap_at(0.0):
+        return "overlaps", 0.0
+    for k in range(samples, 0, -1):
+        t = travel * k / samples
+        if overlap_at(t):
+            return "blocked", t
+    return "clear", None
+
+
 def bom(plan):
     """The bill of materials, item numbers in the order the parts first come
     in; hardware counted by designation."""

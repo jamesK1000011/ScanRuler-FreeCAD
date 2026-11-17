@@ -423,12 +423,12 @@
     "tolerance": 0.05,
     "maxTriangles": 2000
    },
-   "expect": "FreeCAD's decimation (not run on this pass): reduced.inputTriangles about 8800; reduced.triangles at most 2000; method 'FreeCAD Mesh.decimate'; max and backMax in mm; held true or false — READ it: flat faces should hold, the bore's wall may not at 0.05. The reply has no health (not a document change). Nothing applied: mesh_parts next shows it"
+   "expect": "FreeCAD's decimation, the count searched until the tolerance holds (since run 2; live before: 2,136 triangles 14 mm off, held false): reduced.inputTriangles about 10,000 (10,022 live); held true with p999 and backP999 at most 0.05; triangles under the cap of 2,000 if the block with its bore can be that light within 0.05 mm, else capped true, held false and a warning — READ which; tries about a dozen; method 'FreeCAD Mesh.decimate'. Nothing applied: mesh_parts next shows it"
   },
   {
    "tool": "mesh_parts",
    "arguments": {},
-   "expect": "reduced is the report (not null); edited.triangles still about 8800; undo 'smooth' (the undo of the discard was itself taken off the stack)"
+   "expect": "reduced is the report (not null); edited.triangles still about 10,000; undo 'smooth' (the undo of the discard was itself taken off the stack)"
   },
   {
    "tool": "mesh_export",
@@ -441,7 +441,7 @@
   {
    "tool": "mesh_apply_reduced",
    "arguments": {},
-   "expect": "edit.text 'apply the reduction'; mesh.working 'edited copy'; mesh.triangles = reduced.triangles; mesh.open 0 expected (a closed mesh decimated stays closed; if open is above 0 that is a finding)"
+   "expect": "edit.text 'apply the reduction'; mesh.working 'edited copy'; mesh.triangles = reduced.triangles; mesh.open 0 expected (a closed mesh decimated stays closed; if open is above 0 that is a finding); mesh.volume within a few mm³ of 22,429 when the reduction held (live in run 2: 8,830, the reduction 14 mm off and applied without a word); a warning when it did not hold"
   },
   {
    "tool": "mesh_discard",
