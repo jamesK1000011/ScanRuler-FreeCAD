@@ -212,7 +212,11 @@ def dimension_shape(st, d):
         r = f0.get("radius")
         if r is None:
             return {"lines": [], "at": c, "text": text}
-        n = f0.get("axis") or f0.get("normal") or [0, 0, 1]
+        n = f0.get("axis")
+        if n is None:
+            n = f0.get("normal")
+        if n is None:
+            n = [0, 0, 1]
         _n, u, _v = _basis(n)
         return {"lines": [np.array([c - u * float(r), c + u * float(r)])], "at": c + u * float(r), "text": text}
     f1 = els[1]["fit"]
@@ -282,7 +286,8 @@ def draft_layer(scan, args):
     wall along the pull, positive where the wall opens toward it; grey
     off the walls (more than nearDeg from the pull's walls), as
     scan_draft reads them."""
-    pull = _unit((args or {}).get("pull") or [0, 0, 1])
+    pull = (args or {}).get("pull")
+    pull = _unit([0, 0, 1] if pull is None else pull)
     if pull is None:
         return None
     near = float((args or {}).get("nearDeg", 10))
@@ -325,7 +330,7 @@ def wear_layer(session, st, scan):
     reference (signed, mm: negative lost, positive added), grey elsewhere —
     the readings wear_diff sums per region."""
     w = st.get("wear")
-    if not isinstance(w, dict) or not w.get("tags") or not w.get("reference"):
+    if not isinstance(w, dict) or w.get("tags") is None or len(w.get("tags")) == 0 or w.get("reference") is None:
         return None
     from . import wear_core as W
     from .handlers.wear import reference_surface
