@@ -175,23 +175,21 @@ def bind(session):
 
                     other = Part.makeCompound(there)
                     vol = max(sh.Volume, 1e-9)
-                    hit_at = None
-                    for k in range(SAMPLES, -1, -1):
-                        t = travel * k / SAMPLES
+
+                    def overlap_at(t, sh=sh, move=move, other=other, vol=vol):
                         moved = sh.copy()
                         moved.translate(tuple(-move * t))  # back along its way in
                         try:
-                            common = moved.common(other).Volume
+                            return moved.common(other).Volume > 1e-4 * vol
                         except Exception:
-                            common = 0.0
-                        if common > 1e-4 * vol:
-                            hit_at = t  # the first contact on the way in
-                            break
-                    if hit_at is None:
+                            return False
+
+                    how, hit_at = MC.way_in(overlap_at, travel, SAMPLES)
+                    if how == "clear":
                         r["clear"] = True
-                    elif hit_at == 0:
+                    elif how == "overlaps":
                         r["overlapsInPlace"] = True
-                        r["note"] = "Overlaps a part already there where it sits: an interference fit, or the model is wrong."
+                        r["note"] = "Overlaps a part already there where it sits: an interference fit, or the model is wrong (two bodies in the same place). The way in was not swept."
                     else:
                         r["blockedShortBy"] = round(hit_at, 2)
                         r["note"] = f"Runs into a part already there {hit_at:.1f} mm short of its place: another way in, or an earlier step for this part."

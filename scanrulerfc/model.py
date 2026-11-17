@@ -642,6 +642,9 @@ def applied(scan):
 
 
 def _slot_fit(st, slot, value, scan):
+    if not isinstance(value, dict):
+        # A bare name ("Top") failed with an AttributeError before.
+        raise Refusal("invalid_input", f"{slot}: an object — {{ element: name or id }}, {{ points: [[x, y, z], …] }} or {{ point: [x, y, z] }}" + (", or { plane: { origin, normal } }" if slot == "primary" else "") + f" — not {value!r}.")
     if "element" in value:
         return measured(st, value["element"])["fit"]
     if "plane" in value:
@@ -1166,4 +1169,11 @@ def align_symmetry(st):
         raise Refusal("failed", "The symmetry plane has no direction.")
     rig = SYM.rigid_of_pose(pose["axes"], pose["origin"])
     note = f"Settled on {source} (mirror RMS {plane['rms']:.4f} mm): {'XYZ'[pose['axis']]} turned {pose['tiltDeg']:.3f}° onto its normal, the zero point moved {pose['shiftMm']:.3f} mm onto it."
-    return apply_rigid(st, rig, {"note": note})
+    extra = {"note": note, "symmetry": {"rms": round(float(plane["rms"]), 4), "matchedShare": round(float(share), 4), "from": el["name"] if el else "search"}}
+    if share < 0.9995:
+        # Found live (run 2): settled on a plane 0.8 % of the samples had
+        # no mirror image about (the block mirrors at mid-height but for a
+        # pocket in its top), and the note read "mirror RMS 0.0000 mm".
+        extra["note"] = note + (f" Not a mirror of the whole part: {(1 - share) * 100:.1f} % of the samples have no mirror image about this plane, and the RMS is of the others only — "
+                                "if another plane was meant, element_construct { kind: \"plane\", method: \"plane-symmetry\", seed } makes it (the newest such element is the one used), or align_clear takes this back.")
+    return apply_rigid(st, rig, extra)

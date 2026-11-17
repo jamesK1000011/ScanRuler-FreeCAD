@@ -95,7 +95,7 @@ class WhichThreadWrites(unittest.TestCase):
         import unittest.mock
 
         ctx = types.SimpleNamespace(doc=None, family_state={})
-        with unittest.mock.patch.object(D, "mark") as mark:
+        with unittest.mock.patch.object(D, "mark_doc") as mark:
             th = threading.Thread(target=lambda: S.touched(ctx, "deviation_measure"), name="agentlink-job-deviation_measure")
             th.start()
             th.join(3)
@@ -111,7 +111,7 @@ class WhichThreadWrites(unittest.TestCase):
         ctx = types.SimpleNamespace(doc=None, family_state={})
         sent = []
         poster = types.SimpleNamespace(go=types.SimpleNamespace(emit=sent.append))
-        with unittest.mock.patch.object(D, "mark") as mark, unittest.mock.patch.object(D, "_gui_up", lambda: True), \
+        with unittest.mock.patch.object(D, "mark_doc") as mark, unittest.mock.patch.object(D, "_gui_up", lambda: True), \
                 unittest.mock.patch.object(D, "_poster", lambda: poster):
             th = threading.Thread(target=lambda: S.touched(ctx, "mesh_wrap"), name="agentlink-job-mesh_wrap")
             th.start()
@@ -248,7 +248,11 @@ class InTheDocument(unittest.TestCase):
         self.assertFalse(D.hide_from_tree(types.SimpleNamespace(ViewObject=None)))
 
     def test_reopened_document_reads_it_back(self):
-        self.run("align_datum", {"primary": "Top"})
+        ok, out = self.run("align_datum", {"primary": {"element": "Top"}})
+        self.assertTrue(ok, out)
+        ok, out = self.run("align_datum", {"primary": "Top"})  # a bare name: refused with the shape to give
+        self.assertEqual((ok, out["error"]["code"]), (False, "invalid_input"))
+        self.assertIn("{ element: name or id }", out["error"]["message"])
         before = S.state(self.ctx)
         again = runner.Context(doc=self.doc)  # a new session on the saved document
         st = S.state(again)
@@ -274,6 +278,33 @@ class InTheDocument(unittest.TestCase):
         self.run("align_clear", {})
         np.testing.assert_allclose(D.placement_rt(scan.Placement.toMatrix().A)[1], [0, 0, 0], atol=1e-12)
 
+    def test_a_scale_keeps_the_alignment(self):
+        # Found live (run 2, measure model call 102): align, scan_scale 2,
+        # scan_scale 0.5, then align_clear was refused "in scan coordinates
+        # already". The scaled mesh was put on the scan object after its
+        # Placement, and FreeCAD's Mesh::Feature takes a new mesh's (empty)
+        # placement as its own; the next call read the object standing at
+        # the origin as a move made by the person and undid the alignment.
+        ok, out = self.run("align_datum", {"primary": {"element": "Top"}, "origin": {"point": [20, 15, 10]}})
+        self.assertTrue(ok, out)
+        st = S.state(self.ctx)
+        scan = D.role_object(self.doc, "scan")
+        t0 = np.array(st["scan"].t)
+        self.assertGreater(np.abs(t0).max(), 1.0)
+        box0 = (st["scan"].V.min(axis=0), st["scan"].V.max(axis=0))
+        ok, out = self.run("scan_scale", {"factor": 2})
+        self.assertTrue(ok, out)
+        np.testing.assert_allclose(D.placement_rt(scan.Placement.toMatrix().A)[1], 2 * t0, atol=1e-9)  # the object stands where the scan is
+        ok, out = self.run("scan_scale", {"factor": 0.5})
+        self.assertTrue(ok, out)
+        np.testing.assert_allclose(out["scan"]["box"]["min"], box0[0], atol=1e-3)  # still aligned: the box it had
+        np.testing.assert_allclose(out["scan"]["box"]["max"], box0[1], atol=1e-3)
+        np.testing.assert_allclose(S.state(self.ctx)["scan"].t, t0, atol=1e-9)
+        ok, out = self.run("align_clear", {})
+        self.assertTrue(ok, out)  # there is an alignment to clear
+        np.testing.assert_allclose(S.state(self.ctx)["scan"].t, [0, 0, 0], atol=1e-12)
+        np.testing.assert_allclose(S.state(self.ctx)["scan"].V, S.state(self.ctx)["scan"].V0, atol=1e-9)
+
     def test_a_reference_file_becomes_a_mesh_a_body_stays_itself(self):
         V, F = box_mesh(10.0, 10.0, 10.0, n=2)
         st = S.state(self.ctx)
@@ -285,6 +316,147 @@ class InTheDocument(unittest.TestCase):
         st["deviation"]["reference"] = {"name": "Body", "kind": "body", "object": body.Name, "V": np.asarray(V, float), "F": np.asarray(F)}
         D.sync_objects(self.doc, st)
         self.assertIs(D.role_object(self.doc, "reference"), body)
+
+
+class StatePerDocument(unittest.TestCase):
+    """Found live (run 2): the state was the session's, not the document's.
+    After doc_new the earlier document's scan was still open (scan_open was
+    refused, flat_edges answered its section sheet) and its state was
+    written into the new document's file. The state belongs to the document
+    it was made in: another document has its own (none, when new), and
+    going back restores it."""
+
+    def setUp(self):
+        self.fc = fakedoc.installed()
+        self.app = self.fc.__enter__()
+        self.addCleanup(self.fc.__exit__, None, None, None)
+        D._SIGS.clear()
+        self.a = fakedoc.Doc("Worn")
+        # One session that moves between documents, as Agent Link's does
+        # (doc_new and doc_open set session.doc and leave family_state).
+        self.ctx = runner.Context(doc=self.a, out_dir=tempfile.mkdtemp())
+        self.run = runner.local(ctx=self.ctx)
+        S.state(self.ctx)["scan"] = box_scan()
+        ok, out = self.run("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+        self.assertTrue(ok, out)
+
+    def test_a_new_document_starts_with_no_scan_and_gets_none_written(self):
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b
+        ok, out = self.run("scan_info", {})
+        self.assertTrue(ok, out)
+        self.assertIsNone(out["scan"])  # no scan open here
+        ok, out = self.run("flat_edges", {})
+        self.assertFalse(ok)  # and no 2D sheet of the other document's
+        self.assertEqual(out["error"]["code"], "invalid_state")
+        ok, out = self.run("element_list", {})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["elements"], [])
+        self.assertIsNone(D.find_state(b))  # nothing of the other document written into this one
+        self.assertEqual([o.Name for o in b.Objects], [])
+        self.assertIsNotNone(D.find_state(self.a))
+
+    def test_switching_back_restores_the_documents_own_state(self):
+        first = S.state(self.ctx)
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b
+        S.state(self.ctx)["scan"] = S.Scan("other.stl", first["scan"].V0 * 2.0, first["scan"].F)
+        ok, out = self.run("scan_info", {})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["scan"]["file"], "other.stl")
+        self.assertEqual(out["elements"], 0)
+        self.ctx.doc = self.a
+        back = S.state(self.ctx)
+        self.assertIs(back, first)  # the very state, not a copy read back
+        ok, out = self.run("scan_info", {})
+        self.assertEqual((out["scan"]["file"], out["elements"]), ("box.stl", 1))
+        self.ctx.doc = b
+        ok, out = self.run("scan_info", {})
+        self.assertEqual((out["scan"]["file"], out["elements"]), ("other.stl", 0))
+        # each document's file holds its own scan
+        self.assertEqual(D.role_object(self.a, "scan").Label, "box.stl")
+        self.assertEqual(D.role_object(b, "scan").Label, "other.stl")
+
+    def test_what_a_job_left_unwritten_is_written_into_its_own_document_on_leaving(self):
+        import threading
+
+        st = S.state(self.ctx)
+        rev = D.find_state(self.a).Revision
+        # a heavy read on a worker thread changes the state; with no window
+        # its write waits for the next call on the document's thread
+        def job():
+            st["thickness"] = {"stats": {"min": 10.0}}
+            S.touched(self.ctx, "thickness_measure")
+
+        th = threading.Thread(target=job, name="agentlink-job-thickness_measure")
+        th.start()
+        th.join(3)
+        self.assertEqual(D.find_state(self.a).Revision, rev)  # not from the worker
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b
+        self.run("element_list", {})  # the next call is in another document
+        self.assertEqual(D.find_state(self.a).Revision, rev + 1)  # written where it belongs
+        self.assertIsNone(D.find_state(b))
+        again = runner.Context(doc=self.a)  # and a session reading that document finds it
+        self.assertEqual(S.state(again)["thickness"]["stats"]["min"], 10.0)
+
+    def test_a_write_handed_to_the_gui_thread_lands_in_its_own_document(self):
+        import threading
+        import unittest.mock
+
+        st = S.state(self.ctx)
+        rev = D.find_state(self.a).Revision
+        sent = []
+        poster = types.SimpleNamespace(go=types.SimpleNamespace(emit=sent.append))
+        with unittest.mock.patch.object(D, "_gui_up", lambda: True), unittest.mock.patch.object(D, "_poster", lambda: poster):
+            def job():
+                st["thickness"] = {"stats": {"min": 10.0}}
+                S.touched(self.ctx, "thickness_measure")
+
+            th = threading.Thread(target=job, name="agentlink-job-thickness_measure")
+            th.start()
+            th.join(3)
+        self.assertEqual(len(sent), 1)
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b  # the session moved on before the GUI thread ran the write
+        sent[0]()
+        self.assertEqual(D.find_state(self.a).Revision, rev + 1)
+        self.assertIsNone(D.find_state(b))
+
+    def test_a_document_reopened_under_the_same_name_reads_its_file_not_the_old_session(self):
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b
+        self.run("element_list", {})
+        # "Worn" closed and another document made under its name
+        self.app.listDocuments = lambda: {"Fresh": b}
+        self.ctx.doc = self.a
+        self.ctx.doc = b
+        S.state(self.ctx)
+        other = fakedoc.Doc("Worn")
+        self.app.listDocuments = lambda: {"Fresh": b, "Worn": other}
+        self.ctx.doc = other
+        st = S.state(self.ctx)
+        self.assertIsNone(st["scan"])
+        self.assertEqual(st["elements"], [])
+
+    def test_a_closed_documents_state_is_let_go(self):
+        b = fakedoc.Doc("Fresh")
+        self.app.listDocuments = lambda: {"Worn": self.a, "Fresh": b}
+        self.ctx.doc = b
+        S.state(self.ctx)
+        self.assertIn("Worn", getattr(self.ctx, S._BOOK)["parked"])
+        self.app.listDocuments = lambda: {"Fresh": b}  # Worn closed
+        c = fakedoc.Doc("Third")
+        self.app.listDocuments = lambda: {"Fresh": b, "Third": c}
+        self.ctx.doc = c
+        S.state(self.ctx)
+        self.assertNotIn("Worn", getattr(self.ctx, S._BOOK)["parked"])
+
+    def test_mark_never_writes_one_documents_state_into_another(self):
+        b = fakedoc.Doc("Fresh")
+        self.ctx.doc = b  # moved, and mark is the first thing to run (a queued write of the old code)
+        self.assertFalse(D.mark(self.ctx))
+        self.assertIsNone(D.find_state(b))
 
 
 class ViewProps(unittest.TestCase):

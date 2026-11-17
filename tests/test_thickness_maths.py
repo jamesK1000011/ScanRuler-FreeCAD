@@ -117,7 +117,25 @@ def shell(n=60, r_out=40.0, r_in=37.0):
 
 
 class Speed(unittest.TestCase):
-    def test_runs_of_near_rays_hit_what_every_leaf_would(self):
+    def same_first_hits(self, s, O, D, near, far):
+        """The grid's first hits are the leaf-ordered search's: the same
+        rays hit, at the same distance (to rounding: a ray through an edge
+        two triangles share reads t off either), the same face unless the
+        ray meets both at once."""
+        t, f = s.raycast_first(O, D, near, far)
+        t0, f0 = s.raycast_first_leaves(O, D, near, far)
+        np.testing.assert_array_equal(f >= 0, f0 >= 0)
+        hit = f >= 0
+        np.testing.assert_allclose(t[hit], t0[hit], rtol=0, atol=1e-9)
+        differ = np.nonzero(hit & (f != f0))[0]
+        if len(differ):
+            from scanrulerfc.dev_surface import _moller_trumbore
+
+            other = _moller_trumbore(O[differ], D[differ], s.A[f0[differ]], s.B[f0[differ]], s.C[f0[differ]])
+            np.testing.assert_allclose(other, t[differ], rtol=0, atol=1e-9)  # both met at once
+        return t, f
+
+    def test_the_grid_hits_what_every_leaf_would(self):
         V, F = shell(70)
         s = NominalSurface(V, F)
         rng = np.random.default_rng(3)
@@ -125,14 +143,69 @@ class Speed(unittest.TestCase):
         D = rng.normal(size=(900, 3))
         D /= np.linalg.norm(D, axis=1)[:, None]
         far = rng.uniform(1, 30, 900)
-        t, f = s.raycast_first(O, D, 1e-4, far)
-        t0, f0 = s._cast_blocks(O, D, np.full(900, 1e-4), far, None)
-        np.testing.assert_array_equal(f, f0)
-        np.testing.assert_array_equal(t, t0)
+        t, f = self.same_first_hits(s, O, D, np.full(900, 1e-4), far)
         self.assertGreater((f >= 0).sum(), 100)
-        # Unbounded rays take every leaf, as before.
-        t1, f1 = s.raycast_first(O, D, 1e-4, np.inf)
-        self.assertTrue(((f1 >= 0) | (f0 < 0)).all())
+        # Unbounded rays, rays that are not unit vectors, rays from outside.
+        self.same_first_hits(s, O, D, np.full(900, 1e-4), np.full(900, np.inf))
+        self.same_first_hits(s, O * 3, -O * 0.37 + D, np.zeros(900), np.full(900, 5.0))
+
+    def test_the_grid_on_inward_rays_from_the_vertices(self):
+        # What wall thickness casts: from each vertex along its inward
+        # normal, on a solid block, a box with a cavity and a noisy sphere.
+        cases = [box_mesh(20, 12), hollow_box(30.0, 3.0), synth.sphere(sigma=0.02), box_mesh(20, 1)]
+        for V, F in cases:
+            V, F = np.asarray(V, float), np.asarray(F)
+            s = NominalSurface(V, F)
+            N = vertex_normals(V, F)
+            n = len(V)
+            for far in (0.3 * s.bbox_diagonal, np.inf):
+                self.same_first_hits(s, V, -N, np.full(n, 1e-6), np.full(n, far))
+                self.same_first_hits(s, V, N, np.full(n, 1e-6), np.full(n, far))
+
+    def test_a_large_triangle_among_small_ones_stays_out_of_the_cells(self):
+        V, F = box_mesh(10, 20)
+        V, F = np.asarray(V, float), np.asarray(F)
+        V2 = np.vstack([V, [[-200, -200, -50], [200, -200, 60], [0, 300, 10]]])
+        F2 = np.vstack([F, [[len(V), len(V) + 1, len(V) + 2]]])
+        s = NominalSurface(V2, F2)
+        self.assertEqual(list(s._ray_grid()["big"]), [len(F)])
+        rng = np.random.default_rng(4)
+        O = rng.uniform(-60, 60, (600, 3))
+        D = rng.normal(size=(600, 3))
+        D[:300] = -O[:300] + rng.normal(0, 2.0, (300, 3))  # half of them aimed at the small box
+        t, f = self.same_first_hits(s, O, D, np.zeros(600), np.full(600, np.inf))
+        self.assertGreater((f == len(F)).sum(), 20)  # the large one is hit too
+        self.assertGreater(((f >= 0) & (f < len(F))).sum(), 5)
+
+    def test_a_dense_block_with_long_rays_is_quick(self):
+        # Found live (run 2): thickness_measure { maxThickness: 25,
+        # maxPoints: 20000 } on a 219,600-triangle 60 x 40 x 20 block took
+        # 221 s: every run of rays was tried against every leaf its 25 mm
+        # sweep touched. The same reading here: 66 s before the grid.
+        import time
+
+        sys.path.insert(0, HERE)
+        from meshkit import box_mesh as sized_box
+
+        V, F = sized_box(60.0, 40.0, 20.0, n=135)
+        V, F = np.asarray(V, float), np.asarray(F)
+        self.assertGreater(len(F), 200_000)
+        s = NominalSurface(V, F)
+        N = vertex_normals(V, F)
+        idx = sample_points(len(V), 20000)
+        t0 = time.time()
+        v = compute_thickness(s, V[idx], N[idx], max_thickness=25.0, max_normal_deviation=math.radians(60))
+        took = time.time() - t0
+        self.assertLess(took, 20)  # under a second here
+        on_top = np.abs(N[idx][:, 2]) > 0.999
+        np.testing.assert_allclose(v[on_top], 20.0, atol=1e-9)  # top to bottom
+        self.assertTrue(np.isnan(v[np.abs(N[idx][:, 0]) > 0.999]).all())  # 60 mm across: past the 25 searched
+        # and the same numbers as the leaf search gives, on a part of them
+        part = idx[::40]
+        t, f = s.raycast_first(V[part], -N[part], 1e-6, 25.0)
+        t1, f1 = s.raycast_first_leaves(V[part], -N[part], 1e-6, 25.0)
+        np.testing.assert_array_equal(f >= 0, f1 >= 0)
+        np.testing.assert_allclose(t[f >= 0], t1[f1 >= 0], rtol=0, atol=1e-9)
 
     def test_a_shell_reads_its_wall_quickly(self):
         import time

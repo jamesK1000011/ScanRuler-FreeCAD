@@ -167,11 +167,17 @@ def bind(session):
         run = {"n": len(w["runs"]) + 1, "rms": res["rms"]}
         w["runs"].append(run)
         verdict = W.stop_rule(w["runs"], w["settings"]["tolerance"])
+        # The same error read from the print's side: a target with vertices
+        # on its edges only does not see an error in the middle of a face.
+        seen = W.seen_from_print(W.surface(ref["V"], ref["F"]), scan.V, w["settings"]["maxMm"])
+        blind = W.blind_target(res, seen, w["settings"]["tolerance"], int(len(ref["V"])))
+        if blind:
+            verdict = {"stop": False, "why": "the target's vertices do not show the print's error (see warning)"}
         path = a.get("path") or os.path.join(session.out_dir, f"{_stem(ref['name'])}-prewarp-{run['n']}.stl")
         W.write_stl(path, V2, ref["F"])
         return {"file": {"path": path, "name": os.path.basename(path), "bytes": os.path.getsize(path)}, "run": run["n"], "rms": res["rms"], "largest": res["largest"],
-                **({"unread": res["unread"]} if res["unread"] else {}), "runs": [{"run": r["n"], "rms": r["rms"]} for r in w["runs"]],
-                "stop": verdict["stop"], "why": verdict["why"],
+                **({"unread": res["unread"]} if res["unread"] else {}), "seenFromPrint": seen, "runs": [{"run": r["n"], "rms": r["rms"]} for r in w["runs"]],
+                "stop": verdict["stop"], "why": verdict["why"], **({"warning": blind} if blind else {}),
                 "note": "In the target's own frame, to print next. Starting the print is the person's call."}
 
     return {

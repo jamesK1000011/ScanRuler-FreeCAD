@@ -45,6 +45,58 @@ def default_tolerance(diag):
     return round125(diag * 2.5e-4)
 
 
+def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
+    """The lightest decimation that still lies within tolerance.
+
+    attempt(target) decimates the mesh towards `target` triangles and
+    answers { "triangles": what it left, "worst": the larger of the two
+    one-sided deviations, mm, … } or None when nothing usable came back.
+    A decimator asked for a count gives the best mesh it can of that size,
+    whatever the deviation (FreeCAD's Mesh.decimate takes its tolerance as
+    a bound on its own error measure, not as millimetres): so the count is
+    searched here and each try measured — a quarter at a time while the
+    tolerance holds, then between the last that held and the first that
+    did not.
+
+    Returns (best, capped, tries): best is the attempt kept, or None when
+    no lighter mesh holds (the mesh as it is has `triangles`, at most the
+    cap); capped is True when the mesh had to come down to the cap and
+    that does not hold the tolerance (best is then that attempt, the cap
+    being the harder rule); tries counts the decimations."""
+    tries = 0
+    best = None
+    top = int(triangles)
+    if triangles > cap:
+        best = attempt(int(cap))
+        tries += 1
+        if best is None or best["worst"] > tolerance:
+            return best, True, tries
+        top = int(best["triangles"])
+    good, bad = top, None
+    target = good // 4
+    while target >= 4:
+        got = attempt(target)
+        tries += 1
+        if got is None or got["worst"] > tolerance or got["triangles"] >= good:
+            bad = target
+            break
+        best, good = got, int(got["triangles"])
+        target = min(target, good) // 4
+    if bad is None:
+        bad = 3  # down to four triangles and still within: nothing lighter to look for
+    for _ in range(bisections):
+        target = int(round(math.sqrt(max(bad, 1) * good)))
+        if target <= bad or target >= good:
+            break
+        got = attempt(target)
+        tries += 1
+        if got is None or got["worst"] > tolerance or got["triangles"] >= good:
+            bad = target
+        else:
+            best, good = got, int(got["triangles"])
+    return best, False, tries
+
+
 def mean_edge_length(V, F, samples=4096):
     if len(F) == 0:
         return 0.0

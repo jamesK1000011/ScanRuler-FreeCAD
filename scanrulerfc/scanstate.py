@@ -161,7 +161,11 @@ def touched(session, tool, write=True):
     as an Agent Link job answers on one): docstate.on_gui_thread hands the
     write to the GUI thread when a window is up, and otherwise leaves it;
     the next call on the document's thread then writes it (docstate.mark
-    writes whenever the state differs from what it wrote last)."""
+    writes whenever the state differs from what it wrote last).
+
+    The write is of this state into the document it was made in: both are
+    taken here, so a write that lands later (handed to the GUI thread)
+    still goes to that document when the session has moved to another."""
     if tool.startswith("scan_snapshot_") or getattr(session, "family_state", None) is None:
         return  # a session that keeps no state (a catalog-only caller): nothing to show
     st = state(session)
@@ -173,10 +177,11 @@ def touched(session, tool, write=True):
         from . import docstate
     except ImportError:
         return
+    doc = getattr(session, "doc", None)
 
     def to_document():
         try:
-            docstate.mark(session)  # FreeCAD's Save carries it from here
+            docstate.mark_doc(doc, st, session)  # FreeCAD's Save carries it from here
         except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
             _report(f"the state could not be written into the document: {e}")
 
@@ -192,7 +197,102 @@ def _report(text):
         pass
 
 
+# ---- one state per document ----------------------------------------------------------------------
+# ScanRuler's state (the scan, elements, dimensions, sections, the 2D sheet,
+# the deviation, Mesh Tools' copy) belongs to the FreeCAD document it was
+# made in. A session works in one document at a time and may move to
+# another (Agent Link's doc_new, doc_open, doc_switch, doc_close set
+# session.doc; they do not all empty family_state). So, before any state
+# is handed out, settle() looks at the document the session is in now:
+#   the same as last time   nothing to do.
+#   another                 the state is written into the document it
+#                           belongs to (when that is still open, and on
+#                           the document's thread only), set aside under
+#                           that document, and taken out of the session;
+#                           the new document's own state comes back from
+#                           where it was set aside, else from the document
+#                           (docstate.read), else it starts empty.
+# A document closed and another opened under the same name is another
+# document (FreeCAD keeps one Python object per open document: identity
+# tells them apart), so nothing of the old one is handed to it.
+_BOOK = "_scanruler_documents"
+
+
+def _book(session):
+    b = getattr(session, _BOOK, None)
+    if b is None:
+        b = {"owner": None, "name": None, "parked": {}}
+        try:
+            setattr(session, _BOOK, b)
+        except AttributeError:  # a session that takes no attributes: one document, as before
+            return None
+    return b
+
+
+def _doc_name(doc):
+    try:
+        return doc.Name
+    except Exception:  # noqa: BLE001 — a document already closed
+        return None
+
+
+def doc_open(doc, name=None):
+    """True while doc is an open document. Without FreeCAD's list of
+    documents (the tests' stand-in) every document counts as open."""
+    if doc is None:
+        return False
+    try:
+        import FreeCAD
+    except ImportError:
+        return True
+    ld = getattr(FreeCAD, "listDocuments", None)
+    if ld is None:
+        return True
+    try:
+        return ld().get(name if name is not None else doc.Name) is doc
+    except Exception:  # noqa: BLE001 — the document is gone
+        return False
+
+
+def settle(session):
+    """The session's ScanRuler state made the state of the document the
+    session is in now (see above). Returns the document."""
+    fs = getattr(session, "family_state", None)
+    doc = getattr(session, "doc", None)
+    if fs is None or doc is None:
+        return doc
+    book = _book(session)
+    if book is None:
+        return doc
+    owner = book["owner"]
+    if owner is doc:
+        return doc
+    if owner is None:  # the first call: what the session holds is this document's
+        book["owner"], book["name"] = doc, _doc_name(doc)
+        return doc
+    old = fs.pop(KEY, None)
+    was = book["name"]
+    parked = book["parked"]
+    if old is not None and doc_open(owner, was):
+        try:
+            from . import docstate
+
+            docstate.mark_doc(owner, old, session)  # what a job left unwritten goes with it
+        except Exception as e:  # noqa: BLE001 — kept in the session all the same
+            _report(f"the state could not be written into {was}: {e}")
+        parked[was] = (owner, old)
+    for name in [n for n, (d, _st) in parked.items() if not doc_open(d, n)]:
+        del parked[name]  # closed: FreeCAD's file has what was saved
+    name = _doc_name(doc)
+    rec = parked.pop(name, None)
+    if rec is not None and rec[0] is doc:
+        fs[KEY] = rec[1]
+    book["owner"], book["name"] = doc, name
+    return doc
+
+
 def state(session):
+    settle(session)
     fs = session.family_state
     if KEY not in fs:
         restored = _restored(session)

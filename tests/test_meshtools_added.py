@@ -677,6 +677,135 @@ class Handlers(unittest.TestCase):
 
 
 
+class _Pt:
+    def __init__(self, p):
+        self.x, self.y, self.z = p
+
+
+class CountDecimator:
+    """A stand-in for FreeCAD's Mesh with decimate(targetSize) as the
+    1.1 source has it (src/Mod/Mesh/App/Core/Simplify.h): it comes down to
+    about the count asked whatever that costs in shape — here a 40 x 30 x
+    20 box regridded to that count, its faces bulged by 40 / count mm (so
+    4,000 triangles lie 0.01 mm off, 400 lie 0.1 mm off) — and stops a
+    little above the count."""
+
+    asked = []
+
+    def __init__(self, data=None):
+        self.V, self.F = (np.asarray(data[0], float), np.asarray(data[1], np.int64)) if data is not None else (np.zeros((0, 3)), np.zeros((0, 3), np.int64))
+
+    def copy(self):
+        return CountDecimator((self.V, self.F))
+
+    @property
+    def CountFacets(self):
+        return len(self.F)
+
+    @property
+    def Topology(self):
+        return [_Pt(p) for p in self.V], [tuple(int(i) for i in t) for t in self.F]
+
+    def decimate(self, *args):
+        if len(args) != 1:
+            raise AssertionError("mesh_reduce must use decimate(targetSize): the (tolerance, reduction) form holds no tolerance in mm")
+        target = int(args[0])
+        CountDecimator.asked.append(target)
+        n = max(1, int(math.sqrt(target * 1.05 / 12)))  # a little above the count, as FreeCAD's
+        V, F = box_mesh(40, 30, 20, n)
+        V = np.asarray(V, float)
+        bulge = 40.0 / max(12 * n * n, 1)
+        inner = (np.abs(np.abs(V) - np.array([20, 15, 10])) > 1e-9).sum(axis=1) == 2  # a face's own points, not its rim
+        V[inner] *= 1 + bulge / np.linalg.norm(V[inner], axis=1)[:, None]
+        self.V, self.F = V, np.asarray(F, np.int64)
+
+
+class Reduce(unittest.TestCase):
+    """Found live (run 2, Mesh Tools model calls 39 and 42): mesh_reduce
+    { tolerance: 0.05, maxTriangles: 2000 } answered a mesh 14 mm off (held
+    false, 2,136 triangles), and mesh_apply_reduced made it the edited
+    copy without a word: volume 8,830 where it had been 22,429."""
+
+    def lightest(self, triangles, cap, tol, err):
+        tried = []
+
+        def attempt(target):
+            tried.append(target)
+            got = int(target * 1.03)
+            return {"triangles": got, "worst": err(got)}
+
+        best, capped, tries = M.lightest_within(triangles, cap, tol, attempt)
+        self.assertEqual(tries, len(tried))
+        return best, capped, tried
+
+    def test_the_count_is_searched_until_the_tolerance_holds(self):
+        err = lambda n: 40.0 / n  # noqa: E731 — 0.05 mm at 800 triangles
+        best, capped, tried = self.lightest(200_000, 50_000, 0.05, err)
+        self.assertFalse(capped)
+        self.assertLessEqual(best["worst"], 0.05)
+        self.assertLess(best["triangles"], 1400)  # near the 800 that just hold, not the 50,000 of the cap
+        self.assertGreaterEqual(best["triangles"], 800)
+        self.assertLess(len(tried), 12)
+
+    def test_the_cap_wins_and_says_so(self):
+        best, capped, tried = self.lightest(200_000, 500, 0.05, lambda n: 40.0 / n)
+        self.assertTrue(capped)
+        self.assertEqual(tried, [500])
+        self.assertGreater(best["worst"], 0.05)
+
+    def test_nothing_lighter_holds(self):
+        best, capped, tried = self.lightest(1000, 50_000, 0.001, lambda n: 40.0 / n)
+        self.assertIsNone(best)
+        self.assertFalse(capped)
+
+    def test_a_decimator_that_gives_nothing_back(self):
+        best, capped, tries = M.lightest_within(1000, 50_000, 0.05, lambda target: None)
+        self.assertIsNone(best)
+
+    def tools(self, V, F):
+        from scanrulerfc import handlers
+
+        s = Session(V, F)
+        s.out_dir = "."
+        return s, handlers.bound(s, "meshtools")
+
+    def test_mesh_reduce_holds_its_tolerance_and_apply_warns_when_it_does_not(self):
+        from unittest import mock
+
+        fake = type(sys)("Mesh")
+        fake.Mesh = CountDecimator
+        V, F = box_mesh(40, 30, 20, 40)  # 19,200 triangles
+        with mock.patch.dict(sys.modules, {"Mesh": fake}):
+            CountDecimator.asked = []
+            s, t = self.tools(np.asarray(V, float), np.asarray(F, np.int64))
+            red = t["mesh_reduce"]({"tolerance": 0.05})["reduced"]
+            self.assertTrue(red["held"], red)
+            self.assertFalse(red["capped"])
+            self.assertLessEqual(max(red["p999"], red["backP999"]), 0.05)
+            self.assertLess(red["triangles"], 2500)  # 800 would just hold: well under the 19,200 it had
+            self.assertEqual(red["tries"], len(CountDecimator.asked))
+            self.assertNotIn("warning", red)
+            out = t["mesh_apply_reduced"]({})
+            self.assertNotIn("warning", out)
+            self.assertAlmostEqual(out["mesh"]["volume"], 24000, delta=24000 * 0.01)
+            # The cap is the harder rule: a mesh that cannot hold the
+            # tolerance under it is said to, in the preview and on applying.
+            s, t = self.tools(np.asarray(V, float), np.asarray(F, np.int64))
+            red = t["mesh_reduce"]({"tolerance": 0.05, "maxTriangles": 200})["reduced"]
+            self.assertLessEqual(red["triangles"], 200)  # asked again lower when FreeCAD stops above the count
+            self.assertEqual((red["held"], red["capped"]), (False, True))
+            self.assertIn("maxTriangles", red["warning"])
+            out = t["mesh_apply_reduced"]({})
+            self.assertIn("does not hold its tolerance", out["warning"])
+            self.assertIn("mesh_undo", out["warning"])
+            # Nothing lighter holds: the mesh as it is, and a note.
+            s, t = self.tools(np.asarray(V, float), np.asarray(F, np.int64))
+            red = t["mesh_reduce"]({"tolerance": 0.0001})["reduced"]
+            self.assertEqual(red["triangles"], len(F))
+            self.assertTrue(red["held"])
+            self.assertIn("No lighter mesh holds", red["note"])
+
+
 class Hardened(unittest.TestCase):
     """The hardening pass of 16 Nov 2026: what the Mesh Tools handlers say
     and keep, in plain Python on a CAD-style box (8 vertices, 12 triangles)."""
@@ -780,7 +909,7 @@ class HardenedData(unittest.TestCase):
         from scanrulerfc import docstate
 
         s = Session(*cad_box(1, 1, 1))
-        with mock.patch.object(docstate, "mark") as mark:
+        with mock.patch.object(docstate, "mark_doc") as mark:
             S.touched(s, "mesh_wrap", write=False)
             self.assertEqual(mark.call_count, 0)
             self.assertEqual(S.state(s)["last_tool"], "mesh_wrap")

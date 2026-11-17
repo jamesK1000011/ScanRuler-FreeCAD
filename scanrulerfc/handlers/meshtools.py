@@ -285,27 +285,69 @@ def bind(session):
     def mesh_reduce(a):
         import Mesh
 
+        from ..dev_surface import NominalSurface
+
         V, F, which = working(session)
         tol = a.get("tolerance", M.default_tolerance(M.diagonal(V)))
         cap = a.get("maxTriangles", DEFAULT_TRIANGLE_LIMIT)
         # FreeCAD's own quadric decimation (Mesh.decimate) in place of the
-        # meshoptimizer simplifier ScanRuler runs; measured afterwards as
-        # ScanRuler measures it, both ways.
-        m = Mesh.Mesh()
-        m.addFacets([[tuple(V[i]) for i in t] for t in F.tolist()])
-        m.decimate(float(tol), 1.0)
-        capped = False
-        if m.CountFacets > cap:
-            m.decimate(int(cap))
-            capped = True
-        pts, tris = m.Topology
-        RV = np.array([[p.x, p.y, p.z] for p in pts], dtype=float)
-        RF = np.array(tris, dtype=np.int64)
-        there = surface_distances(V, RV, RF)
-        back = surface_distances(RV, V, F)
+        # meshoptimizer simplifier ScanRuler runs. Its (tolerance,
+        # reduction) form does not hold a tolerance in millimetres: the
+        # tolerance only stops it once no triangle's quadric error is under
+        # it, and a flat face's is always 0, so with reduction 1.0 it went
+        # on to almost nothing (found live, run 2: asked 0.05 mm, got a
+        # mesh 14 mm off and a third of the volume; FreeCAD 1.1 source:
+        # src/Mod/Mesh/App/Core/Simplify.h, simplify_mesh). So the count
+        # form is used, decimate(targetSize), and the count searched: each
+        # try measured against the original both ways, as ScanRuler
+        # measures it, and the lightest that holds the tolerance kept
+        # (mesh_core.lightest_within).
+        try:
+            base = Mesh.Mesh((np.asarray(V, dtype=float).tolist(), np.asarray(F, dtype=np.int64).tolist()))
+        except Exception:  # noqa: BLE001 — an older Mesh: facet by facet
+            base = Mesh.Mesh()
+            base.addFacets([[tuple(V[i]) for i in t] for t in F.tolist()])
+        original = NominalSurface(V, F)
+        sample = _sampled(V)
+
+        def attempt(target):
+            m = base.copy()
+            m.decimate(int(target))
+            # FreeCAD stops a little above the count asked where a collapse
+            # would flip a triangle: asked again lower, the cap is kept.
+            ask = int(target)
+            for _ in range(3):
+                if m.CountFacets <= target or ask < 8:
+                    break
+                ask = max(4, int(ask * target / m.CountFacets * 0.97))
+                m = base.copy()
+                m.decimate(ask)
+            pts, tris = m.Topology
+            RV = S.points_array(pts)
+            RF = np.array(tris, dtype=np.int64).reshape(-1, 3)
+            if len(RF) < 4:
+                return None
+            there = NominalSurface(RV, RF).closest(sample).distance
+            back = original.closest(_sampled(RV)).distance
+            return {"triangles": int(len(RF)), "worst": float(max(np.quantile(there, 0.999), np.quantile(back, 0.999))), "RV": RV, "RF": RF, "there": there, "back": back}
+
+        best, capped, tries = M.lightest_within(len(F), cap, tol, attempt)
+        if best is None:
+            # Nothing lighter holds the tolerance (or FreeCAD's decimator
+            # gave nothing back): the mesh as it is, and the reply says so.
+            RV, RF = np.asarray(V, dtype=float), np.asarray(F, dtype=np.int64)
+            there = back = np.zeros(1)
+        else:
+            RV, RF, there, back = best["RV"], best["RF"], best["there"], best["back"]
+        held = bool(np.quantile(there, 0.999) <= tol and np.quantile(back, 0.999) <= tol)
         report = {"settings": {"tolerance": tol, "maxTriangles": cap}, "inputTriangles": int(len(F)), "triangles": int(len(RF)), "vertices": int(len(RV)),
-                  "measured": int(len(there)), "within": int((there <= tol).sum()), "p999": r(np.quantile(there, 0.999)), "max": r(there.max()), "rms": r(math.sqrt((there ** 2).mean())),
-                  "backP999": r(np.quantile(back, 0.999)), "backMax": r(back.max()), "held": bool(np.quantile(there, 0.999) <= tol and np.quantile(back, 0.999) <= tol), "capped": capped, "method": "FreeCAD Mesh.decimate"}
+                  "measured": int(len(sample)), "within": int((there <= tol).sum()) if best is not None else int(len(sample)), "p999": r(np.quantile(there, 0.999)), "max": r(there.max()), "rms": r(math.sqrt((there ** 2).mean())),
+                  "backP999": r(np.quantile(back, 0.999)), "backMax": r(back.max()), "held": held, "capped": capped, "tries": tries, "method": "FreeCAD Mesh.decimate"}
+        if best is None:
+            report["note"] = f"No lighter mesh holds {tol:g} mm: this is the mesh as it is. A larger tolerance lets triangles go."
+        elif not held:
+            report["warning"] = (f"Brought down to the cap of {cap} triangles, this lies up to {report['max']:g} mm from the original (tolerance {tol:g} mm): not a mesh to measure or model on. "
+                                 "A higher maxTriangles or a larger tolerance; mesh_discard { what: \"reduced\" } drops it.")
         mt_state(session)["reduced"] = {"V": RV, "F": RF, "report": report, "from": which}
         return {"reduced": report}
 
@@ -316,6 +358,12 @@ def bind(session):
             raise ToolError("invalid_state", "There is no reduced mesh — mesh_reduce makes one.")
         out = edit("apply the reduction", lambda V, F: (red["V"], red["F"], None, red["report"]))
         ms["reduced"] = None
+        if not red["report"].get("held", True):
+            # Found live (run 2): a reduction 14 mm off its tolerance of
+            # 0.05 mm was applied without a word.
+            rep = red["report"]
+            out["warning"] = (f"The reduction applied does not hold its tolerance: up to {max(rep['max'], rep['backMax']):g} mm from the mesh it was made of (tolerance {rep['settings']['tolerance']:g} mm). "
+                              "mesh_undo puts that mesh back.")
         return out
 
     def mesh_discard(a):
@@ -439,6 +487,14 @@ def _added(session):
     from ..meshtools import handlers as ADDED
 
     return {n: functools.partial(ADDED.HANDLERS[n], session) for n in ADDED.NAMES}
+
+
+def _sampled(P, sample=4000):
+    """At most `sample` of the points, spread evenly through their order."""
+    P = np.asarray(P, dtype=float).reshape(-1, 3)
+    if len(P) > sample:
+        P = P[np.linspace(0, len(P) - 1, sample).astype(int)]
+    return P
 
 
 def point_mesh_distances(P, V, F, sample=4000):

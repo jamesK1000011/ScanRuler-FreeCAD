@@ -91,6 +91,11 @@ class Obj:
             shutil.copyfile(value, to)
             value = to
         self.__dict__[name] = value
+        if name == "Mesh" and self.TypeId == "Mesh::Feature":
+            # As FreeCAD's Mesh::Feature (src/Mod/Mesh/App/MeshFeature.cpp,
+            # Feature::onChanged): a new mesh brings its own placement —
+            # none — and the object's Placement becomes it.
+            self.__dict__["Placement"] = Placement()
 
     @property
     def Visibility(self):

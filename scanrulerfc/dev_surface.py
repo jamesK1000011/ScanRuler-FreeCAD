@@ -24,8 +24,21 @@ LEAF = 16
 NODE = 16
 # Queries times leaves held at once while ordering the leaves.
 _BLOCK = 3_000_000
-# Rays cast together against the leaves near them (raycast_first).
+# Rays cast together against the leaves near them (the leaf-ordered search
+# raycast_first used before the grid; kept as raycast_first_leaves, which
+# the tests hold the grid's answers against).
 RAY_RUN = 256
+# The ray grid (raycast_first): triangles aimed at per occupied cell, the
+# most cells, and the most cell entries per triangle before the cells are
+# made larger (one large triangle among small ones lies across many).
+RAY_CELL_TRIS = 12
+RAY_CELLS_MAX = 2_000_000
+RAY_ENTRIES_PER_TRI = 24
+# A triangle across more cells than RAY_BIG_CELLS is kept out of the grid
+# and tried against every ray by itself, while there are no more than
+# RAY_BIG_MAX of them (a ground plane under a dense scan).
+RAY_BIG_CELLS = 512
+RAY_BIG_MAX = 128
 
 
 def closest_on_triangles(P, A, B, C):
@@ -353,8 +366,174 @@ class NominalSurface:
 
     def raycast_first(self, O, D, near, far):
         """The first triangle each ray O + t D meets, either side, with
-        near <= t <= far: (t, face), t inf and face -1 for none. Leaves are
-        opened best-first by where the ray enters their box. Rays of finite
+        near <= t <= far: (t, face), t inf and face -1 for none; of
+        triangles met at the very same t, the one of the lowest index.
+
+        Every ray walks a uniform grid of cells together, a cell a round
+        (a 3D DDA in numpy): in each cell only the triangles whose boxes
+        reach it are tried, and a hit counts once it lies inside the cell
+        being walked, so the first hit found is the first there is. The
+        work is the triangles near each ray's path, where the leaf-ordered
+        search (raycast_first_leaves) tried every leaf whose box a run of
+        rays swept: on a 219,600-triangle scan with rays of 25 mm, about a
+        hundred times less (found live: thickness_measure took 221 s)."""
+        O = np.asarray(O, dtype=float).reshape(-1, 3)
+        D = np.asarray(D, dtype=float).reshape(-1, 3)
+        n = len(O)
+        near = np.broadcast_to(np.asarray(near, dtype=float), (n,))
+        far = np.broadcast_to(np.asarray(far, dtype=float), (n,))
+        t_out = np.full(n, np.inf)
+        f_out = np.full(n, -1, dtype=np.int64)
+        if n == 0:
+            return t_out, f_out
+        g = self._ray_grid()
+        for s in range(0, n, g["rays"]):
+            e = min(n, s + g["rays"])
+            t_out[s:e], f_out[s:e] = self._cast_grid(g, O[s:e], D[s:e], near[s:e], far[s:e])
+        big = g["big"]
+        if len(big):
+            # The few large triangles kept out of the grid, each against every ray.
+            for s in range(0, n, max(1, _BLOCK // len(big))):
+                e = min(n, s + max(1, _BLOCK // len(big)))
+                m = e - s
+                pq = np.repeat(np.arange(s, e), len(big))
+                pt = np.tile(big, m)
+                t = _moller_trumbore(O[pq], D[pq], self.A[pt], self.B[pt], self.C[pt])
+                t[(t < near[pq]) | (t > far[pq])] = np.inf
+                t = t.reshape(m, len(big))
+                k = t.argmin(axis=1)  # the first of equals: the lowest index (big is sorted)
+                tb, fb = t[np.arange(m), k], big[k]
+                better = (tb < t_out[s:e]) | ((tb == t_out[s:e]) & np.isfinite(tb) & (fb < f_out[s:e]))
+                t_out[s:e][better] = tb[better]
+                f_out[s:e][better] = fb[better]
+        return t_out, f_out
+
+    def _ray_grid(self):
+        """The triangles by the cells of a uniform grid over the mesh
+        (built once): cell size, counts, and per cell its triangles in
+        index order (off, tris). A triangle is in every cell its box,
+        padded by a hair, reaches."""
+        g = getattr(self, "_grid", None)
+        if g is not None:
+            return g
+        T = self.triangle_count
+        scale = max(self.bbox_diagonal, 1.0)
+        pad = 4e-9 * scale
+        lo = self.bbox_min - 16 * pad
+        hi = self.bbox_max + 16 * pad
+        size = hi - lo
+        tlo = np.minimum(np.minimum(self.A, self.B), self.C) - pad
+        thi = np.maximum(np.maximum(self.A, self.B), self.C) + pad
+        # Cells sized by the usual triangle (the median area), so a few
+        # large triangles do not put a dense patch into one cell.
+        areas = np.linalg.norm(np.cross(self.B - self.A, self.C - self.A), axis=1) / 2
+        usual = float(np.median(areas))
+        cell = float(np.sqrt(RAY_CELL_TRIS * usual)) if usual > 0 else float(size.max())
+        cell = max(cell, float(size.max()) * 1e-4, 1e-12)
+        while True:
+            dims = np.maximum(1, np.ceil(size / cell).astype(np.int64))
+            if int(dims.prod()) > RAY_CELLS_MAX:
+                cell *= 1.26
+                continue
+            i0 = np.clip(np.floor((tlo - lo) / cell).astype(np.int64), 0, dims - 1)
+            i1 = np.clip(np.floor((thi - lo) / cell).astype(np.int64), 0, dims - 1)
+            span = i1 - i0 + 1
+            count = span.prod(axis=1)
+            big = count > RAY_BIG_CELLS
+            if int(big.sum()) > RAY_BIG_MAX:
+                big[:] = False  # too many to try one by one: the cells grow instead
+            if int(count[~big].sum()) <= RAY_ENTRIES_PER_TRI * T + 4096 or int(dims.prod()) == 1:
+                break
+            cell *= 1.5
+        count = np.where(big, 0, count)
+        total = int(count.sum())
+        tri = np.repeat(np.arange(T, dtype=np.int64), count)
+        k = np.arange(total, dtype=np.int64) - np.repeat(np.cumsum(count) - count, count)
+        sy, sz = np.repeat(span[:, 1], count), np.repeat(span[:, 2], count)
+        cx = np.repeat(i0[:, 0], count) + k // (sy * sz)
+        cy = np.repeat(i0[:, 1], count) + (k // sz) % sy
+        cz = np.repeat(i0[:, 2], count) + k % sz
+        cid = (cx * dims[1] + cy) * dims[2] + cz
+        order = np.argsort(cid, kind="stable")  # within a cell: by triangle index
+        cells = int(dims.prod())
+        off = np.zeros(cells + 1, dtype=np.int64)
+        np.cumsum(np.bincount(cid, minlength=cells), out=off[1:])
+        most = int((off[1:] - off[:-1]).max()) if cells else 1
+        g = self._grid = {"lo": lo, "hi": hi, "cell": cell, "dims": dims, "off": off, "tris": tri[order], "tol": 1e-9 * scale,
+                          "big": np.nonzero(big)[0],
+                          # rays walked together: bounded so a round's ray-triangle pairs stay in memory
+                          "rays": max(1024, _BLOCK // max(1, most))}
+        return g
+
+    def _cast_grid(self, g, O, D, near, far):
+        m = len(O)
+        t_out = np.full(m, np.inf)
+        f_out = np.full(m, -1, dtype=np.int64)
+        lo, hi, cell, dims = g["lo"], g["hi"], g["cell"], g["dims"]
+        off, tris = g["off"], g["tris"]
+        flat = np.abs(D) < 1e-300
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            inv = np.where(flat, np.inf, 1.0 / np.where(flat, 1.0, D))
+            # The part of each ray inside the grid's box.
+            a = (lo - O) * inv
+            b = (hi - O) * inv
+        inside = (O >= lo) & (O <= hi)
+        a = np.where(flat, np.where(inside, -np.inf, np.inf), a)
+        b = np.where(flat, np.where(inside, np.inf, -np.inf), b)
+        t0 = np.maximum(np.minimum(a, b).max(axis=1), near)
+        t1 = np.minimum(np.maximum(a, b).min(axis=1), far)
+        speed = np.linalg.norm(D, axis=1)
+        tol = g["tol"] / np.maximum(speed, 1e-300)
+        rows = np.nonzero((t0 <= t1) & (speed > 0))[0]
+        if not len(rows):
+            return t_out, f_out
+        Or, Dr = O[rows], D[rows]
+        start = Or + Dr * t0[rows, None]
+        ijk = np.clip(np.floor((start - lo) / cell).astype(np.int64), 0, dims - 1)
+        step = np.where(Dr > 0, 1, -1).astype(np.int64)
+        fr = flat[rows]
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            wall = lo + (ijk + (Dr > 0)) * cell
+            t_next = np.where(fr, np.inf, (wall - Or) * inv[rows])
+            t_step = np.where(fr, np.inf, cell * np.abs(inv[rows]))
+        end = t1[rows]
+        while len(rows):
+            leave = t_next.min(axis=1)  # where each ray leaves its cell
+            cid = (ijk[:, 0] * dims[1] + ijk[:, 1]) * dims[2] + ijk[:, 2]
+            cnt = off[cid + 1] - off[cid]
+            done = np.zeros(len(rows), dtype=bool)
+            if cnt.any():
+                loc = np.repeat(np.arange(len(rows)), cnt)
+                k = np.arange(len(loc), dtype=np.int64) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+                pt = tris[np.repeat(off[cid], cnt) + k]
+                pq = rows[loc]
+                t = _moller_trumbore(O[pq], D[pq], self.A[pt], self.B[pt], self.C[pt])
+                ok = (t >= near[pq]) & (t <= far[pq]) & (t <= leave[loc] + tol[pq])
+                loc, pt, t = loc[ok], pt[ok], t[ok]
+                if len(loc):
+                    o = np.lexsort((pt, t, loc))
+                    loc, pt, t = loc[o], pt[o], t[o]
+                    first = np.ones(len(loc), dtype=bool)
+                    first[1:] = loc[1:] != loc[:-1]
+                    hit = loc[first]
+                    t_out[rows[hit]] = t[first]
+                    f_out[rows[hit]] = pt[first]
+                    done[hit] = True
+            # On into the next cell along the axis whose wall comes first.
+            ax = t_next.argmin(axis=1)
+            r = np.arange(len(rows))
+            ijk[r, ax] += step[r, ax]
+            t_next[r, ax] += t_step[r, ax]
+            gone = done | (leave > end) | (ijk[r, ax] < 0) | (ijk[r, ax] >= dims[ax]) | ~np.isfinite(leave)
+            if gone.any():
+                keep = ~gone
+                rows, ijk, step, t_next, t_step, end = rows[keep], ijk[keep], step[keep], t_next[keep], t_step[keep], end[keep]
+        return t_out, f_out
+
+    def raycast_first_leaves(self, O, D, near, far):
+        """raycast_first as it was before the grid: the same first hit,
+        found by opening the leaves best-first by where the ray enters
+        their box (slow on a large scan: kept for the tests to compare). Rays of finite
         reach (all of wall thickness's) go in runs of RAY_RUN with origins
         close together (along a Morton curve), each run tried against only
         the leaves whose boxes meet the box its segments sweep: the same

@@ -515,11 +515,18 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
             o = doc.getObject(s.object)
             if o is None:
                 return
-            o.Placement = _placement(s.R, s.t)
-            s.placed = _read_placement(o)
+            # The mesh first, then the Placement: a Mesh::Feature given a
+            # new mesh takes that mesh's own placement (none) as its
+            # Placement (FreeCAD 1.1 source: src/Mod/Mesh/App/MeshFeature.cpp,
+            # Feature::onChanged). Set the other way round, a scan_scale on
+            # an aligned scan left the object at the origin, and the next
+            # call read that as a move made by the person and took the
+            # alignment off (found live, run 2).
             if getattr(s, "meshed_k", s.k) != s.k:  # scaled: the mesh holds k·V0
                 o.Mesh = _mesh_of(s.k * s.V0, s.F)
                 s.meshed_k = s.k
+            o.Placement = _placement(s.R, s.t)
+            s.placed = _read_placement(o)
         except Exception as e:  # noqa: BLE001 — the view only: the measurement holds
             _report(f"the scan's placement could not follow its alignment: {e}")
 
@@ -684,25 +691,47 @@ _SIGS = {}
 def mark(session):
     """After a call: the state written into the document when it changed
     (scanstate.touched), and a scan Placement left waiting by a worker
-    thread with it. On the document's thread only."""
-    doc = getattr(session, "doc", None)
+    thread with it. On the document's thread only. The state is the
+    document's own: a session that has moved to another document since
+    its last call is settled first (scanstate.settle), so one document's
+    state is never written into another."""
+    from . import scanstate
+
     fs = getattr(session, "family_state", None)
-    if doc is None or not fs or "scanruler" not in fs or not hasattr(doc, "addObject"):
+    if getattr(session, "doc", None) is None or fs is None:
         return False
-    st = fs["scanruler"]
     if not on_document_thread():
         return False  # never from a worker: scanstate.touched hands it over or leaves it
+    doc = scanstate.settle(session)
+    if "scanruler" not in fs:
+        return False
+    return mark_doc(doc, fs["scanruler"], session)
+
+
+def mark_doc(doc, st, session=None):
+    """st written into doc, the document it belongs to, when it differs
+    from what was written last. On the document's thread only, and only
+    while the document is open (a write handed to the GUI thread can land
+    after its document was closed)."""
+    from . import scanstate
+
+    if doc is None or st is None or not hasattr(doc, "addObject"):
+        return False
+    if not on_document_thread():
+        return False
+    if not scanstate.doc_open(doc):
+        return False
     flush_pose(st)
     sig = signature(st)
     key = (getattr(doc, "Name", id(doc)), id(session))
-    if _SIGS.get(key) == sig:
+    if _SIGS.get(key) == (id(doc), sig):
         return False
     if find_state(doc) is None and st.get("scan") is None and not st.get("elements"):
-        _SIGS[key] = sig
+        _SIGS[key] = (id(doc), sig)
         return False  # nothing worth a state object yet
     sync_objects(doc, st)
     dropped = write(doc, st)
-    _SIGS[key] = signature(st)  # the objects' names just set in it count as written
+    _SIGS[key] = (id(doc), signature(st))  # the objects' names just set in it count as written
     if dropped:
         _report("not kept in the document: " + ", ".join(dropped))
     return True
