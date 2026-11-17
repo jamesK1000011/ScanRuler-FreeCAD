@@ -83,10 +83,12 @@ def fmt_len(mm, units="mm", mm_decimals=3, bare=False, signed=False):
     return text if bare else f"{text} {unit_word(units)}"
 
 
-def format_signed(mm, units="mm"):
-    """A deviation: '+0.120' / '−0.120', with a true minus sign."""
+def format_signed(mm, units="mm", decimals=None):
+    """A deviation: '+0.120' / '−0.120', with a true minus sign. decimals:
+    the places shown (the unit's own by default)."""
     shown = to_display(mm, units)
-    return ("+" if shown >= 0 else MINUS) + to_fixed(abs(shown), length_decimals(3, units))
+    d = length_decimals(3, units) if decimals is None else decimals
+    return ("+" if shown >= 0 else MINUS) + to_fixed(abs(shown), d)
 
 
 def length_input_text(mm, units="mm"):
@@ -96,8 +98,33 @@ def length_input_text(mm, units="mm"):
     return js_number(float(to_fixed(to_display(mm, units), 6)))
 
 
-def wall(mm, units="mm"):
-    return fmt_len(mm, units, 3, bare=True)
+def wall(mm, units="mm", decimals=None):
+    if decimals is None:
+        return fmt_len(mm, units, 3, bare=True)
+    text = to_fixed(to_display(mm, units), decimals)
+    return to_fixed(0, decimals) if float(text) == 0 else text
+
+
+TICK_DECIMALS_MAX = 6
+
+
+def tick_decimals(low, high, units="mm", n=None):
+    """The places a tick's value is written with: the unit's own (3 in mm),
+    more when the ticks stand closer than that can tell apart, so each
+    tick reads within a twentieth of a step of its value. Window review
+    round 7: a ±0.001 mm deviation scale read +0.001, +0.001, +0.001, +0.000,
+    ... at 3 places."""
+    n = CM.TICKS if n is None else n
+    base = length_decimals(3, units)
+    lo, hi = to_display(low, units), to_display(high, units)
+    step = abs(hi - lo) / max(1, n - 1)
+    if not (step > 0 and math.isfinite(step)):
+        return base
+    vals = [lo + (hi - lo) * i / (n - 1) for i in range(n)]
+    d = base
+    while d < TICK_DECIMALS_MAX and max(abs(float(to_fixed(v, d)) - v) for v in vals) > step * 0.05:
+        d += 1
+    return d
 
 
 def count(n):
@@ -268,6 +295,11 @@ def model(kind, low, high, *, colormap=CM.DEFAULT, bands=None, units="mm", value
     def fmt(v):
         return format_signed(v, units) if signed else wall(v, units)
 
+    places = tick_decimals(low, high, units)
+
+    def tick_fmt(v):
+        return format_signed(v, units, places) if signed else wall(v, units, places)
+
     head_words = [unit_word(units), "wall" if kind == "thickness" else None]
     head = " ".join(w for w in head_words if w)
     ends = None
@@ -321,7 +353,8 @@ def model(kind, low, high, *, colormap=CM.DEFAULT, bands=None, units="mm", value
         "ramp": CM.legend_stops(colormap, bands, reversed_),
         "caps": {"high": {"rgb": tuple(cap_hi), "title": CAP_TITLES["high"]},
                  "low": {"rgb": tuple(cap_lo), "title": CAP_TITLES["low"]}},
-        "ticks": ticks(low, high, fmt, 0 if signed else None),
+        "ticks": ticks(low, high, tick_fmt, 0 if signed else None),
+        "tickDecimals": places,
         "limit_title": LIMIT_TITLE,
         "histogram": hist,
         "stats": rows,
@@ -349,14 +382,26 @@ def coin_text(s):
     return "".join(out).replace(" , ", ", ")
 
 
-# Where the legend stands in the 3D view, as shares of the view (its
-# camera maps the unit square onto the whole view): against the right
-# edge, clear of a part framed in the middle. Window review round 6: at
-# x 0.80 it stood over the part's right side.
-PLACE = {"x": 0.86, "y": 0.24, "w": 0.03, "h": 0.52}
+# Where the legend stands in the 3D view. Its words are SoText2, drawn at
+# a size in the view's device pixels whatever the view's size, so the card
+# is laid out in device pixels too, from the words it holds: wide enough
+# for its longest line, against the view's right edge, under the corner
+# where the navigation cube stands and above the bottom right corner where
+# Agent Link's caption stands. Window review round 7: laid out as shares
+# of the view, the card ended at the view's edge while its words ran past
+# it, and the stats' second column fell on the first.
 CARD_RGB = (246, 246, 244)
 TEXT_RGB = (30, 30, 30)
 ZERO_RGB = (46, 125, 70)
+HIST_RGB = (150, 150, 150)
+CHAR_W = 0.75        # a character's advance, a share of the font size (round 7 pictures: Coin's default face 0.70-0.73)
+MIN_CHARS = 14       # the card's narrowest, in characters
+LINE_H = 1.45        # a line's height, a share of the font size
+TOP_SHARE = 0.86     # the card's top, a share of the view's height (the navigation cube above it)
+FLOOR_SHARE = 0.17   # the card's lowest edge when there is room (Agent Link's caption below it)
+RAMP_SHARE = 0.5     # the ramp's height at most, a share of the view's height
+DEFAULT_VIEW = (1600.0, 1000.0)  # device px, when the view's size is not known (stand-ins)
+DEFAULT_FONT = 26.0
 
 
 def text_rows(m):
@@ -395,21 +440,169 @@ def stat_places(stats):
     return out
 
 
-def coin_nodes(m, x=None, y=None, w=None, h=None, coin=None, font_size=None):
+def stat_text(row):
+    return coin_text(f"{row['caption']} {row['value']}")
+
+
+def card_layout(m, view_w=None, view_h=None, font_px=None):
+    """_card_layout at font_px, or at a smaller font (down to 0.6 of it,
+    in steps of a tenth) when the card would not fit in a small view; the
+    answer's `font` is the size the words are drawn at."""
+    fs = float(font_px or DEFAULT_FONT)
+    lay = _card_layout(m, view_w, view_h, fs)
+    k = 1.0
+    while not lay["fits"] and k > 0.65:
+        k -= 0.1
+        lay = _card_layout(m, view_w, view_h, fs * k)
+    return lay
+
+
+def wrap(text, chars):
+    """text in lines of at most `chars` characters, broken between words
+    (a word longer than that stands on a line of its own)."""
+    lines, cur = [], ""
+    for word in str(text).split():
+        if cur and len(cur) + 1 + len(word) > chars:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = f"{cur} {word}" if cur else word
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
+def _card_layout(m, view_w=None, view_h=None, font_px=None):
+    """Where every part of the legend stands, in the view's device pixels
+    (x right, y up, from the view's bottom left corner): the card, the
+    ramp, the caps, each word (its left end and baseline) and the
+    histogram's bars. Widths come from the words: CHAR_W of the font size a
+    character, an upper bound for Coin's monospaced face. The card is as
+    wide as the title, the ramp with its ticks, or the widest single
+    figure (MIN_CHARS at least); the ends' words and a wide figure wrap to
+    that; the stats take two columns when two fit, else one. Ticks too
+    close to read are thinned (every 2nd, 4th, ...); the ends always stay.
+    `fits` says the card lies inside the view."""
+    vw, vh = float(view_w or DEFAULT_VIEW[0]), float(view_h or DEFAULT_VIEW[1])
+    fs = float(font_px or DEFAULT_FONT)
+    cw, lh, pad = CHAR_W * fs, LINE_H * fs, 0.7 * fs
+    margin = max(8.0, 0.015 * min(vw, vh))
+    title = coin_text(m.get("caption") or "")
+    ends = m.get("ends")
+    ticks_ = m.get("ticks") or []
+    tick_t = [coin_text(t["text"]) for t in ticks_]
+    hist = m.get("histogram")
+    ramp_w, gap = 1.1 * fs, 0.5 * fs
+    hist_w = 3.0 * fs if hist else 0.0
+    ramp_block = hist_w + (gap if hist else 0.0) + ramp_w + gap + max((len(t) for t in tick_t), default=0) * cw
+    stats = m.get("stats") or []
+    texts = [stat_text(r) for r in stats]
+    narrow = [t for t, r in zip(texts, stats) if not r["wide"]]
+    chars = max(MIN_CHARS, len(title), math.ceil(ramp_block / cw), max((len(t) for t in narrow), default=0))
+    # The stats: two columns when two fit in `chars`, else one; a wide row
+    # on its own line(s), wrapped.
+    col_gap = 2
+    half = (narrow[0::2], narrow[1::2])
+    col0 = max((len(t) for t in half[0]), default=0)
+    col1 = max((len(t) for t in half[1]), default=0)
+    two = bool(half[1]) and col0 + col_gap + col1 <= chars
+    stat_cells = []  # (text, line, column)
+    line = col = 0
+    for t, r in zip(texts, stats):
+        if r["wide"]:
+            if col:
+                line, col = line + 1, 0
+            for part in wrap(t, chars):
+                stat_cells.append((part, line, 0))
+                line += 1
+            continue
+        stat_cells.append((t, line, col))
+        if two and col == 0:
+            col = 1
+        else:
+            line, col = line + 1, 0
+    n_stats = line + (1 if col else 0)
+    high_l = wrap(coin_text(ends["high"]["caption"]), chars) if ends else []
+    low_l = wrap(coin_text(ends["low"]["caption"]), chars) if ends else []
+    card_w = chars * cw + 2 * pad
+    above = 1 + len(high_l)
+    below = len(low_l) + n_stats
+    cap = 0.5 * fs
+    stat_gap = 0.4 * lh if stats else 0.0
+    fixed = 2 * pad + lh * (above + below) + 2 * cap + stat_gap
+    top = min(vh - margin, vh * TOP_SHARE)
+    ramp_h = min(top - vh * FLOOR_SHARE - fixed, vh * RAMP_SHARE)
+    ramp_h = max(ramp_h, min(4 * lh, top - margin - fixed))
+    ramp_h = max(ramp_h, 2 * lh)
+    card_h = fixed + ramp_h
+    if top - card_h < margin:
+        top = max(top, vh - margin)  # a short view: up into the cube's corner rather than off the bottom
+    x1 = vw - margin
+    x0 = x1 - card_w
+    y1 = top
+    y0 = y1 - card_h
+    rx0 = x0 + pad + hist_w + (gap if hist else 0.0)
+    rx1 = rx0 + ramp_w
+    rt = y1 - pad - lh * above - cap
+    rb = rt - ramp_h
+    n = len(ticks_)
+    every = 1
+    while n > 2 and every < n - 1 and ramp_h / max(1, n - 1) * every < 1.1 * lh:
+        every *= 2
+    shown = [i for i in range(n) if i % every == 0 or i == n - 1]
+    if n > 1 and every > 1 and len(shown) >= 2 and (shown[-1] - shown[-2]) * ramp_h / (n - 1) < 1.1 * lh:
+        shown.pop(-2)  # the top end stays; the one under it goes
+    base = 0.8 * fs + 0.2 * lh  # a line's baseline under its top
+    words = [{"text": title, "x": x0 + pad, "y": y1 - pad - base, "role": "title"}]
+    for i, t in enumerate(high_l):
+        words.append({"text": t, "x": x0 + pad, "y": y1 - pad - lh * (1 + i) - base, "role": "high"})
+    for i in shown:
+        t = ticks_[i]
+        words.append({"text": tick_t[i], "x": rx1 + gap, "y": rb + t["fraction"] * ramp_h - 0.35 * fs,
+                      "role": "zero" if t.get("zero") else "tick"})
+    line_y = rb - cap
+    for i, t in enumerate(low_l):
+        words.append({"text": t, "x": x0 + pad, "y": line_y - lh * i - base, "role": "low"})
+    line_y -= lh * len(low_l) + stat_gap
+    for t, ln, c in stat_cells:
+        words.append({"text": t, "x": x0 + pad + c * (col0 + col_gap) * cw, "y": line_y - ln * lh - base, "role": "stat"})
+    bars = []
+    if hist:
+        for row in hist.get("rows") or []:
+            if row["count"]:
+                right = rx0 - 0.2 * fs
+                bars.append((right - hist_w * row["width"], rb + row["lo"] * ramp_h, right, rb + row["hi"] * ramp_h))
+    rnd = lambda v: round(float(v), 1)  # noqa: E731
+    return {"view": [rnd(vw), rnd(vh)], "font": fs, "card": [rnd(x0), rnd(y0), rnd(x1), rnd(y1)],
+            "ramp": [rnd(rx0), rnd(rb), rnd(rx1), rnd(rt)], "cap": cap, "words": words, "bars": bars,
+            "shownTicks": [tick_t[i] for i in shown], "every": every, "chars": chars, "statColumns": 2 if two else 1,
+            "fits": bool(x0 >= 0 and y0 >= 0 and x1 <= vw and y1 <= vh)}
+
+
+def box_facts(lay):
+    """The card against the view, for the call's answer: its pixel rect,
+    the view's size, whether it fits, the tick strings drawn."""
+    vw, vh = lay["view"]
+    x0, y0, x1, y1 = lay["card"]
+    return {"px": lay["card"], "view": lay["view"], "share": [round(x0 / vw, 3), round(y0 / vh, 3), round(x1 / vw, 3), round(y1 / vh, 3)],
+            "fits": lay["fits"], "fontSize": lay["font"], "shownTicks": lay["shownTicks"],
+            "textRight": round(max(w["x"] + len(w["text"]) * CHAR_W * lay["font"] for w in lay["words"]), 1) if lay["words"] else None}
+
+
+def coin_nodes(m, coin=None, font_size=None, view=None, layout=None):
     """The legend as a Coin overlay: an SoAnnotation holding an orthographic
-    camera over the unit square, a light card behind it (the words read on
-    any background), the ramp as quads (with its caps), the title above it
-    (what is mapped, its unit), the value of every tick beside it (low,
-    middle and high among them), histogram bars and the stats card. Draws
-    in view_render pictures and saved images too, which a Qt overlay would
-    not. coin: the module to build with (pivy's by default; the tests hand
-    a stand-in). font_size: the words' size in the view's device pixels
-    (SoFont); None leaves Coin's default (10, half of that on a Retina
-    screen: window review round 6 could read none of them)."""
-    x = PLACE["x"] if x is None else x
-    y = PLACE["y"] if y is None else y
-    w = PLACE["w"] if w is None else w
-    h = PLACE["h"] if h is None else h
+    camera over the unit square (the whole view), a light card behind it
+    (the words read on any background), the ramp as quads (with its caps),
+    the title above it (what is mapped, its unit), the value of the ticks
+    beside it (low, middle and high among them), histogram bars and the
+    stats card, all where card_layout puts them. Draws in view_render
+    pictures and saved images too, which a Qt overlay would not. coin: the
+    module to build with (pivy's by default; the tests hand a stand-in).
+    font_size: the words' size in the view's device pixels (SoFont). view:
+    (width, height) of the view in device pixels. layout: card_layout's
+    answer, when the caller has it already."""
+    lay = layout or card_layout(m, *(view or (None, None)), font_size)
+    vw, vh = lay["view"]
     if coin is None:
         from pivy import coin  # lazy: only inside FreeCAD's GUI
 
@@ -426,12 +619,13 @@ def coin_nodes(m, x=None, y=None, w=None, h=None, coin=None, font_size=None):
     lm = coin.SoLightModel()
     lm.model = coin.SoLightModel.BASE_COLOR
     root.addChild(lm)
-    if font_size:
+    if font_size or layout is not None:
         font = coin.SoFont()
-        font.size = float(font_size)
+        font.size = float(lay["font"])  # card_layout's: font_size, or less in a small view
         root.addChild(font)
 
-    def quad(x0, y0, x1, y1, rgb):
+    def quad(px0, py0, px1, py1, rgb):
+        x0, y0, x1, y1 = px0 / vw, py0 / vh, px1 / vw, py1 / vh
         sep = coin.SoSeparator()
         mat = coin.SoBaseColor()
         mat.rgb = tuple(c / 255.0 for c in rgb)
@@ -444,54 +638,35 @@ def coin_nodes(m, x=None, y=None, w=None, h=None, coin=None, font_size=None):
         sep.addChild(fs)
         return sep
 
-    def text(s, tx, ty, rgb=TEXT_RGB, right=False):
+    def text(s, px, py, rgb=TEXT_RGB):
         sep = coin.SoSeparator()
         col = coin.SoBaseColor()
         col.rgb = tuple(c / 255.0 for c in rgb)
         sep.addChild(col)
         tr = coin.SoTranslation()
-        tr.translation = (tx, ty, 0)
+        tr.translation = (px / vw, py / vh, 0)
         sep.addChild(tr)
         t = coin.SoText2()
         t.string = coin_text(s)
-        if right and getattr(coin.SoText2, "RIGHT", None) is not None:
-            t.justification = coin.SoText2.RIGHT
         sep.addChild(t)
         return sep
 
-    cap = 0.02
-    stats = m.get("stats") or []
-    rows = stat_lines(stats)
-    wide_left = bool(stats or m.get("ends") or m.get("histogram"))
-    left = x - 0.11 if wide_left else x - 0.015
-    bottom = (y - cap - 0.075 - 0.03 * rows) if stats else (y - cap - 0.05 if m.get("ends") else y - cap - 0.02)
     # The card first: SoAnnotation draws in order, without the depth test.
-    root.addChild(quad(left, bottom, 0.995, y + h + cap + 0.065, CARD_RGB))
+    root.addChild(quad(*lay["card"], CARD_RGB))
+    rx0, rb, rx1, rt = lay["ramp"]
+    h = rt - rb
     if m["bands"] and m["bands"] >= 2:
         for a, b, rgb in m["ramp"]:
-            root.addChild(quad(x, y + a * h, x + w, y + b * h, rgb))
+            root.addChild(quad(rx0, rb + a * h, rx1, rb + b * h, rgb))
     else:
         r = m["ramp"]
         for (a, ca), (b, _cb) in zip(r, r[1:]):
-            root.addChild(quad(x, y + a * h, x + w, y + b * h, ca))
-    root.addChild(quad(x, y + h, x + w, y + h + cap, m["caps"]["high"]["rgb"]))
-    root.addChild(quad(x, y - cap, x + w, y, m["caps"]["low"]["rgb"]))
-    for t in m["ticks"]:
-        root.addChild(text(t["text"], x + w + 0.008, y + t["fraction"] * h - 0.008,
-                           ZERO_RGB if t["zero"] else TEXT_RGB))
-    # The title: what is mapped and its unit, over the ramp, its right end
-    # at the card's.
-    root.addChild(text(m["caption"], 0.985, y + h + cap + 0.03, right=True))
-    if m["ends"]:
-        root.addChild(text(m["ends"]["high"]["caption"], x - 0.1, y + h + cap + 0.005))
-        root.addChild(text(m["ends"]["low"]["caption"], x - 0.1, y - cap - 0.035))
-    if m["histogram"]:
-        hw = 0.06
-        for row in m["histogram"]["rows"]:
-            if row["count"]:
-                root.addChild(quad(x - 0.004 - hw * row["width"], y + row["lo"] * h,
-                                   x - 0.004, y + row["hi"] * h, (150, 150, 150)))
-    if stats:
-        for row, (line, col) in zip(stats, stat_places(stats)):
-            root.addChild(text(f"{row['caption']}  {row['value']}", x - 0.1 + col * 0.1, y - cap - 0.07 - 0.03 * line))
+            root.addChild(quad(rx0, rb + a * h, rx1, rb + b * h, ca))
+    cap = lay["cap"]
+    root.addChild(quad(rx0, rt, rx1, rt + cap, m["caps"]["high"]["rgb"]))
+    root.addChild(quad(rx0, rb - cap, rx1, rb, m["caps"]["low"]["rgb"]))
+    for bar in lay["bars"]:
+        root.addChild(quad(*bar, HIST_RGB))
+    for w in lay["words"]:
+        root.addChild(text(w["text"], w["x"], w["y"], ZERO_RGB if w["role"] == "zero" else TEXT_RGB))
     return root

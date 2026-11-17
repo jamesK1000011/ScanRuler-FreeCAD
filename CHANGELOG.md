@@ -9,6 +9,17 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Window review round 7 of the 3D-view overlay. The legend card is laid
+  out in the view's device pixels from the words it holds (it ran past the
+  view's right edge while its words were drawn at a fixed pixel size): it
+  stands against the right edge, under the navigation cube and above Agent
+  Link's caption; the ends' words wrap, the figures take one or two
+  columns as they fit, close ticks are thinned and a small view gets a
+  smaller font. A tick's value gets more places when the ticks stand
+  closer than three can tell (a ±0.001 mm scale read +0.001 on every
+  tick). Labels are a 40th of the view's height (12 to 28 px), bold, on a
+  light backing (FreeCAD's SoTextLabel). The answer's view3d facts give
+  the legend's box against the view, its tick strings and the label node.
 - Window review round 6 of the 3D-view overlay. Colours went to Coin as
   0..255, so Coin's 32-bit packing swapped them: what a call made showed
   blue and the rest orange; they are 0..1 now (new #e8590c, element
