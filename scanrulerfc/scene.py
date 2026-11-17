@@ -60,6 +60,11 @@ MOVES_ALL = ("align_", "scan_scale", "deviation_align", "mesh_use_edited", "mesh
 MARKS = ("scan_query", "scan_segment", "element_fit", "element_fit_marked", "mesh_delete_marked", "wear_setup")
 
 
+def _seq(x):
+    """x, or an empty list for None: `x or []` fails on a numpy array."""
+    return [] if x is None else x
+
+
 def _longest(name, pairs):
     best, got = -1, None
     for k, v in pairs:
@@ -350,7 +355,7 @@ def segments_layer(st, scan):
     cache = st.get("segCache")
     if not cache or not isinstance(cache, tuple) or len(cache) != 2 or cache[0][0] != scan.version:
         return None
-    regions = cache[1].get("regions") or []
+    regions = _seq(cache[1].get("regions"))
     rgb = np.tile(np.asarray(SEGMENT_GREY, dtype=float), (len(scan.V), 1))
     for i, r in enumerate(regions):
         m = np.asarray(r.get("members", []), dtype=np.int64)
@@ -426,7 +431,7 @@ def mesh_tools(st):
     scan = st.get("scan")
     if not isinstance(ms, dict) or scan is None:
         return None, []
-    if ms.get("base") is not scan and not any(u.get("scan") is scan for u in ms.get("undo") or []):
+    if ms.get("base") is not scan and not any(u.get("scan") is scan for u in _seq(ms.get("undo"))):
         return None, []
     copy = ms.get("copy")
     previews = []
@@ -454,7 +459,7 @@ def _points_at(body, keys=("hotspots", "patches", "spots", "places")):
     out = []
     b = body if isinstance(body, dict) else {}
     for k in keys:
-        for row in b.get(k) or []:
+        for row in _seq(b.get(k)):
             if isinstance(row, dict):
                 p = _vec3(row.get("at") if row.get("at") is not None else row.get("centroid"))
                 if p is not None:
@@ -466,7 +471,7 @@ def outline_lines(scan, body):
     """scan_outline's loops lifted into 3D: on its plane, or on the scan's
     face toward the eye for an axis (its box's top looking down -z)."""
     b = body if isinstance(body, dict) else {}
-    loops = b.get("loops") or []
+    loops = _seq(b.get("loops"))
     if not loops:
         return []
     plane = b.get("plane")
@@ -496,7 +501,7 @@ def outline_lines(scan, body):
             t = np.linspace(0, 2 * math.pi, CIRCLE_SEGMENTS + 1)
             pts = [(c["center"][0] + c["radius"] * math.cos(a), c["center"][1] + c["radius"] * math.sin(a)) for a in t]
         else:
-            pts = [tuple(p) for p in lp.get("points") or []]
+            pts = [tuple(p) for p in _seq(lp.get("points"))]
             if pts:
                 pts.append(pts[0])
         if len(pts) >= 2:
