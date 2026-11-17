@@ -95,7 +95,14 @@ def segment_planes(g, min_area, max_rms, max_deg, box=None):
     rough = (turn + np.bincount(owner, weights=turn[nb], minlength=n)) / (deg + 1)
     seed_limit = 1 - cos_max
     ok = allowed & (rough <= seed_limit)
-    keys = np.minimum(SEED_BUCKETS - 1, np.floor(np.sqrt(rough / seed_limit) * SEED_BUCKETS)).astype(np.int64)
+    # The bucket of each seed's roughness. Only seeds (ok) are sorted, so
+    # the rest get no key worth the name; a roughness read a hair under 0
+    # (unit normals whose dot comes out a rounding over 1, on a flat face)
+    # is flat, bucket 0. Taken straight, sqrt of the one and the cast of the
+    # NaN a missing normal gives wrote "invalid value encountered in sqrt /
+    # cast" to the Report view (window review round 3, scan_segment).
+    flatness = np.where(ok, np.clip(rough, 0.0, seed_limit), seed_limit)
+    keys = np.minimum(SEED_BUCKETS - 1, np.floor(np.sqrt(flatness / seed_limit) * SEED_BUCKETS)).astype(np.int64)
     cand = np.nonzero(ok)[0]
     order = cand[np.argsort(keys[cand], kind="stable")]
 

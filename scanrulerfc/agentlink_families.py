@@ -17,6 +17,7 @@ import importlib
 import sys
 
 import scanrulerfc
+from scanrulerfc import echo_words as _EW
 from scanrulerfc import workspaces as _W
 from scanrulerfc.reverse import handlers as _R
 
@@ -57,14 +58,37 @@ AREAS = dict(_W.AREAS)
 # args) for the ones whose key hangs on an argument (element_fit's kind).
 COMMANDS = {k["tool"]: _W.command_for(k["tool"]) for k in _W.keys() + [_W.SNAPSHOT] if k.get("tool")}
 COMMANDS.update(_R.ECHO["COMMANDS"])
+COMMANDS.update(_EW.COMMANDS)
 # The Reverse engineer's Create feature keys hang on reverse_feature_add's
-# feature kind (workspaces.command_for asks reverse.handlers.command_for).
-command_for = _W.command_for
+# feature kind (workspaces.command_for asks reverse.handlers.command_for);
+# a fit from marked points and a construction light the element key of
+# their kind (echo_words.command_for).
+command_for = _EW.command_for
 # Read-only tools that still show something.
 SHOWN = ("element_list", "report_get", "deviation_stats", "deviation_hotspots", "thickness_stats", "scan_info", "scan_query",
          "scan_nearest", "mesh_inspect", "section_list", "flat_objects") + tuple(_R.ECHO["SHOWN"])
 # Tools that light no key at all, whatever their prefix matches.
 NO_BUTTON = tuple(_R.ECHO["NO_BUTTON"])
+# The reads that bring the ScanRuler workbench up and light their key, as
+# a changing call does: every ScanRuler tool but the snapshot reads. They
+# change ScanRuler's state or show a result (the panel turns to their
+# workspace, the 3D view draws it), not the FreeCAD model, so their
+# tools.json "changes" stays false and they open no undo step. Window
+# review round 3: scan_open, scan_info, scan_qa and the Mesh Tools stayed
+# in the Mesh workbench with a stale Mesh Info task open.
+OPENS = _EW.OPENS
+# The words of each call with what it measured, from its own answer
+# (echo_words.words(name, args, body) -> str or None): Agent Link's
+# PHRASES reach only the top of an answer, where most of these tools keep
+# no figure. PHRASES has what the top holds today; WORDS is for an Agent
+# Link that reads it (docs/hardening/sr4-findings.md says what it needs).
+PHRASES = dict(_EW.PHRASES)
+WORDS = _EW.words
+# What to select after a call (echo_words.selects(name, args, body, doc)
+# -> object names or None): the scan's own mesh object after scan_open,
+# not the hidden mesh it was read from; the reference after
+# deviation_open_reference. For an Agent Link that reads it.
+SELECTS_FOR = _EW.selects
 
 
 def _hook(name, call):

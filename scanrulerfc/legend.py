@@ -333,15 +333,17 @@ def model(kind, low, high, *, colormap=CM.DEFAULT, bands=None, units="mm", value
 
 # ---------------------------------------------------------------- Coin
 
-def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60):
+def coin_nodes(m, x=0.80, y=0.20, w=0.035, h=0.60, coin=None):
     """The legend as a Coin overlay: an SoAnnotation holding an orthographic
     camera over the unit square, the ramp as quads (with its caps), tick and
     caption text, histogram bars and the stats card. Draws in view_render
-    pictures and saved images too, which a Qt overlay would not."""
-    from pivy import coin  # lazy: only inside FreeCAD's GUI
+    pictures and saved images too, which a Qt overlay would not. coin: the
+    module to build with (pivy's by default; the tests hand a stand-in)."""
+    if coin is None:
+        from pivy import coin  # lazy: only inside FreeCAD's GUI
 
-    if not coin.SoDB.isInitialized():  # outside FreeCAD's GUI (a test run): nodes need the database
-        coin.SoDB.init()
+        if not coin.SoDB.isInitialized():  # outside FreeCAD's GUI (a test run): nodes need the database
+            coin.SoDB.init()
     root = coin.SoAnnotation()
     cam = coin.SoOrthographicCamera()
     cam.viewportMapping = coin.SoCamera.LEAVE_ALONE

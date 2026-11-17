@@ -52,7 +52,9 @@ def touching(fn, session, tool):
     def run(*a):
         S.before(session)  # a move made on the scan in FreeCAD, carried in first
         out = fn(*a)
-        S.touched(session, tool)
+        # The arguments and the answer go along for the window's drawing of
+        # this call's results (scene_coin; nothing is drawn without a window).
+        S.touched(session, tool, args=a[0] if a and isinstance(a[0], dict) else None, answer=out)
         return out
 
     return run

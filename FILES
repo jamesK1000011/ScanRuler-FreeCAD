@@ -15,6 +15,7 @@ docs/hardening/scanruler-meshtools-model.json
 docs/hardening/scanruler-reverse-findings.md
 docs/hardening/scanruler-reverse-model.json
 docs/hardening/scanruler6-findings.md
+docs/hardening/sr4-findings.md
 package.xml
 scanrulerfc/__init__.py
 scanrulerfc/agentlink/__init__.py
@@ -63,6 +64,7 @@ scanrulerfc/dimensions.py
 scanrulerfc/dock.py
 scanrulerfc/docstate.py
 scanrulerfc/draft_core.py
+scanrulerfc/echo_words.py
 scanrulerfc/editor_view.py
 scanrulerfc/errors.py
 scanrulerfc/fitcomp_core.py
@@ -285,6 +287,8 @@ scanrulerfc/reverse/vec.py
 scanrulerfc/reverse/where.py
 scanrulerfc/runner.py
 scanrulerfc/scanstate.py
+scanrulerfc/scene.py
+scanrulerfc/scene_coin.py
 scanrulerfc/schema.py
 scanrulerfc/section_core.py
 scanrulerfc/segment.py
@@ -406,6 +410,7 @@ tests/test_reverse_topo.py
 tests/test_reverse_where.py
 tests/test_reverse_wiring.py
 tests/test_scan.py
+tests/test_scene.py
 tests/test_sections.py
 tests/test_segment_sparse.py
 tests/test_shared.py

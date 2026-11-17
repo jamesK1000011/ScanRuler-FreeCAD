@@ -52,6 +52,22 @@ def poll(st):
     return version, last
 
 
+def history_mark(doc):
+    """Where the document stands in FreeCAD's undo history: (UndoCount,
+    RedoCount), or None. An undo or a redo (Edit › Undo, Agent Link's
+    history_undo / history_redo) moves it without a ScanRuler call, so
+    scanstate's version stays: the panel read the Reverse engineer's
+    features before the undo and kept them (window review round 3, sr-b
+    8056 / 8061: Features 0 after the undo of a clear, 9 after its redo).
+    The dock draws again when this moves too."""
+    if doc is None:
+        return None
+    try:
+        return (int(doc.UndoCount), int(doc.RedoCount))
+    except Exception:  # noqa: BLE001 — a closed document or a stand-in: no history to follow
+        return None
+
+
 def header(st, project=None, agent=None, dirty=None, checkpoint=False):
     """The dock's header line: "project · scan file", the agent dot and
     text (None when no link is on) and the save state."""
@@ -272,14 +288,16 @@ class Dock:
     def tick(self):
         if not self.widget.isVisible():
             return
-        st, _a, _d = self._state()
-        if poll(st) != self._seen or reverse.editor_version() != getattr(self, "_box_seen", None):
+        st, _a, doc = self._state()
+        if (poll(st) != self._seen or reverse.editor_version() != getattr(self, "_box_seen", None)
+                or history_mark(doc) != getattr(self, "_history_seen", None)):
             self.refresh()
 
     def refresh(self, force=False):
         st, agent, doc = self._state()
         seen = poll(st)
         self._box_seen = reverse.editor_version()  # the feature box's numbers and ghost line
+        self._history_seen = history_mark(doc)  # an undo or a redo draws the panel again
         follow = seen != self._seen and seen[1] is not None
         self._seen = seen
         dirty = doc.isTouched() if doc is not None and hasattr(doc, "isTouched") else None

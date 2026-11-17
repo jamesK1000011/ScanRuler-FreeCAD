@@ -9,6 +9,29 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Results drawn in FreeCAD's 3D view (window review round 3: the panel
+  listed them, the view showed only the grey scan). After each ScanRuler
+  call, with a window only, one overlay node in each 3D view of the
+  document (scanrulerfc/scene.py, scene_coin.py) draws the fitted and
+  constructed elements, the dimensions with their values, the sections,
+  marked points, the nearest point, hot spots, an outline and a cut plane —
+  what the call made in orange — and the call's colour map on the scan
+  (deviation, wall thickness, draft, height, wear, segments) with its
+  legend, gone with the first call that does not show it. Mesh Tools'
+  edited copy is drawn in the scan's place while it stands, the scan
+  object's own drawing switched off (its SwitchNode; its Visibility, which
+  is saved, is left alone). View state only: no object, property or undo
+  step; nothing changes headless. The window echo is told which reads
+  bring the ScanRuler workbench up and light their key (OPENS: scan_open,
+  scan_info, scan_qa, the Mesh Tools stayed in the Mesh workbench), the
+  Open Scan… and element keys for scan_open, element_fit_marked and
+  element_construct, words with the measured value (PHRASES today; WORDS
+  and SELECTS_FOR for an Agent Link that reads them). The panel draws
+  again on an undo or a redo (it kept the Reverse engineer's features from
+  before). scan_segment and scan_outline no longer write RuntimeWarnings
+  (NaN) to the Report view on a turned or CAD-tessellated block. Findings
+  in docs/hardening/sr4-findings.md.
+
 - The scan's mesh object holds its points in the scan's own order (built
   from Vector points and tuple triangles, the form FreeCAD 1.1 takes); a
   document read back puts the triangles on the right points again, also
