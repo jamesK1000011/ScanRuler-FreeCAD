@@ -12,9 +12,17 @@
 # were the tool's name, with no measured value ("Scan nearest", "Wear
 # diff"); the hidden mesh scan_open read from stayed selected.
 #
+# Window pass 3 (17 Nov): most captions were still the tool's name
+# (fit_scan_*, flat_*, mesh_trim, scan_noise, scan_pattern, wear_setup,
+# element_set_visible, report_get), and flat_profile's was its help text
+# (Agent Link read the answer's note). Every tool of this add-on now has
+# words from its own answer; other tools (Agent Link's, other add-ons')
+# get None here, so their own words stand.
+#
 # Pure Python and the add-on's own data: no FreeCAD, no Agent Link.
 
 import json
+import math
 import os
 
 from . import workspaces as W
@@ -36,6 +44,9 @@ def _entries():
 # stays false: they change no FreeCAD object, so no undo step is opened.
 OPENS = tuple(sorted(n for n, e in _entries().items()
                      if e.get("workbench") == WB and not e.get("changes") and not n.startswith("scan_snapshot_")))
+
+# The tools these words are for: this add-on's own, every one in tools.json.
+OWN = frozenset(_entries())
 
 # Keys for tools the workspace tables give none (workspaces.command_for):
 # Open Scan… (the ScanRuler menu's), and the element keys by kind for the
@@ -142,10 +153,40 @@ def _file(b):
 
 
 def _mesh(b):
+    """'edited copy 10,036 triangles, 22,431 mm³' (and its open edges when
+    there are any): the mesh as a Mesh Tools edit left it."""
     m = b.get("mesh") if isinstance(b, dict) else None
     if isinstance(m, dict) and isinstance(m.get("triangles"), int):
-        return f"{m.get('working', 'mesh')} {m['triangles']:,} triangles"
+        out = f"{m.get('working', 'mesh')} {m['triangles']:,} triangles"
+        if isinstance(m.get("volume"), (int, float)) and not isinstance(m.get("volume"), bool):
+            out += f", {_vol(m['volume'])}"
+        if isinstance(m.get("open"), int) and m["open"] > 0:
+            out += f", {m['open']:,} open edges"
+        return out
     return None
+
+
+def _vol(v, nd=1):
+    """'22,431.2 mm³'."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    s = f"{v:,.{nd}f}".rstrip("0").rstrip(".")
+    return f"{s} mm³"
+
+
+def _clause(text, most=90):
+    """The first clause of an answer's own sentence ('Trimmed Stub to the
+    break — 499.0 mm³, …' stays whole up to most characters)."""
+    t = str(text or "").strip()
+    if not t:
+        return None
+    for stop in (". ", "; "):
+        i = t.find(stop)
+        if 0 < i < most:
+            t = t[:i]
+            break
+    t = t.rstrip(".")
+    return t if len(t) <= most else t[: most - 1].rstrip() + "…"
 
 
 def _join(head, *tail):
@@ -163,6 +204,10 @@ def words(name, args=None, body=None):
     a = args if isinstance(args, dict) else {}
     b = body
     name = str(name or "")
+    if name not in OWN:
+        # Agent Link asks every add-on's words for every call: another
+        # add-on's tools (and Agent Link's own) keep their own words.
+        return None
     try:
         return _words(name, a, b)
     except Exception:  # noqa: BLE001 — words never stop a call
@@ -208,7 +253,8 @@ def _words(name, a, b):
                      f"{_mm(_d(b, 'size', 'before'))} → {_mm(_d(b, 'size', 'after'))} across" if isinstance(b.get("size"), dict) else None)
     if name in ("element_fit", "element_fit_marked", "element_construct"):
         verb = "Constructed" if name == "element_construct" else "Fitted"
-        return f"{verb} {_element(b.get('element')) or 'an element'}"
+        marked = _d(b, "element", "source", "markedPoints")
+        return _join(f"{verb} {_element(b.get('element')) or 'an element'}", f"from {marked:,} marked points" if isinstance(marked, int) else None)
     if name == "element_rename":
         return f"Renamed to {_d(b, 'element', 'name')}" if _d(b, "element", "name") else None
     if name == "element_remove":
@@ -223,7 +269,36 @@ def _words(name, a, b):
         gone = b.get("removed")
         return f"Removed dimension {gone.get('name') if isinstance(gone, dict) else a.get('dimension') or ''}".strip()
     if name == "report_get":
-        return _join("Report", _count(b.get("dimensions"), "dimension"), _count(b.get("elements"), "element"))
+        r = b.get("report") if isinstance(b.get("report"), dict) else b
+        ch = r.get("checks") if isinstance(r.get("checks"), dict) else None
+        lines = len([x for x in str(b.get("text") or "").splitlines() if x.strip()]) if b.get("text") else None
+        return _join("Measurement report", _count(r.get("elements"), "element"), _count(r.get("dimensions"), "dimension"),
+                     f"{ch.get('pass', 0)} of {ch.get('checked', 0)} checks pass" if ch and ch.get("checked") else None,
+                     f"{lines} lines of text" if lines else None)
+    if name == "export_csv":
+        return _join("Exported the measurements", _file(b), _count(b.get("rows"), "row"))
+    if name == "element_set_visible":
+        el = b.get("element") or {}
+        return f"{'Showed' if el.get('visible') else 'Hid'} {el.get('name') or 'the element'}" if el else None
+    if name == "element_unlink":
+        el = b.get("element") or {}
+        src = el.get("source") or {}
+        return _join(f"Unlinked {el.get('name') or 'the element'}", f"now fixed coordinates ({src.get('method')})" if src.get("method") else "now fixed coordinates")
+    if name == "element_to_document":
+        made = b.get("made") if isinstance(b.get("made"), list) else []
+        kinds = ", ".join(f"{m.get('name') or m.get('label')} {m.get('shape') or m.get('kind') or ''}".strip() for m in made[:4] if isinstance(m, dict))
+        return _join(f"Made {len(made)} object{'' if len(made) == 1 else 's'} in {b.get('group') or 'the document'}", kinds or None, _file(b))
+    if name == "section_to_sketch":
+        fitted = b.get("fitted") if isinstance(b.get("fitted"), (dict, list)) else None
+        if isinstance(fitted, list):
+            lines = sum(int((c or {}).get("lines") or 0) for c in fitted if isinstance(c, dict))
+            arcs = sum(int((c or {}).get("arcs") or 0) + int((c or {}).get("circles") or 0) for c in fitted if isinstance(c, dict))
+        elif isinstance(fitted, dict):
+            lines, arcs = int(fitted.get("lines") or 0), int(fitted.get("arcs") or 0) + int(fitted.get("circles") or 0)
+        else:
+            lines = arcs = None
+        return _join(f"Sketch {b.get('sketch') or ''} in {b.get('body') or 'a body'}".replace("Sketch  in", "Sketch in"),
+                     f"{lines} lines, {arcs} arcs or circles" if lines is not None else None, _count(b.get("wires"), "wire"))
     if name == "section_cut":
         s = b.get("section") or {}
         return _join(f"Cut section {s.get('name') or ''}".strip(), f"{s.get('across')}{' at ' + _mm(s.get('offset')) if s.get('offset') is not None else ''}" if s.get("across") else None,
@@ -231,7 +306,13 @@ def _words(name, a, b):
     if name == "section_list":
         return _join("Sections", _count(b.get("sections"), "section"))
     if name == "section_fit":
-        return _join(f"Fitted section {_d(b, 'section', 'name') or ''}".strip(), _count(b.get("chains"), "chain"))
+        kinds = {}
+        for c in b.get("chains") or []:
+            for pc in (c.get("pieces") or []) if isinstance(c, dict) else []:
+                if isinstance(pc, dict) and pc.get("kind"):
+                    kinds[pc["kind"]] = kinds.get(pc["kind"], 0) + 1
+        return _join(f"Fitted section {_d(b, 'section', 'name') or ''}".strip(), _count(b.get("chains"), "chain"),
+                     ", ".join(_count(v, k) for k, v in sorted(kinds.items())) or None)
     if name == "section_get":
         return _join(f"Section {_d(b, 'section', 'name') or ''}".strip(), _count(b.get("chains"), "chain"))
     if name == "section_remove":
@@ -255,13 +336,30 @@ def _words(name, a, b):
             return _join(f"{verb}: {ref.get('fileName')}" if ref.get("fileName") else verb, _count(ref.get("triangles"), "triangle"))
         if name == "deviation_hotspots":
             spots = b.get("hotspots") if isinstance(b.get("hotspots"), list) else b.get("patches")
-            return _join(verb, _count(spots, "hot spot"))
+            first = spots[0] if isinstance(spots, list) and spots and isinstance(spots[0], dict) else {}
+            return _join(verb, _count(b["found"] if isinstance(b.get("found"), int) else spots, "hot spot"),
+                         f"worst {_mm(first.get('extreme'))} {first.get('side') or ''}".rstrip() if first.get("extreme") is not None else None,
+                         f"{_n(first.get('area'), 1)} mm²" if first.get("area") is not None else None)
         if name == "deviation_volume":
             ex, mi = _d(b, "excess", "volume"), _d(b, "missing", "volume")
-            return _join(verb, f"excess {_n(ex, 1)} mm³" if ex is not None else None, f"missing {_n(mi, 1)} mm³" if mi is not None else None, _count(b.get("regions"), "region"))
+            rows = [r for r in b.get("regions") or [] if isinstance(r, dict)]
+            first = rows[0] if rows else {}
+            return _join(verb, f"excess {_n(ex, 1)} mm³" if ex is not None else None, f"missing {_n(mi, 1)} mm³" if mi is not None else None,
+                         _count(b["found"] if isinstance(b.get("found"), int) else rows, "region"),
+                         f"largest {first.get('kind')} {_vol(first.get('volume'))}, {_mm(first.get('maxDepth'), 2)} deep" if first.get("volume") is not None else None)
         if name == "deviation_export":
             return _join(verb, _file(b), f"{_n(b.get('withinTolerancePct'), 1)} % within ±{_n(b.get('tolerance'))} mm" if b.get("withinTolerancePct") is not None else None)
+        if name == "deviation_settings":
+            se = _d(b, "deviation", "settings") or {}
+            return _join(verb, f"colours ±{_mm(se.get('range'))}" if se.get("range") is not None else None,
+                         f"tolerance ±{_mm(se.get('tolerance'))}" if se.get("tolerance") is not None else None,
+                         f"search {_mm(se.get('maxDistance'))}" if se.get("maxDistance") is not None else None) if se else _join(verb, _dev(b))
         return _join(verb, _dev(b))
+    if name == "thickness_settings":
+        se = _d(b, "thickness", "settings") or b.get("settings") or {}
+        return _join("Wall thickness settings", f"limit {_mm(se.get('limit'))}" if se.get("limit") is not None else None,
+                     f"colours {_n(se.get('low'))} to {_mm(se.get('high'))}" if se.get("low") is not None and se.get("high") is not None else None,
+                     f"{se.get('method')} up to {_mm(se.get('maxThickness'))}" if se.get("method") else None)
     if name.startswith("thickness_"):
         s = _d(b, "thickness", "stats") or {}
         return _join("Wall thickness" if name == "thickness_measure" else "Wall thickness settings",
@@ -294,13 +392,355 @@ def _words(name, a, b):
             return _join("Inspected the mesh", _mesh(b) or (_count(b.get("triangles"), "triangle") if isinstance(b.get("triangles"), int) else None),
                          _count(b.get("open"), "open edge") if isinstance(b.get("open"), int) else None)
         if name == "mesh_wrap":
-            return _join("Wrapped (preview beside the mesh)", _count(_d(b, "wrap", "triangles") or b.get("triangles"), "triangle"))
+            w = b.get("wrap") or {}
+            vol = _vol(w.get("volume"))
+            if b.get("edit"):  # preview: false — applied at once
+                return _join("Wrapped and applied", _mesh(b), f"wrap {vol}" if vol else None)
+            return _join("Wrapped (a preview over the mesh)", _count(w.get("triangles") or b.get("triangles"), "triangle"), vol,
+                         _count(w.get("shells"), "shell"))
+        if name == "mesh_trim":
+            pc = b.get("piece") or {}
+            return _join(f"Trimmed {pc.get('name') or 'the piece'} to the break", _vol(pc.get("volume")),
+                         f"mating face {_n(pc.get('matingArea'), 1)} mm²" if pc.get("matingArea") is not None else None) if pc else _clause(b.get("status"))
+        if name == "mesh_discard":
+            return _join(f"Discarded the {b.get('discarded') or a.get('what') or 'preview'}", _mesh(b))
+        if name == "mesh_shell":
+            ed = b.get("edit") or {}
+            return _join(_cap(ed.get("text")) or "Hollowed", _count(ed.get("cavities"), "cavity", "cavities"), _mesh(b))
         if edit:
             return _join(edit[:1].upper() + edit[1:], _mesh(b))
-        return None
-    if isinstance(b.get("file"), dict):
-        return _join(name.replace("_", " ").capitalize(), _file(b))
-    return None
+        if b.get("status"):
+            return _join(_clause(b["status"]), _mesh(b))
+        return _generic(name, a, b)
+    if name.startswith("flat_"):
+        return _flat(name, a, b)
+    if name.startswith("fit_scan_"):
+        return _fit_scan(name, a, b)
+    if name.startswith("wear_"):
+        return _wear(name, a, b)
+    if name.startswith("reverse_"):
+        return _reverse(name, a, b)
+    if name == "scan_noise":
+        if b.get("sigmaMm") is not None:
+            return _join("Scan noise", f"σ {_mm(b.get('sigmaMm'), 4)} (90 % under {_mm(b.get('p90'), 4)})" if b.get("p90") is not None else f"σ {_mm(b.get('sigmaMm'), 4)}",
+                         f"point spacing {_mm(b.get('spacingMm'), 3)}" if b.get("spacingMm") is not None else None, _count(b.get("sampled"), "point") + " sampled" if isinstance(b.get("sampled"), int) else None)
+        if b.get("added"):
+            return _join("Kept a scanner", (b["added"] or {}).get("name") if isinstance(b.get("added"), dict) else None)
+        if b.get("removed"):
+            return f"Removed the scanner {b['removed']}"
+        if "scanners" in b:
+            return _join("Scanners", _count(b.get("scanners"), "scanner"), f"using {_d(b, 'using', 'name')}" if _d(b, "using", "name") else None)
+        return _generic(name, a, b)
+    if name == "scanner":
+        return _join("Scanners", _count(b.get("scanners"), "scanner"), f"using {_d(b, 'using', 'name')}" if _d(b, "using", "name") else None,
+                     f"exported {b['exported']}" if b.get("exported") is not None else None) if "scanners" in b or "exported" in b else _generic(name, a, b)
+    if name == "scan_pattern":
+        rows = [r for r in b.get("heights") or [] if isinstance(r, dict)]
+        rep = [r for r in rows if isinstance(r.get("count"), int) and r["count"] > 1]
+        if rep:
+            best = max(rep, key=lambda r: r.get("score") or 0)
+            return _join("Repeat found", f"{best['count']} × {_n(best.get('pitchDeg'), 2)}°" if best.get("pitchDeg") is not None else f"{best['count']} times",
+                         f"score {_n(best.get('score'), 2)}" if best.get("score") is not None else None, f"at {len(rep)} of {len(rows)} heights")
+        rings = [g for r in rows for g in (r.get("rings") or []) if isinstance(g, dict)]
+        return _join("No repeat found", f"{len(rows)} heights read", f"a ring of radius {_mm(rings[0].get('radius'))}" if rings else None)
+    if name == "scan_thread":
+        return _join(f"Thread: {b.get('verdict') or 'read'}", (b.get("best") or {}).get("designation") if isinstance(b.get("best"), dict) else b.get("best"),
+                     f"pitch {_mm(b.get('pitch'))}" if isinstance(b.get("pitch"), (int, float)) else None)
+    if name == "scan_cloud":
+        return _join("Wrote the point cloud", _file(b), _count(b.get("points"), "point"))
+    if name.startswith("scan_snapshot_"):
+        return _join({"scan_snapshot_latest": "Latest window shot", "scan_snapshot_list": "Window shots", "scan_snapshot_wait": "Waited for a window shot"}.get(name, "Window shot"),
+                     _count(b.get("snapshots") or b.get("shots"), "shot") if (b.get("snapshots") or b.get("shots")) is not None else None,
+                     _file(b), f"{b.get('width')} × {b.get('height')} px" if b.get("width") and b.get("height") else None,
+                     _count(b.get("marks"), "mark") if isinstance(b.get("marks"), int) and b["marks"] else None)
+    return _generic(name, a, b)
+
+
+def _cap(t):
+    t = str(t or "").strip()
+    return t[:1].upper() + t[1:] if t else None
+
+
+def _flat(name, a, b):
+    """The 2D sheet's tools (ScanRuler's flat workspace)."""
+    fl = b.get("flat") if isinstance(b.get("flat"), dict) else (b if "subject" in b and "elements" in b else None)
+    el = b.get("element") if isinstance(b.get("element"), dict) else None
+    note = b.get("note") if isinstance(b.get("note"), dict) else None
+    if name == "flat_open_image":
+        im = (fl or {}).get("image") or {}
+        cal = (fl or {}).get("calibration") or {}
+        ppm = cal.get("pxPerMm") or {}
+        return _join(f"Opened the image {im.get('fileName') or a.get('path') or ''}".strip(), f"{im.get('width')} × {im.get('height')} px" if im.get("width") else None,
+                     f"{_n(ppm.get('x'), 4)} px/mm from the file" if ppm.get("x") else "uncalibrated (pixels)", _count(_d(fl, "edges", "chains"), "edge chain"))
+    if name == "flat_calibrate":
+        c = b.get("calibration") or {}
+        return _join("Calibrated the image", f"{_n(_d(c, 'pxPerMm', 'x'), 4)} px/mm ({_n(c.get('dpi'), 1)} dpi)" if _d(c, "pxPerMm", "x") else None,
+                     f"places × {_n(b.get('scaledBy'), 4)}" if b.get("scaledBy") is not None else None, _count(b.get("chains"), "edge chain"))
+    if name == "flat_detect_edges":
+        return _join("Edges on the section" if b.get("note") and "section" in str(b.get("note")) else "Detected edges", _count(b.get("chains"), "chain"),
+                     f"sensitivity {_n(a.get('sensitivity'), 2)}" if a.get("sensitivity") is not None else None)
+    if name == "flat_edges":
+        rows = [c for c in b.get("chains") or [] if isinstance(c, dict)]
+        top = rows[0] if rows else None
+        return _join("Edge chains", _count(b.get("total"), "chain"),
+                     f"longest {_n(top.get('length'), 2)} {b.get('units') or 'mm'}{' closed' if top.get('closed') else ''}" if top else None)
+    if name == "flat_objects":
+        objs = [o for o in b.get("objects") or [] if isinstance(o, dict)]
+        return _join("Parts on the image", _count(b.get("count"), "part"),
+                     f"largest {_n(max(o.get('area') or 0 for o in objs), 2)} {b.get('units') or 'mm'}²" if objs else None, f"threshold {b.get('threshold')}" if b.get("threshold") is not None else None)
+    if name == "flat_profile":
+        ab = b.get("about") or {}
+        sides = [x for x in b.get("sides") or [] if isinstance(x, dict)]
+        sd = sides[0] if sides else {}
+        u = b.get("units") or "mm"
+        return _join(f"{_cap(ab.get('kind')) or 'Radial'} profile", f"{sd.get('peaks')} peaks" if sd.get("peaks") is not None else None,
+                     f"{_n(sd.get('min'), 3)} to {_n(sd.get('max'), 3)} {u}" if sd.get("min") is not None else None,
+                     f"pitch {_n(sd.get('pitch'), 2)}{'°' if sd.get('pitchUnit') == 'deg' else ' ' + u}" if sd.get("pitch") is not None else None,
+                     f"{len(sides)} sides" if len(sides) > 1 else None)
+    if name == "flat_curvature":
+        if b.get("element"):
+            st = [x for x in b.get("stretches") or [] if isinstance(x, dict)]
+            arc = next((x for x in st if x.get("radius") is not None), None)
+            return _join(f"Curvature of {b['element']}", _count(st, "stretch", "stretches"), f"radius {_mm(arc['radius'])}" if arc else None,
+                         f"comb {_d(b, 'comb', 'object')}" if b.get("comb") else None)
+        items = [x for x in b.get("items") or [] if isinstance(x, dict)]
+        st = [x for it in items for x in it.get("stretches") or [] if isinstance(x, dict)]
+        kinds = {}
+        for x in st:
+            kinds[x.get("kind")] = kinds.get(x.get("kind"), 0) + 1
+        arc = next((x for x in st if x.get("radius") is not None), None)
+        return _join(f"Curvature along {_count(items, 'chain')}", ", ".join(f"{v} {k}" for k, v in kinds.items() if k) or None,
+                     f"radius {_mm(arc['radius'])}" if arc else None, f"comb {_d(b, 'comb', 'object')} ({_d(b, 'comb', 'teeth')} teeth)" if b.get("comb") else None)
+    if name == "flat_fit":
+        if not el:
+            return None
+        fit = el.get("fit") or {}
+        k = el.get("kind")
+        if k == "point" and fit.get("at"):
+            val = f"at {_n(fit['at'][0], 3)}, {_n(fit['at'][1], 3)}"
+        elif k in ("circle", "arc") and fit.get("radius") is not None:
+            val = f"Ø {_n(2 * fit['radius'], 3)}" + (f", {_n(math.degrees(fit['sweep']), 1)}°" if k == "arc" and fit.get("sweep") is not None else "") + \
+                  (f" at {_n(fit['center'][0], 3)}, {_n(fit['center'][1], 3)}" if fit.get("center") else "")
+        elif k == "line" and fit.get("length") is not None:
+            val = f"length {_n(fit['length'], 3)}" + (f" through {_n(fit['center'][0], 3)}, {_n(fit['center'][1], 3)}" if fit.get("center") else "")
+        else:
+            val = None
+        return _join(f"Fitted 2D {k or 'element'} {el.get('name') or ''}".strip(), val, f"σ {_n(fit.get('sigma'), 4)}" if fit.get("sigma") is not None else None)
+    if name == "flat_dimension_add":
+        dims = [x for x in (fl or {}).get("dimensions") or [] if isinstance(x, dict)]
+        want = a.get("name")
+        i = next((n for n, x in enumerate(dims) if x.get("name") == want), None) if want else None
+        i = len(dims) - 1 if i is None else i
+        d = dims[i] if dims else None
+        rows = _report_section(b.get("report"), "Dimensions")
+        said = rows[i].split("—", 1)[-1].strip() if d and len(rows) == len(dims) else None
+        val = f"{_n(d.get('value'), 3)} {(fl or {}).get('units') or ''}".strip() if d and d.get("value") is not None else None
+        return _join(f"2D dimension {d.get('name') if d else ''}".strip(), said or val)
+    if name == "flat_note_add":
+        return _join("Added a note", f"\"{note.get('text')}\" at {_n(note['at'][0], 2)}, {_n(note['at'][1], 2)}" if note and note.get("at") else None)
+    if name == "flat_edit":
+        if note:
+            return _join(f"Edited note {note.get('id')}", f"\"{note.get('text')}\"" if note.get("text") else None,
+                         ("shown" if note.get("visible") else "hidden") if "visible" in note else None)
+        what = a.get("element") if a.get("element") is not None else a.get("dimension")
+        bits = []
+        if a.get("name"):
+            bits.append(f"now {a['name']}")
+        if a.get("visible") is not None:
+            bits.append("shown" if a["visible"] else "hidden")
+        return _join(f"Edited {what}" if what is not None else "Edited the sheet", *bits)
+    if name == "flat_remove":
+        r = b.get("removed") or {}
+        bits = [_count(r.get(k), one) for k, one in (("elements", "element"), ("dimensions", "dimension"), ("notes", "note")) if r.get(k)]
+        return _join("Removed " + (", ".join(bits) if bits else "nothing"),
+                     f"{', '.join(b['invalidDimensions'])} now invalid" if b.get("invalidDimensions") else None,
+                     f"{_count(len((fl or {}).get('elements') or []), 'element')} left")
+    if name == "flat_set_alignment":
+        al = b.get("alignment")
+        if a.get("clear") or not al:
+            return "Cleared the sheet's alignment: image frame again"
+        o = al.get("origin") or [0, 0]
+        return _join("Aligned the sheet", f"origin {_n(o[0], 3)}, {_n(o[1], 3)}", f"X axis at {_n(al.get('angleDeg'), 2)}°")
+    if name == "flat_report":
+        t = str(b.get("text") or "")
+        scale = next((ln.split(":", 1)[1].strip() for ln in t.splitlines() if ln.startswith("Scale:")), None)
+        return _join("2D report", _count(len((fl or {}).get("elements") or []), "element"), _count(len((fl or {}).get("dimensions") or []), "dimension"),
+                     _clause(scale, 50) if scale else None)
+    if name == "flat_export":
+        return _join(f"Exported the sheet as {str(b.get('format') or '').upper()}".strip(), _file(b), _count(b.get("elements"), "element"), _count(b.get("chains"), "chain"))
+    if name == "flat_render":
+        return _join("Drew the sheet", _file(b), f"{b.get('width')} × {b.get('height')} px" if b.get("width") else None,
+                     f"{_n(_d(b, 'map', 'unitsPerPx'), 4)} {b.get('units') or 'mm'}/px" if _d(b, "map", "unitsPerPx") is not None else None)
+    return _generic(name, a, b)
+
+
+def _report_section(text, title):
+    """The lines under a heading of a flat report ('Dimensions')."""
+    out, inside = [], False
+    for ln in str(text or "").splitlines():
+        if ln.strip() == title:
+            inside = True
+            continue
+        if inside:
+            if not ln.strip():
+                if out:
+                    break
+                continue
+            if not ln.startswith(" "):
+                break
+            out.append(ln.strip())
+    return out
+
+
+def _fit_scan(name, a, b):
+    """Print fit (ScanRuler's printer calibration from a scanned print)."""
+    if name == "fit_scan_setup":
+        s = b.get("settings") or {}
+        return _join("Print fit setup", f"up {s.get('up')}" if s.get("up") else None, f"band {_mm(s.get('band'))}" if s.get("band") is not None else None,
+                     f"slicer {s.get('slicer')}" if s.get("slicer") else None, _count(b.get("runs"), "run") + " so far" if isinstance(b.get("runs"), int) else None)
+    if name == "fit_scan_features":
+        circles = [c for c in b.get("circles") or [] if isinstance(c, dict)]
+        holes = sum(1 for c in circles if c.get("hole") or c.get("kind") == "hole")
+        return _join("Print fit features", _count(b.get("planes"), "plane"), _count(circles, "circle"),
+                     f"{holes} hole{'' if holes == 1 else 's'}" if circles else None)
+    if name == "fit_scan_measure":
+        sc = b.get("scale") or {}
+        bits = [f"scale {'/'.join(_n(_d(sc, k, 'value'), 4) or '-' for k in ('x', 'y', 'z'))}" if sc else None,
+                f"contour {_mm(_d(b, 'contour', 'value'), 3)}" if _d(b, "contour", "value") is not None else None,
+                f"hole {_mm(_d(b, 'hole', 'value'), 3)}" if _d(b, "hole", "value") is not None else None,
+                f"χ²/dof {_n(b.get('fit'), 2)}{' (poor)' if b.get('poor') else ''}" if b.get("fit") is not None else None,
+                _count(len(_d(b, "slicer", "changes") or []) if b.get("slicer") else None, "slicer change")]
+        return _join(f"Print fit run {b.get('run')}" if b.get("run") else "Print fit measured", *bits)
+    if name == "fit_scan_export":
+        ch = b.get("changes")
+        return _join("Exported the print fit", _file(b), _count(ch, "change") if isinstance(ch, list) else None,
+                     "compensated STL" if b.get("applied") else None)
+    return _generic(name, a, b)
+
+
+def _wear(name, a, b):
+    if name == "wear_setup":
+        tags = [t for t in b.get("tags") or [] if isinstance(t, dict)]
+        ref = b.get("reference") or {}
+        s = b.get("settings") or {}
+        return _join("Wear setup", (f"region{'s' if len(tags) != 1 else ''} " + ", ".join(str(t.get("name")) for t in tags[:4])) if tags else "no region",
+                     f"reference {ref.get('name') or ref.get('source')}" if ref else "no reference yet",
+                     f"tolerance {_mm(s.get('tolerance'))}" if s.get("tolerance") is not None else None)
+    if name == "wear_rebuild":
+        return _join("Rebuilt the worn surface", _file(b), _count(b.get("moved"), "point") + " moved" if isinstance(b.get("moved"), int) else None,
+                     f"at most {_mm(b.get('largestMoveMm'))}" if b.get("largestMoveMm") is not None else None)
+    if name == "wear_prewarp":
+        return _join(f"Pre-warped target, run {b.get('run')}" if b.get("run") else "Pre-warped target", _file(b), f"RMS {_mm(b.get('rms'), 4)}" if b.get("rms") is not None else None,
+                     "stop here" if b.get("stop") else ("print and scan again" if "stop" in b else None))
+    return _generic(name, a, b)
+
+
+def _bodies(b):
+    rows = [x for x in b.get("bodies") or [] if isinstance(x, dict)]
+    if not rows:
+        return "no bodies" if "bodies" in b else None
+    first = ", ".join(f"{x.get('name')} {_vol(x.get('volume'), 2)}" for x in rows[:2] if x.get("volume") is not None)
+    return first + (f" and {len(rows) - 2} more" if len(rows) > 2 else "") if first else _count(rows, "body", "bodies")
+
+
+def _reverse(name, a, b):
+    """The Reverse engineer (ScanRuler's parametric feature tree)."""
+    failed = [x for x in b.get("failed") or [] if isinstance(x, dict)]
+    fail = f"{len(failed)} failed ({failed[0].get('name')})" if failed else None
+    if name == "reverse_feature_add" or name == "reverse_import_step":
+        added = [x for x in b.get("added") or [] if isinstance(x, dict)]
+        names = ", ".join(str(x.get("name")) for x in added[:3])
+        return _join(f"Added {names or 'a feature'}" if name == "reverse_feature_add" else f"Imported {names or 'the STEP file'}",
+                     ", ".join(f"{x.get('status')}" for x in added[:1] if x.get("status")) or None, fail, _bodies(b))
+    if name == "reverse_feature_suppress":
+        on = a.get("suppressed", True)
+        return _join(f"{'Suppressed' if on else 'Resumed'} {a.get('feature') or 'the feature'}", fail, _bodies(b))
+    if name == "reverse_feature_clear":
+        return _join("Cleared every feature and parameter", _bodies(b))
+    if name == "reverse_feature_move":
+        what = a.get("features") or a.get("feature")
+        return _join(f"Moved {', '.join(map(str, what)) if isinstance(what, list) else what}" + (f" after {a.get('after')}" if a.get("after") is not None else " to the top"), fail, _bodies(b))
+    if name == "reverse_feature_remove":
+        return _join(f"Removed {_count(b.get('removed'), 'feature')}", fail, _bodies(b))
+    if name == "reverse_feature_update":
+        f = b.get("feature") or {}
+        r = b.get("result") or {}
+        return _join(f"Updated {f.get('name') or a.get('feature') or 'the feature'}", r.get("status"), fail, _bodies(b))
+    if name == "reverse_feature_rollback":
+        rb = b.get("rollback") or {}
+        return _join("Rolled back" if rb.get("built") != rb.get("of") else "Rolled forward to the end", f"{rb.get('built')} of {rb.get('of')} built" if rb else None, _bodies(b))
+    if name == "reverse_feature_list":
+        rows = b.get("features")
+        if rows is None:
+            return _join(f"Feature {b.get('name') or a.get('feature')}", b.get("kind"), _d(b, "result", "status"))
+        return _join("Features", _count(rows, "feature"), f"{_d(b, 'rollback', 'built')} of {_d(b, 'rollback', 'of')} built" if b.get("rollback") else None,
+                     _count(b.get("parameters"), "parameter"))
+    if name == "reverse_feature_schema":
+        return _join(f"Fields of a {b.get('label') or b.get('kind') or 'feature'}", _count(len(b.get("fields") or {}), "field"))
+    if name in ("reverse_build", "reverse_build_stop"):
+        return _join("Rebuilt the part", _count(b.get("results"), "feature"), fail, _bodies(b))
+    if name.startswith("reverse_parameter_"):
+        q = b.get("parameter") if isinstance(b.get("parameter"), dict) else None
+        if name == "reverse_parameter_list":
+            return _join("Parameters", _count(b.get("parameters"), "parameter"))
+        verb = {"reverse_parameter_add": "Added parameter", "reverse_parameter_set": "Set", "reverse_parameter_rename": "Renamed",
+                "reverse_parameter_remove": "Removed parameter"}[name]
+        who = (q or {}).get("name") or a.get("parameter") or a.get("name")
+        val = f"= {_n(q.get('value'), 4)}" if q and q.get("value") is not None else None
+        to = f"to {a.get('to')}" if name == "reverse_parameter_rename" and a.get("to") else None
+        return _join(f"{verb} {who}".strip(), val, to, fail, _bodies(b))
+    if name == "reverse_body_names":
+        return _join("Bodies", _bodies(b))
+    if name == "reverse_body_describe":
+        bd = b.get("body") or {}
+        return _join(f"Body {bd.get('name') or ''}".strip(), _count(b.get("faces"), "face"), _count(b.get("edges"), "edge"), _vol(bd.get("volume")))
+    if name == "reverse_body_check":
+        return _join(f"Checked {b.get('shownAs') or b.get('name') or 'the body'}", "closed" if b.get("closed") else "not closed", "valid" if b.get("valid") else "not valid",
+                     _vol(b.get("volume")))
+    if name == "reverse_body_set":
+        bits = [f"now {a['name']}" if a.get("name") else None, f"colour {a['color']}" if a.get("color") else None,
+                ("shown" if a["visible"] else "hidden") if a.get("visible") is not None else None]
+        return _join(f"Set body {a.get('body')}", *bits)
+    if name == "reverse_body_clearance":
+        if b.get("overlap"):
+            return _join("Bodies overlap", f"{_vol(b.get('overlap'), 2)} shared")
+        return _join("Clearance", f"gap {_mm(b.get('gap'))}" if b.get("gap") is not None else None)
+    return _generic(name, a, b)
+
+
+# Each tool's words when no branch above reads its answer: the verb, then
+# the answer's key values (_values).
+HEADS = {
+    "catalog_part": "Catalog parts", "catalog_links": "Catalog search links", "catalog_provenance": "File provenance",
+    "manual_plan": "Assembly manual plan", "manual_check": "Checked the manual's steps", "manual_render": "Wrote the assembly manual",
+    "pack_setup": "Pack setup", "pack_plan": "Pack plan", "pack_write": "Wrote the pack",
+}
+
+
+def _values(b):
+    """A few key values of an answer: its file, counts of its lists and
+    its volume, area, RMS or gap, in that order."""
+    bits = [_file(b)]
+    for k, one, many in (("parts", "part", None), ("links", "link", None), ("files", "file", None), ("steps", "step", None), ("pictures", "picture", None),
+                         ("contents", "file", None), ("features", "feature", None), ("bodies", "body", "bodies"), ("elements", "element", None),
+                         ("chains", "chain", None), ("results", "result", None), ("issues", "issue", None), ("problems", "problem", None)):
+        v = b.get(k)
+        if isinstance(v, (list, int)) and not isinstance(v, bool):
+            bits.append(_count(v, one, many))
+    for k, fmt in (("volume", _vol), ("rms", lambda x: f"RMS {_mm(x, 4)}"), ("gap", lambda x: f"gap {_mm(x)}"), ("count", lambda x: f"{x} found")):
+        if isinstance(b.get(k), (int, float)) and not isinstance(b.get(k), bool):
+            bits.append(fmt(b[k]))
+    return [x for x in bits if x][:3]
+
+
+def _generic(name, a, b):
+    """Words for a tool no branch reads: its verb (HEADS, else its name in
+    words) and the answer's key values; the answer's own status sentence
+    where it has one. Never the tool's help: a note is not a result."""
+    head = HEADS.get(name) or name.replace("_", " ").capitalize()
+    if isinstance(b.get("status"), str) and b["status"].strip():
+        return _join(_clause(b["status"]), *_values(b)[:2])
+    return _join(head, *_values(b))
 
 
 # ---- what to select ----------------------------------------------------------------------------------

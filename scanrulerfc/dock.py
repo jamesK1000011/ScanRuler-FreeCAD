@@ -68,13 +68,20 @@ def history_mark(doc):
         return None
 
 
-def header(st, project=None, agent=None, dirty=None, checkpoint=False):
+def header(st, project=None, agent=None, dirty=None, checkpoint=False, workspace=None):
     """The dock's header line: "project · scan file", the agent dot and
-    text (None when no link is on) and the save state."""
+    text (None when no link is on) and the save state. In the 2D Measure
+    workspace with an image on the sheet, the image's file in place of the
+    scan's (window pass 3, 02-069 to 02-088: the header named the scan
+    while the 2D sheet was in front)."""
     scan = st.get("scan")
     name = project or UNTITLED
-    line = f"{name} · {scan.name}" if scan is not None and getattr(scan, "name", None) else name
-    out = {"title": line, "project": name, "file": getattr(scan, "name", None),
+    shown = getattr(scan, "name", None) if scan is not None else None
+    f = st.get("flatState") if workspace == "flat" else None
+    if isinstance(f, dict) and isinstance(f.get("subject"), dict) and f["subject"].get("kind") == "image" and f["subject"].get("name"):
+        shown = f["subject"]["name"]
+    line = f"{name} · {shown}" if shown else name
+    out = {"title": line, "project": name, "file": shown,
            "agent": AGENT_TEXT.get(agent) if agent else None, "agent_dot": AGENT_DOT.get(agent) if agent else None,
            "save": SAVE_TEXT[bool(dirty)] if dirty is not None else None,
            "checkpoint": CHECKPOINT_TEXT if checkpoint else None}
@@ -111,7 +118,7 @@ def dock_model(st, ui=None, current=W.DEFAULT_WORKSPACE, project=None, agent=Non
     and the credit. `ui` holds each page's own state by workspace id."""
     ws = workspace_of(st, current) if follow else current
     page_ui = (ui or {}).get(ws)
-    return {"workspace": ws, "label": W.workspace(ws)["label"], "header": header(st, project, agent, dirty, checkpoint),
+    return {"workspace": ws, "label": W.workspace(ws)["label"], "header": header(st, project, agent, dirty, checkpoint, ws),
             "page": PAGES[ws].build(st, page_ui), "footer": W.CREDIT}
 
 

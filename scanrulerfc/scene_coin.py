@@ -64,6 +64,10 @@ LABEL_FRAME = 0.3  # the backing's margin round the words, a share of the font s
 LEGEND_PX_SHARE = 1.0 / 56.0
 LEGEND_PX_MIN, LEGEND_PX_MAX = 13.0, 18.0
 LEGEND_PX = 13.0
+# The edited copy's offset is one step; a preview over it two, so the
+# preview stays in front of the copy and the part both.
+PREVIEW_OFFSET = 2.0
+TEXTURE_MAX = 2048  # the sheet image's texture, pixels a side at most
 
 
 def label_px(view_height=None, dpr=1.0):
@@ -151,6 +155,8 @@ class Builder:
         self.view = tuple(view) if view else None
         self.legend_layout = None   # card_layout of the legend drawn, for the facts
         self.label_node = None      # the type the labels were drawn with
+        self.offsets = []           # the meshes drawn a hair toward the eye
+        self.texture = None         # the sheet image's texture: [w, h] drawn, or why not
 
     def legend_font(self):
         """The legend's SoFont size, device pixels."""
@@ -193,14 +199,17 @@ class Builder:
         return c
 
     def mesh(self, V, F, rgb=None, colour=None, transparency=0.0, offset=False):
-        """Triangles, in one colour or coloured per vertex."""
+        """Triangles, in one colour or coloured per vertex. offset: drawn a
+        hair toward the eye (True: one step; a number: that many), so an
+        overlay wins over the surface it lies on instead of striping."""
         coin = self.coin
         sep = coin.SoSeparator()
         if offset:
             # A hair toward the eye, so the map wins over the scan it lies on.
+            k = float(offset) if not isinstance(offset, bool) else 1.0
             po = coin.SoPolygonOffset()
-            po.factor.setValue(-1.0)
-            po.units.setValue(-1.0)
+            po.factor.setValue(-k)
+            po.units.setValue(-k)
             sep.addChild(po)
         hints = coin.SoShapeHints()
         hints.vertexOrdering.setValue(coin.SoShapeHints.COUNTERCLOCKWISE)
@@ -289,6 +298,61 @@ class Builder:
         sep.addChild(over)
         return sep
 
+    def image_texture(self, img, unit):
+        """The sheet's image as a textured square on the XY plane, or None:
+        SoTexture2 fed the grey rows (bottom row first, as OpenGL reads
+        them, as flat_open_image keeps them), at most TEXTURE_MAX pixels a
+        side (every n-th pixel past that), lit as it is (BASE_COLOR)."""
+        coin = self.coin
+        g = img.get("gray") if isinstance(img, dict) else None
+        if g is None:
+            self.texture = "no pixels"
+            return None
+        try:
+            g = np.asarray(g, dtype=np.uint8)
+            step = max(1, int(np.ceil(max(g.shape) / float(TEXTURE_MAX))))
+            t = np.ascontiguousarray(g[::step, ::step])
+            th, tw = t.shape
+            sep = coin.SoSeparator()
+            lm = coin.SoLightModel()
+            lm.model.setValue(coin.SoLightModel.BASE_COLOR)
+            sep.addChild(lm)
+            mat = coin.SoBaseColor()
+            mat.rgb.setValue(1.0, 1.0, 1.0)
+            sep.addChild(mat)
+            tex = coin.SoTexture2()
+            tex.image.setValue(coin.SbVec2s(int(tw), int(th)), 1, t.tobytes())
+            sep.addChild(tex)
+            tc = coin.SoTextureCoordinate2()
+            tc.point.setValues(0, 4, [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+            sep.addChild(tc)
+            W, H = float(img["width"]) * unit[0], float(img["height"]) * unit[1]
+            co = coin.SoCoordinate3()
+            co.point.setValues(0, 4, [[0.0, 0.0, 0.0], [W, 0.0, 0.0], [W, H, 0.0], [0.0, H, 0.0]])
+            sep.addChild(co)
+            fs = coin.SoFaceSet()
+            fs.numVertices.setValue(4)
+            sep.addChild(fs)
+            self.texture = [int(tw), int(th)]
+            return sep
+        except Exception as e:  # noqa: BLE001 — no texture (a stand-in, an older pivy): the edges and elements still show
+            self.texture = f"{type(e).__name__}: {e}"
+            return None
+
+    def sheet(self, flat):
+        """The 2D sheet: its image (an image's sheet), then its border,
+        edges, elements, dimensions, notes and zero point, all on top of
+        the model (SoAnnotation): the flat workspace in the 3D view."""
+        coin = self.coin
+        over = coin.SoAnnotation()
+        if flat.get("kind") == "image" and flat.get("image") is not None:
+            tex = self.image_texture(flat["image"], flat.get("unit") or (1.0, 1.0))
+            if tex is not None:
+                over.addChild(tex)
+        for sh in _seq(flat.get("items")):
+            over.addChild(self.shape(sh))
+        return over
+
     def build(self, plan, scan_size=10.0):
         """The whole scene as one node (named NODE_NAME), or None when there
         is nothing to draw."""
@@ -302,15 +366,26 @@ class Builder:
         layer = plan.get("map")
         if plan.get("mesh") is not None:
             V, F = plan["mesh"]
-            root.addChild(self.mesh(V, F, colour=SC.EDITED))
+            # A hair toward the eye: the copy lies where the part it was
+            # made from may still be shown (a Part solid the scan was
+            # meshed from): window pass 3, 05-055 to 05-074, striped.
+            root.addChild(self.mesh(V, F, colour=SC.EDITED, offset=True))
+            self.offsets.append("editedCopy")
             drawn += 1
         elif layer is not None and plan.get("scanVF") is not None:
             V, F = plan["scanVF"]
             if len(layer["rgb"]) == len(V):
                 root.addChild(self.mesh(V, F, rgb=layer["rgb"], offset=True))
                 drawn += 1
-        for _name, V, F in _seq(plan.get("previews")):
-            root.addChild(self.mesh(V, F, colour=SC.GHOST, transparency=GHOST_TRANSPARENCY))
+        for name, V, F in _seq(plan.get("previews")):
+            # In front of the mesh it lies on (a wrap of a box is the box
+            # where its corners are sharp: 05-063 teal stripes).
+            root.addChild(self.mesh(V, F, colour=SC.GHOST, transparency=GHOST_TRANSPARENCY, offset=PREVIEW_OFFSET))
+            self.offsets.append(name)
+            drawn += 1
+        flat = plan.get("flat")
+        if flat is not None:
+            root.addChild(self.sheet(flat))
             drawn += 1
         lift = 0.0
         for group in ("sections", "elements", "dimensions", "items"):
@@ -426,16 +501,48 @@ class Window:
                 except (RuntimeError, AttributeError):  # a view closing, or not a 3D view
                     continue
         self.installed[doc.Name] = put
+        framed = frame_sheet(self.coin, views, plan.get("flat")) if put and plan.get("flat") else None
         layer = plan.get("map")
-        return {"drawn": bool(put), "views": len(put), "map": layer["kind"] if layer else None,
+        return {"drawn": bool(put), "views": len(put), "map": layer["kind"] if layer else None, "framed": framed,
                 "legend": bool(layer and layer.get("legend")), "editedCopy": plan.get("mesh") is not None, "scan": scan_was,
                 "elements": len(plan["elements"]), "dimensions": len(plan["dimensions"]), "sections": len(plan["sections"]),
                 "items": [i["kind"] for i in plan["items"]],
                 "new": [x.get("name") for g in ("elements", "dimensions", "sections") for x in plan[g] if x.get("new")],
-                "facts": facts(plan, builder, height)}
+                "facts": facts(plan, builder, height, framed)}
 
 
-def facts(plan, builder, height=None):
+def frame_sheet(coin, views, flat):
+    """Each view turned square onto the 2D sheet (its u to the right, its v
+    up) and framed on it, as the flat workspace shows the sheet: Coin's
+    viewBoundingBox on the view's camera (FreeCAD's Fit selection does the
+    same). Window pass 3, 02-062 and 02-064: after flat_curvature's comb the
+    view stayed zoomed into the bore's corner through every later flat call.
+    Returns what was done, for the facts: {"views", "box", "look"} or
+    {"error"}. Never raises."""
+    try:
+        fr = flat["frame"]
+        q = SC.camera_rotation(fr["basisU"], fr["basisV"])
+        lo, hi = (np.asarray(x, dtype=float) for x in flat["box"])
+        pad = 0.04 * float(np.linalg.norm(hi - lo)) or 1.0
+        lo, hi = lo - pad, hi + pad
+        done = 0
+        for v in views:
+            try:
+                cam = v.getCameraNode()
+                w, h = v.getSize()[:2] if callable(getattr(v, "getSize", None)) else (1, 1)
+                cam.orientation.setValue(coin.SbRotation(*q))
+                cam.viewBoundingBox(coin.SbBox3f(*[float(x) for x in lo], *[float(x) for x in hi]), float(w) / float(h) if h else 1.0, 1.0)
+                done += 1
+            except Exception:  # noqa: BLE001 — a view without a camera (closing): the others still turn
+                continue
+        look = SC.rotate_by(q, [0.0, 0.0, -1.0])
+        return {"views": done, "box": [[round(float(x), 3) for x in lo], [round(float(x), 3) for x in hi]],
+                "look": [round(float(x), 4) for x in look]}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+def facts(plan, builder, height=None, framed=None):
     """What the window shows that a picture alone would otherwise have to
     tell, as plain data for the call's answer (window review round 6):
     the colours of what this call made and of the rest (hex), the label
@@ -465,6 +572,15 @@ def facts(plan, builder, height=None):
                              tickDecimals=lg.get("tickDecimals"), low=lg.get("low"), high=lg.get("high"))
         lay = builder.legend_layout or L.card_layout(lg, *(builder.view or (None, None)), builder.legend_font())
         out["legend"]["box"] = L.box_facts(lay)
+    if builder.offsets:
+        out["inFront"] = list(builder.offsets)
+    fl = plan.get("flat")
+    if fl is not None:
+        out["flat"] = dict(fl["counts"], sheet=fl["kind"], units=fl["units"],
+                           corners=[[round(float(c), 3) for c in p] for p in fl["corners"]],
+                           texture=builder.texture if fl["kind"] == "image" else None,
+                           new=[x.get("name") for x in fl["items"] if x.get("new")], framed=framed,
+                           scanHidden=bool(plan.get("scan") and plan["scan"].get("hide")))
     secs = _seq(plan.get("sections"))
     if secs:
         first = [np.asarray(x, dtype=float) for x in _seq(secs[0].get("lines")) if len(x)]
