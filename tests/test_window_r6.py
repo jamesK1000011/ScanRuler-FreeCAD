@@ -73,10 +73,11 @@ class Colours(unittest.TestCase):
 
 class Labels(unittest.TestCase):
     def test_label_size_scales_with_the_view_and_the_screen(self):
-        self.assertEqual(SCC.label_px(1704, 2.0), 16.0)  # an 852 px tall view on a Retina Mac
-        self.assertEqual(SCC.label_px(700, 1.0), 13.0)
+        # Round 7: a 40th of the view's height, 12..28 (see test_window_r7).
+        self.assertEqual(SCC.label_px(1704, 2.0), 21.0)  # an 852 px tall view on a Retina Mac
+        self.assertEqual(SCC.label_px(700, 1.0), 18.0)
         self.assertEqual(SCC.label_px(400, 2.0), 12.0)   # never under 12
-        self.assertEqual(SCC.label_px(4000, 1.0), 22.0)  # never over 22
+        self.assertEqual(SCC.label_px(4000, 1.0), 28.0)  # never over 28
         self.assertEqual(SCC.label_px(None, 2.0), SCC.FONT_SIZE)
 
     def test_font_size_is_device_pixels_and_new_is_larger(self):
@@ -101,7 +102,7 @@ class Labels(unittest.TestCase):
             def getSize(self):  # noqa: N802
                 return (2400, 1500)
 
-        self.assertEqual(SCC.text_scale(G(), [V()]), (14.0, 2.0, 1500))
+        self.assertEqual(SCC.text_scale(G(), [V()]), (19.0, 2.0, 1500))
         self.assertEqual(SCC.text_scale(object(), []), (SCC.FONT_SIZE, 1.0, None))
 
 

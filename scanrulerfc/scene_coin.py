@@ -44,12 +44,26 @@ GHOST_TRANSPARENCY = 0.6
 # for what this call made. Coin's SoFont size is in the framebuffer's
 # device pixels, so it is this times the screen's device pixel ratio
 # (2 on a Retina Mac). Window review round 6: a fixed 13 came out about
-# 6 px in a 1400 px window picture, too small to read.
-LABEL_PX_SHARE = 1.0 / 52.0
-LABEL_PX_MIN, LABEL_PX_MAX = 12.0, 22.0
+# 6 px in a 1400 px window picture. Round 7: a 52nd of the view (16 px in
+# an 824 px view) came out 11-12 px and thin in a 1400 px picture of a
+# 1710 px window; a 40th (21 px there) is about 17 px in that picture.
+LABEL_PX_SHARE = 1.0 / 40.0
+LABEL_PX_MIN, LABEL_PX_MAX = 12.0, 28.0
 LABEL_NEW_PX = 2.0
-LEGEND_PX = 13.0
 FONT_SIZE = 13.0  # the label size when the view's size is not known (stand-ins, an older FreeCAD)
+# A label is bold, on a light backing: FreeCAD's SoTextLabel (an SoText2
+# with a filled box behind it, registered by FreeCAD's GUI) where it is
+# there, a plain SoText2 where not. Coin reads "family:style" font names;
+# a face it cannot find falls back to its default one.
+LABEL_FONT = "Arial:Bold"
+LABEL_BACK_RGB = (0.97, 0.97, 0.96)
+LABEL_FRAME = 0.3  # the backing's margin round the words, a share of the font size
+# The legend's words: a share of the view's height too, smaller than the
+# labels (the card holds up to 20 lines), in Coin's default monospaced
+# face (its columns are laid out from the characters' count).
+LEGEND_PX_SHARE = 1.0 / 56.0
+LEGEND_PX_MIN, LEGEND_PX_MAX = 13.0, 18.0
+LEGEND_PX = 13.0
 
 
 def label_px(view_height=None, dpr=1.0):
@@ -62,6 +76,31 @@ def label_px(view_height=None, dpr=1.0):
     if not h > 0:
         return FONT_SIZE
     return float(min(LABEL_PX_MAX, max(LABEL_PX_MIN, round(h * LABEL_PX_SHARE))))
+
+
+def legend_px(view_height=None, dpr=1.0):
+    """The legend's font size in logical pixels for a view view_height
+    device pixels tall."""
+    try:
+        h = float(view_height) / max(1.0, float(dpr or 1.0))
+    except (TypeError, ValueError):
+        return LEGEND_PX
+    if not h > 0:
+        return LEGEND_PX
+    return float(min(LEGEND_PX_MAX, max(LEGEND_PX_MIN, round(h * LEGEND_PX_SHARE))))
+
+
+def view_size(views):
+    """(width, height) of the first view in device pixels
+    (View3DInventor.getSize), or None."""
+    for v in views:
+        try:
+            w, h = v.getSize()[:2]
+            if int(w) > 0 and int(h) > 0:
+                return int(w), int(h)
+        except Exception:  # noqa: BLE001 — a view without getSize
+            continue
+    return None
 
 
 def text_scale(gui, views):
@@ -105,10 +144,44 @@ def _seq(x):
 class Builder:
     """Coin nodes for one plan, from a coin module (pivy's or a stand-in)."""
 
-    def __init__(self, coin, label_px=FONT_SIZE, dpr=1.0):
+    def __init__(self, coin, label_px=FONT_SIZE, dpr=1.0, view=None):
         self.coin = coin
         self.label_px = float(label_px)
         self.dpr = float(dpr or 1.0)
+        self.view = tuple(view) if view else None
+        self.legend_layout = None   # card_layout of the legend drawn, for the facts
+        self.label_node = None      # the type the labels were drawn with
+
+    def legend_font(self):
+        """The legend's SoFont size, device pixels."""
+        return legend_px(self.view[1] if self.view else None, self.dpr) * self.dpr
+
+    def label(self, text, new=False):
+        """A label's nodes: its font (bold) and its words on a light
+        backing (SoTextLabel), or plain words where FreeCAD's node type
+        is not there (stand-ins, an older FreeCAD)."""
+        coin = self.coin
+        font = coin.SoFont()
+        font.size.setValue(self.font_size(new))
+        try:
+            font.name.setValue(LABEL_FONT)
+        except Exception:  # noqa: BLE001 — a stand-in without the field
+            pass
+        words = None
+        try:
+            got = coin.SoType.fromName("SoTextLabel").createInstance()
+            if got is not None and hasattr(got, "background"):
+                got.background = True
+                got.backgroundColor = LABEL_BACK_RGB
+                got.frameSize = LABEL_FRAME * self.font_size(new)
+                words = got
+        except Exception:  # noqa: BLE001 — no SoType (a stand-in) or no such type
+            words = None
+        if words is None:
+            words = coin.SoText2()
+        self.label_node = type(words).__name__ if words is not None else None
+        words.string.setValue(L.coin_text(text))
+        return font, words
 
     def font_size(self, new=False):
         """A label's SoFont size, device pixels."""
@@ -206,11 +279,8 @@ class Builder:
             tr = coin.SoTranslation()
             tr.translation.setValue(*[float(x) + (lift if i == 2 else 0.0) for i, x in enumerate(np.asarray(at, dtype=float))])
             t.addChild(tr)
-            font = coin.SoFont()
-            font.size.setValue(self.font_size(bool(sh.get("new"))))
+            font, words = self.label(text, bool(sh.get("new")))
             t.addChild(font)
-            words = coin.SoText2()
-            words.string.setValue(L.coin_text(text))
             t.addChild(words)
             over.addChild(t)
         sep = coin.SoSeparator()
@@ -248,7 +318,9 @@ class Builder:
                 root.addChild(self.shape(sh, lift))
                 drawn += 1
         if layer is not None and layer.get("legend") is not None and drawn:
-            root.addChild(L.coin_nodes(layer["legend"], coin=coin, font_size=LEGEND_PX * self.dpr))
+            fs = self.legend_font()
+            self.legend_layout = L.card_layout(layer["legend"], *(self.view or (None, None)), fs)
+            root.addChild(L.coin_nodes(layer["legend"], coin=coin, font_size=fs, layout=self.legend_layout))
         return root if drawn else None
 
 
@@ -342,7 +414,7 @@ class Window:
         self.clear(doc.Name)
         views = self.views(doc)
         px, dpr, height = text_scale(self.gui, views)
-        builder = Builder(self.coin, px, dpr)
+        builder = Builder(self.coin, px, dpr, view_size(views))
         node = builder.build(plan, SC.size_of(scan))
         put = []
         if node is not None:
@@ -381,8 +453,18 @@ def facts(plan, builder, height=None):
     if drawn:
         out["drawn"] = drawn
     layer = plan.get("map")
+    if builder.view:
+        out["viewSize"] = list(builder.view)
+    if builder.label_node:
+        out["labelNode"] = builder.label_node
+        out["labelFont"] = LABEL_FONT
     if layer is not None and layer.get("legend") is not None:
-        out["legend"] = dict(L.text_rows(layer["legend"]), fontSize=LEGEND_PX * builder.dpr)
+        lg = layer["legend"]
+        out["legend"] = dict(L.text_rows(lg), fontSize=builder.legend_font(),
+                             tickTexts=[L.coin_text(t["text"]) for t in lg.get("ticks") or []],
+                             tickDecimals=lg.get("tickDecimals"), low=lg.get("low"), high=lg.get("high"))
+        lay = builder.legend_layout or L.card_layout(lg, *(builder.view or (None, None)), builder.legend_font())
+        out["legend"]["box"] = L.box_facts(lay)
     secs = _seq(plan.get("sections"))
     if secs:
         first = [np.asarray(x, dtype=float) for x in _seq(secs[0].get("lines")) if len(x)]
