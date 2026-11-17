@@ -1,0 +1,1936 @@
+{
+ "about": "The tool descriptions as main held them before the ASD-STE100 rewrite (branch explore/full-ste); scripts/ste_check.py compares with them. toolNames: every tool name of this add-on, Agent Link and its other add-ons, to find the ones a text points to.",
+ "toolNames": [
+  "addon",
+  "addon_test",
+  "align_auto",
+  "align_clear",
+  "align_datum",
+  "align_symmetry",
+  "app_extensions",
+  "app_force_restart",
+  "app_install",
+  "app_recover",
+  "app_restart",
+  "asm_add",
+  "asm_bom",
+  "asm_check",
+  "asm_explode",
+  "asm_export",
+  "asm_fits",
+  "asm_ground",
+  "asm_joint",
+  "asm_joint_remove",
+  "asm_limits",
+  "asm_list",
+  "asm_motion",
+  "asm_new",
+  "asm_new_part",
+  "asm_pose",
+  "asm_rigid_group",
+  "asm_sub",
+  "asm_sweep",
+  "batch",
+  "bim_building",
+  "bim_component",
+  "bim_covering",
+  "bim_curtain_wall",
+  "bim_edit",
+  "bim_equipment",
+  "bim_export",
+  "bim_fence",
+  "bim_frame",
+  "bim_glue",
+  "bim_grid",
+  "bim_ifc",
+  "bim_ifc_brep",
+  "bim_image_plane",
+  "bim_import",
+  "bim_layers",
+  "bim_level",
+  "bim_library",
+  "bim_list",
+  "bim_material",
+  "bim_member",
+  "bim_nest",
+  "bim_opening",
+  "bim_panel",
+  "bim_panel_out",
+  "bim_pipe",
+  "bim_pipe_connector",
+  "bim_preflight",
+  "bim_profiles",
+  "bim_quantities",
+  "bim_rebar",
+  "bim_reextrude",
+  "bim_reference",
+  "bim_remove_shape",
+  "bim_reorder",
+  "bim_rewire",
+  "bim_roof",
+  "bim_schedule",
+  "bim_section",
+  "bim_space",
+  "bim_stairs",
+  "bim_structural_system",
+  "bim_structure",
+  "bim_trash",
+  "bim_truss",
+  "bim_views",
+  "bim_wall",
+  "board_enclosure",
+  "body_check",
+  "cam_dressup",
+  "cam_edit",
+  "cam_job",
+  "cam_library",
+  "cam_list",
+  "cam_op",
+  "cam_path",
+  "cam_post",
+  "cam_property_bag",
+  "cam_remove",
+  "cam_setup",
+  "cam_sim",
+  "cam_template_export",
+  "cam_tool",
+  "cam_tool_add",
+  "catalog_links",
+  "catalog_part",
+  "catalog_provenance",
+  "clearance",
+  "cmd_list",
+  "cmd_run",
+  "compound_explode",
+  "compound_filter",
+  "crash_collect",
+  "cut_check",
+  "cut_export",
+  "deviation_align",
+  "deviation_export",
+  "deviation_hotspots",
+  "deviation_measure",
+  "deviation_open_reference",
+  "deviation_set_target",
+  "deviation_settings",
+  "deviation_volume",
+  "dfm_check",
+  "dialog_answer",
+  "dimension_add",
+  "dimension_remove",
+  "dimension_set_basic",
+  "dimension_set_limit",
+  "doc_close",
+  "doc_graph",
+  "doc_info",
+  "doc_merge",
+  "doc_new",
+  "doc_open",
+  "doc_revert",
+  "doc_save",
+  "doc_save_all",
+  "doc_switch",
+  "draft_2d_view",
+  "draft_array",
+  "draft_clone",
+  "draft_dimension",
+  "draft_facebinder",
+  "draft_fix",
+  "draft_fonts",
+  "draft_from_sketch",
+  "draft_hatch",
+  "draft_label",
+  "draft_layer",
+  "draft_link_array",
+  "draft_modify",
+  "draft_outline",
+  "draft_plane",
+  "draft_shape",
+  "draft_style",
+  "draft_text",
+  "draft_to_sketch",
+  "drawing_exploded",
+  "drawing_make",
+  "element_construct",
+  "element_fit",
+  "element_fit_marked",
+  "element_list",
+  "element_remove",
+  "element_rename",
+  "element_set_visible",
+  "element_to_document",
+  "element_unlink",
+  "export",
+  "export_csv",
+  "export_file",
+  "fastener_add",
+  "fastener_list",
+  "fastener_print",
+  "fastener_set",
+  "fastener_types",
+  "fea_buckle",
+  "fea_chart",
+  "fea_clear",
+  "fea_export",
+  "fea_frame",
+  "fea_heat",
+  "fea_hold",
+  "fea_load",
+  "fea_modes",
+  "fea_native",
+  "fea_parts",
+  "fea_probe",
+  "fea_refine",
+  "fea_results",
+  "fea_setup",
+  "fea_shell",
+  "fea_solve",
+  "feature_edit",
+  "feature_list",
+  "feature_remove",
+  "feature_suppress",
+  "fem_add",
+  "fem_linearize",
+  "fem_mesh",
+  "fit",
+  "fit_scan_export",
+  "fit_scan_features",
+  "fit_scan_measure",
+  "fit_scan_setup",
+  "flat_calibrate",
+  "flat_curvature",
+  "flat_detect_edges",
+  "flat_dimension_add",
+  "flat_edges",
+  "flat_edit",
+  "flat_export",
+  "flat_fit",
+  "flat_note_add",
+  "flat_objects",
+  "flat_open_image",
+  "flat_profile",
+  "flat_remove",
+  "flat_render",
+  "flat_report",
+  "flat_set_alignment",
+  "gen_make",
+  "gen_part",
+  "gui_input",
+  "gui_unstick",
+  "guide_read",
+  "history_checkpoint",
+  "history_diff",
+  "history_redo",
+  "history_restore",
+  "history_undo",
+  "hw_embed",
+  "hw_embed_list",
+  "hw_hole",
+  "hw_pauses",
+  "hw_unembed",
+  "ifc_diff",
+  "ifc_edit",
+  "ifc_find",
+  "ifc_open",
+  "ifc_remove",
+  "ifc_save",
+  "import_file",
+  "insp_export",
+  "insp_faces",
+  "insp_list",
+  "insp_read",
+  "insp_run",
+  "insp_update",
+  "job_start",
+  "job_status",
+  "kicad_import",
+  "library_pack",
+  "link_edit",
+  "link_make",
+  "live_run",
+  "macro_approve",
+  "macro_list",
+  "macro_run",
+  "macro_save",
+  "macro_show",
+  "macro_unapprove",
+  "manual_check",
+  "manual_plan",
+  "manual_render",
+  "mass_ballast",
+  "mass_calibrate",
+  "mass_properties",
+  "mass_target",
+  "material_clear",
+  "material_get",
+  "material_list",
+  "material_set",
+  "measure",
+  "measure_keep",
+  "measure_mass",
+  "menu_list",
+  "menu_run",
+  "mesh_apply_reduced",
+  "mesh_apply_wrap",
+  "mesh_boolean",
+  "mesh_cut",
+  "mesh_cut_preview",
+  "mesh_delete_marked",
+  "mesh_densify",
+  "mesh_discard",
+  "mesh_discard_edited",
+  "mesh_export",
+  "mesh_fill_holes",
+  "mesh_flip_normals",
+  "mesh_inspect",
+  "mesh_mirror",
+  "mesh_offset",
+  "mesh_parts",
+  "mesh_reduce",
+  "mesh_remove_islands",
+  "mesh_shell",
+  "mesh_smooth",
+  "mesh_trim",
+  "mesh_undo",
+  "mesh_use_edited",
+  "mesh_wrap",
+  "meshobj_boolean",
+  "meshobj_boundary",
+  "meshobj_curvature",
+  "meshobj_decimate",
+  "meshobj_edit",
+  "meshobj_export",
+  "meshobj_from_shape",
+  "meshobj_info",
+  "meshobj_merge",
+  "meshobj_offset",
+  "meshobj_primitive",
+  "meshobj_project",
+  "meshobj_refine",
+  "meshobj_repair",
+  "meshobj_sections",
+  "meshobj_segments",
+  "meshobj_smooth",
+  "meshobj_split",
+  "meshobj_transform",
+  "meshobj_trim",
+  "meshobj_unwrap",
+  "mill_check",
+  "mill_export",
+  "note_add",
+  "note_answer",
+  "note_delete",
+  "note_done",
+  "note_list",
+  "object_align",
+  "object_appearance",
+  "object_delete",
+  "object_duplicate",
+  "object_freeze",
+  "object_get",
+  "object_group",
+  "object_list",
+  "object_rename",
+  "object_set",
+  "outputs_clean",
+  "pack_plan",
+  "pack_setup",
+  "pack_write",
+  "param_bind",
+  "param_list",
+  "param_remove",
+  "param_set",
+  "part_attach",
+  "part_boolean",
+  "part_chamfer",
+  "part_compound",
+  "part_container",
+  "part_datum",
+  "part_defeature",
+  "part_extract",
+  "part_extrude",
+  "part_face",
+  "part_fillet",
+  "part_fix",
+  "part_from_mesh",
+  "part_import_curves",
+  "part_join",
+  "part_loft",
+  "part_offset",
+  "part_offset2d",
+  "part_primitive",
+  "part_project",
+  "part_refine",
+  "part_review",
+  "part_revolve",
+  "part_ruled",
+  "part_section",
+  "part_slices",
+  "part_spec",
+  "part_split",
+  "part_sweep",
+  "part_thickness",
+  "part_transform",
+  "part_wire",
+  "patent_draft",
+  "patent_figures",
+  "pcb_order_package",
+  "pd_binder",
+  "pd_body_new",
+  "pd_boolean",
+  "pd_chamfer",
+  "pd_clone",
+  "pd_datum",
+  "pd_datum_plane",
+  "pd_draft",
+  "pd_fillet",
+  "pd_gear",
+  "pd_groove",
+  "pd_helix",
+  "pd_hole",
+  "pd_linear_pattern",
+  "pd_loft",
+  "pd_mirrored",
+  "pd_move_feature",
+  "pd_multitransform",
+  "pd_pad",
+  "pd_pipe",
+  "pd_pocket",
+  "pd_polar_pattern",
+  "pd_primitive",
+  "pd_reorder",
+  "pd_revolution",
+  "pd_shaft",
+  "pd_thickness",
+  "pd_tip",
+  "points_crop",
+  "points_export",
+  "points_fit",
+  "points_import",
+  "points_info",
+  "points_merge",
+  "points_mesh",
+  "points_sample",
+  "points_structure",
+  "pref_get",
+  "pref_history",
+  "pref_import",
+  "pref_pack",
+  "pref_reset",
+  "pref_rollback",
+  "pref_set",
+  "printed_channel",
+  "printer_add",
+  "printer_list",
+  "printer_pause",
+  "printer_send",
+  "printer_status",
+  "printer_stop",
+  "queue_go",
+  "recompute",
+  "report_get",
+  "report_read",
+  "reverse_body_check",
+  "reverse_body_clearance",
+  "reverse_body_describe",
+  "reverse_body_names",
+  "reverse_body_set",
+  "reverse_build",
+  "reverse_build_stop",
+  "reverse_feature_add",
+  "reverse_feature_clear",
+  "reverse_feature_list",
+  "reverse_feature_move",
+  "reverse_feature_remove",
+  "reverse_feature_rollback",
+  "reverse_feature_schema",
+  "reverse_feature_suppress",
+  "reverse_feature_update",
+  "reverse_import_step",
+  "reverse_parameter_add",
+  "reverse_parameter_list",
+  "reverse_parameter_remove",
+  "reverse_parameter_rename",
+  "reverse_parameter_set",
+  "robot_export",
+  "robot_move",
+  "robot_new",
+  "robot_path",
+  "robot_run",
+  "robot_tool",
+  "robot_trajectory",
+  "scad_code",
+  "scad_export",
+  "scad_import",
+  "scad_op",
+  "scad_status",
+  "scad_tidy",
+  "scan_cloud",
+  "scan_draft",
+  "scan_fit_surface",
+  "scan_heightmap",
+  "scan_info",
+  "scan_nearest",
+  "scan_noise",
+  "scan_open",
+  "scan_outline",
+  "scan_pattern",
+  "scan_qa",
+  "scan_query",
+  "scan_scale",
+  "scan_segment",
+  "scan_snapshot_latest",
+  "scan_snapshot_list",
+  "scan_snapshot_wait",
+  "scan_thread",
+  "scanner",
+  "section",
+  "section_cut",
+  "section_fit",
+  "section_get",
+  "section_list",
+  "section_remove",
+  "section_to_sketch",
+  "selection",
+  "session_state",
+  "setup",
+  "shape_query",
+  "sheet_cells",
+  "sheet_chart",
+  "sheet_clear",
+  "sheet_export",
+  "sheet_format",
+  "sheet_import",
+  "sheet_list",
+  "sheet_new",
+  "sheet_read",
+  "sheet_rows",
+  "sheet_set",
+  "sheet_table",
+  "show",
+  "sketch_add",
+  "sketch_array",
+  "sketch_attach",
+  "sketch_bspline",
+  "sketch_carbon",
+  "sketch_constrain",
+  "sketch_copy",
+  "sketch_edit",
+  "sketch_extend",
+  "sketch_external",
+  "sketch_join",
+  "sketch_merge",
+  "sketch_mirror",
+  "sketch_new",
+  "sketch_offset",
+  "sketch_project",
+  "sketch_state",
+  "sketch_to_bspline",
+  "sketch_validate",
+  "slice",
+  "slice_open",
+  "slice_read",
+  "slice_with",
+  "slicer_presets",
+  "snapshot_latest",
+  "snapshot_list",
+  "steps_list",
+  "steps_render",
+  "surface_blend",
+  "surface_boundary",
+  "surface_cut",
+  "surface_extend",
+  "surface_fill",
+  "surface_loft",
+  "surface_points",
+  "surface_polynomial",
+  "surface_sections",
+  "surface_sew",
+  "surface_thicken",
+  "td_area",
+  "td_balloon",
+  "td_bim",
+  "td_centermarks",
+  "td_cosmetic",
+  "td_datum",
+  "td_detail",
+  "td_dim",
+  "td_dim_align",
+  "td_dim_format",
+  "td_dim_repair",
+  "td_dim_special",
+  "td_dimset",
+  "td_export",
+  "td_finish",
+  "td_gdt",
+  "td_geometry",
+  "td_hatch",
+  "td_leader",
+  "td_lines",
+  "td_list",
+  "td_note",
+  "td_page",
+  "td_projection",
+  "td_section",
+  "td_section_position",
+  "td_table",
+  "td_title",
+  "td_tolerance",
+  "td_view",
+  "td_view_more",
+  "td_weld",
+  "text_document",
+  "texture_apply",
+  "texture_check",
+  "texture_draft",
+  "texture_export",
+  "texture_layer",
+  "texture_list",
+  "texture_mask",
+  "texture_prepare",
+  "texture_preview",
+  "texture_set",
+  "texture_settings",
+  "thickness_measure",
+  "thickness_settings",
+  "thread_cut",
+  "thread_identify",
+  "thread_lookup",
+  "tool_find",
+  "tool_groups",
+  "units_convert",
+  "usage_report",
+  "varset_new",
+  "varset_set",
+  "view_maps",
+  "view_render",
+  "view_snapshot",
+  "wear_diff",
+  "wear_prewarp",
+  "wear_rebuild",
+  "wear_setup",
+  "window_snapshot",
+  "workbench"
+ ],
+ "tools": {
+  "scan_open": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Open a 3D scan to measure, in place of the one open. Inputs — one of: path (STL, PLY, OBJ, OFF or 3MF through FreeCAD's Mesh module; glTF/GLB, Collada, VRML or 3DS through Agent Link's readers, in the units their format says) or object (a mesh in the document by label or name, taken as millimetres; a mesh only — mesh a solid first with meshobj_from_shape). units: mm (default), cm, m or in, for a file. discard: true is needed to replace a scan that has elements or dimensions on it (they go with it). What it does in FreeCAD: the scan is put in the document as its own mesh object, whose Placement follows the alignment (a document mesh it was read from is hidden, not deleted: shownAs says so), and ScanRuler's state is kept in the document, so FreeCAD's Save carries it. Gotchas: a mesh exported from CAD has vertices only on its edges — scan_qa says tessellation.sparse and mesh_densify cures it before fits, segmentation and section fits; a wrong unit shows as a size warning, cured by opening again with units or by scan_scale. Size: read whole into memory, on FreeCAD's own thread, so the window waits and it cannot run as a job. Past 2,000,000 triangles every tool grows slow (the reply warns: mesh_reduce first); reading time is not measured. Reply: opened { file, units, vertices, triangles, box { min, max, size }, centre, area mm² }, shownAs, and warnings (a scan under 1 mm or over 5 m across, the triangle count, vertices that were not numbers dropped with their triangles) — read them before measuring.",
+   "inputs": [
+    "discard",
+    "object",
+    "path",
+    "units"
+   ]
+  },
+  "scan_nearest": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Where a place lands on the scan. Input at: { vertex: n } (numbered from 0) or { point: [x, y, z] } in mm in the frame the scan is measured in now; a point snaps to the nearest vertex, not to the nearest place on a triangle. Use it to check a point lies on the surface meant before fitting there, and to turn coordinates into a vertex number. Reply: vertex, point (its coordinates), normal (outward), triangle (the three vertices of one triangle it is a corner of) and distance, mm, from the point asked about — a large distance means the point is off the part or the frame is not the one assumed (an alignment moves every coordinate). On a sparse CAD tessellation the nearest vertex can be far along a face: mesh_densify first. Reads the vertices once (0.9 s at 68,000 vertices, measured in plain Python off the Mac). Changes nothing.",
+   "inputs": [
+    "at",
+    "point",
+    "vertex"
+   ]
+  },
+  "scan_query": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan's vertices inside a box, or within a radius of a point, with their outward normals — the points on a face. Inputs — one of: box { min, max } or near { at, radius } (mm, current frame); normal { dir, withinDeg (30) } keeps only those facing that way; limit (1000; 20000 at most); fields: count (the numbers alone; the default with mark), ids (with vertex numbers) or all (with points and normals; the default); mark: true leaves every matching vertex marked for element_fit_marked { marked: true }. Gotcha: at most limit come back, every k-th spread evenly, and step says k — but matched counts them all and mark marks them all, not the thinned list. A box that reaches a neighbouring face takes its vertices too (a pocket's walls beside a top face): keep the box tight or add normal. Reply: matched, returned, step, bounds { min, max }, centroid, meanNormal, marked { points, from }, vertices, points, normals. An empty answer (matched 0) usually means the wrong frame: scan_info gives the box. Changes nothing on the part.",
+   "inputs": [
+    "at",
+    "box",
+    "dir",
+    "fields",
+    "limit",
+    "mark",
+    "max",
+    "min",
+    "near",
+    "normal",
+    "radius",
+    "withinDeg"
+   ]
+  },
+  "scan_segment": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan's planar regions, found all at once: grown from the flattest places outward within maxDeg (15°) and maxRms (0.05 mm), those smaller than minArea (a square 2 % of the scan's diagonal on a side) given back (ScanRuler's vertex method). On a sparse mesh — a CAD-style tessellation, a cylinder's cap a fan of triangles with vertices only on its rim — that finds nothing, and the triangles are grouped instead (the faces method): triangles in one plane are a plane, a smooth strip of faces square to one axis whose corners lie on a cylinder within maxRms is a cylinder. Inputs: method auto (default: vertices, then faces only when that found nothing and the mesh is sparse), vertices or faces; box { min, max } confines it; limit (20, 200 at most) is how many regions are listed; mark: a region's id or several leaves their points marked for element_fit_marked { marked: true } (list: true gives the regions too). Gotchas: region ids are of this call's settings — mark with the same settings; on a densified CAD mesh a round wall comes back as its flat facets (one narrow plane each), so count the large regions only; area is of the points gathered, a little under the face's. Reply: found, method (which ran), why (when faces ran under auto), considered, claimed, shown and regions, largest first: id, kind (plane: normal, point; cylinder: axis, point, radius, length, bore), sigma, area mm², box, vertices, neighbours { id, deg }. Size: reads every vertex; declared heavy, so on its own it runs as a job (job_status gives the answer past 45 s). Measured 1.2 s at 137,000 triangles in plain Python off the Mac; the Mac is not measured. The result is kept until the scan moves. Changes nothing.",
+   "inputs": [
+    "box",
+    "kind",
+    "limit",
+    "list",
+    "mark",
+    "max",
+    "maxDeg",
+    "maxRms",
+    "method",
+    "min",
+    "minArea"
+   ]
+  },
+  "scan_fit_surface": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A patch of the scan measured as a surface — a sloped side, a twisted ruled face, a dome, a saddle. Inputs — one of: vertices (7 or more vertex numbers) or box { min, max } (mm), with normal { dir, withinDeg } to keep only what faces a way; model: plane, bilinear, quadric or best (default: fits each and names the simplest whose rms is within a tenth of the lowest); limit (20000) points at most, spread evenly. Reply: points, frame { origin, basisU, basisV, normal } and models, each a height over (u, v) in that frame: plane a + b·u + c·v; bilinear + d·u·v; quadric + d·u² + e·u·v + f·v² with curvature { k1, k2 (1/mm), r1, r2 (mm, null when flat), axis1, axis2, shape } — each with coefficients, rms and worst (mm); best names the model. Gotchas: heights are in the patch's own frame, not world z; a box that takes in a neighbouring face fits a bend that is not there; for a plane, sphere, cylinder, cone or torus use element_fit, which keeps an element. Refused under 7 points or when they lie on a line. Changes nothing, keeps nothing.",
+   "inputs": [
+    "box",
+    "dir",
+    "limit",
+    "max",
+    "min",
+    "model",
+    "normal",
+    "vertices",
+    "withinDeg"
+   ]
+  },
+  "scan_qa": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "One call before modelling, to know what the scan will and will not give. Input: axis (x, y, z or a direction) for the thickness reading — by default the alignment's z, or unaligned the way most of the surface faces. Reply: rims (the open edges of its holes: count, total length, largest with rim number, at, size and circle { center, axis, diameter } where one fits); noise { median, p90 (mm scatter of small plane fits), sampled; 0 on a CAD tessellation, with measured: the bends between facets }; tessellation { cad, sparse, spacing, flatShare, densifyTo } when the mesh was exported from CAD — sparse: true means mesh_densify { maxEdge: densifyTo } before any fit, segmentation or section fit; sheet { gauge { p5, p50, p95 }, twoSkins, reach } where most of the area has a second skin facing back, with apart (tabs, ribs, bosses standing off the walls); thickness { axis, axisFrom, cells, p5, p50, p95, tiltDeg, run, over, faces { topDeg, bottomDeg } } through the part along axis; and notes, what looks wrong in plain words — read them all. Gotchas: a scanned skin with no rims, or only pinholes, is a wrap that bridged the holes it did not see through (read each hole from both ends); on a sheet or thin shell thickness reads the box across the part — the wall is sheet.gauge; a tiltDeg of 0.2° or more is a merge error or a real taper, to settle before modelling to one thickness. Size: reads every triangle (rims, a ray grid through the part). Measured 1.7 s at 219,000 triangles in a Linux container since the rays walk a grid (7.3 s before), the Mac not measured; declared heavy, so on its own it runs as a job and job_status gives the answer past 45 s. Changes nothing.",
+   "inputs": [
+    "axis"
+   ]
+  },
+  "scan_draft": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan's walls that run near a pull direction — the sides a mould opens along — gathered into patches, each with draftDeg, the angle it leans off the pull: positive where the wall faces partly along the pull, negative where it faces back (a back draft, an undercut). Inputs: pull [x, y, z] (needed, any length); box { min, max }; nearDeg (10: how far off square to the pull a wall may lean and count; 45 at most); patches (12, the largest first; 100 at most); minArea (1 mm²); split, a plane no patch reaches across: \"symmetry\", a plane element, \"XY\", \"YZ\", \"XZ\" or { point, normal }. Reply: pull, nearDeg, points, walls (points on walls), found, split, and patches: draftDeg, sigmaDeg (of the mean), spreadDeg, area mm², count, centroid, box, facing, turnDeg, round (a boss's or hole's round side), side. Gotchas: read it early on a moulded or cast part, along each direction the tools open — walls leaning half a degree to a few explain fits that miss by the lean. Patches are grown between neighbouring points by the median point spacing, and area is count × spacing²: on an unevenly sampled mesh (a densified CAD tessellation, rows of vertices far apart) walls break into strips or drop out and areas read small — trust it on a real, evenly sampled scan. Size: over 400,000 vertices every k-th is read. 0.3 s at 68,000 vertices (plain Python off the Mac). Changes nothing.",
+   "inputs": [
+    "box",
+    "max",
+    "min",
+    "minArea",
+    "nearDeg",
+    "normal",
+    "patches",
+    "point",
+    "pull",
+    "split"
+   ]
+  },
+  "scan_pattern": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Rotational repeats about an axis — a fan's blades, a flange's holes, a wheel's spokes, a gear's teeth — counted from the scan: it is cut square to the axis at each height, and each cut is turned against itself. Inputs: axis (needed): a cylinder, cone, line or circle element by id or name, \"X\", \"Y\", \"Z\" (through the frame's zero), or { origin, dir }; at: heights along the axis in mm from the zero point's foot on it (six spread over the part by default, 12 at most); radius { min, max } keeps only the outline between those radii — use it to leave out a housing that does not repeat; count (60) the most copies looked for; instances: false leaves each copy's figures out. Reply: axis { name, origin, dir, zeroDir } and heights, each: count, pitchDeg, phaseDeg (from zeroDir), betweenDeg, score (0 to 1), rms, worst, worstInstance, length (mm of outline read), instances { angleDeg, radius, offDeg, rms, worst, share } — a copy out of place or worn reads off — and rings { radius, off, towardDeg, rms }, the round outlines about the axis. Gotchas: count 1 with tried { count, score } means no repeat held (score under 0.5) — tried is only the best guess, not a finding; a count that changes between heights is two features, so narrow with at and radius. A few cuts of the mesh: 0.3 s at 137,000 triangles (plain Python off the Mac). Changes nothing.",
+   "inputs": [
+    "at",
+    "axis",
+    "count",
+    "dir",
+    "instances",
+    "max",
+    "min",
+    "origin",
+    "radius"
+   ]
+  },
+  "scan_heightmap": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Where the scan is first met looking along an axis or square onto a plane, over a grid of cells: pocket floors, ledges, a step's height, a face's tilt, a pad's tiers, an icon on a key in one call. Inputs: axis (-z by default: the top from above; ±x, ±y, ±z) or plane (a plane element, \"XY\", \"YZ\", \"XZ\" or { origin, normal, u? }) — one of them; flip looks from the plane's other side; box limits it (with axis { min, max } in mm; with plane [u, v, height] in the plane's frame, or { world: { min, max } }); cell, mm (widened to keep 1,600 cells with the grid, 25,600 without; note says so); of: height (default), deviation (the deviation map's reading where each ray lands; needs a map) or relief (height less the surface round it, for icons, grooves, lettering; smooth, mm, three cells by default); levels: true gathers the values into levels in place of the grid (gap: the least gap between two, mm; slopeDeg, 10: steeper cells are left out of a height's levels); grid: false and picture: true write the map as a PNG (path, or in the session's folder). Reply: axis or plane (its frame), along, across, of, cell, origin [u0, v0], cols, rows, hit, valued, min, max; grid as rows from the low v up, null where nothing is met — grid[r][c] stands at u0 + (c + ½)·cell, v0 + (r + ½)·cell; levels, largest first: height, sigma, range, cells, area mm², sharePct, box, and for a height of 5 % or more plane { origin, normal }, which align_datum { primary: { plane } } levels on; warp { rise, bow, note } when a gentle warp was taken out first; ramps where slopes join tiers; scanLies when few cells meet the scan; picture { path, note }. Gotchas: a through hole reads null, not a depth; a level's area counts whole cells, so it runs under the face's; with plane, heights are along its normal from its origin, not world z. Size: every triangle goes into a search structure on the first call after the scan changes, then rays are cast: 5 s the first time and 1.5 s after at 137,000 triangles (plain Python off the Mac; the Mac not measured). Declared heavy: on its own it runs as a job. Changes nothing in the document.",
+   "inputs": [
+    "axis",
+    "box",
+    "cell",
+    "flip",
+    "gap",
+    "grid",
+    "levels",
+    "max",
+    "min",
+    "normal",
+    "of",
+    "origin",
+    "path",
+    "picture",
+    "plane",
+    "slopeDeg",
+    "smooth",
+    "u",
+    "world"
+   ]
+  },
+  "scan_outline": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan's outline seen along an axis, or square onto a plane, read as a sketch would draw it — a flange's plan, a bezel's opening, a gasket's shape: each loop as the fewest lines and arcs that follow it within tolerance, a round loop as one circle. Inputs: axis, plane, flip and box as scan_heightmap takes them (u, v as it lays them); tolerance, mm (0.2); loops (4, the largest first; 50 at most). Reply: axis or plane, across, cell, tolerance, and loops: hole (true for an opening seen right through), area mm², box, then either circle { center, radius, rms } or points ([u, v] corners in order) with rounds { at, radius, center } (a rounded corner at points[at]) and arcs { from, radius, center, mid } (from points[from] through mid to the next point); worst (mm the trace strays from what is drawn) and worstAt when past the tolerance; more counts the loops not listed. Gotchas: this is the shadow of everything along the view, not a cut — a pocket that does not go through leaves no loop (section_cut cuts at a height); only what is seen through counts as a hole; the cell is half the tolerance and is widened past 250,000 cells (note says to what: give a box round the part looked for to read it finer). To get a sketch, section_cut { kind: \"shadow\" } then section_to_sketch. 0.6 s at 137,000 triangles (plain Python off the Mac). Changes nothing.",
+   "inputs": [
+    "axis",
+    "box",
+    "flip",
+    "loops",
+    "max",
+    "min",
+    "normal",
+    "origin",
+    "plane",
+    "tolerance",
+    "u",
+    "world"
+   ]
+  },
+  "scan_cloud": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the scan as a point cloud file: every vertex with its outward normal, mm, in the pose the scan is measured in now (after any alignment or scale). Inputs: format ply (default: binary little-endian, float x y z nx ny nz) or xyz (text, a line each: x y z nx ny nz); path (a relative name goes in the session's folder; left out: <scan>-cloud.<format> there). Reply: file { path, name, bytes }, points, format, note. Size: one record a vertex — 24 bytes in PLY, about 50 in XYZ (3.5 MB for 68,000 vertices). Vertices only: triangles are not written (mesh_export writes the mesh). Changes nothing in the document.",
+   "inputs": [
+    "format",
+    "path"
+   ]
+  },
+  "scan_info": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan open, in the frame it is measured in now: scan { file, units, vertices, triangles, box { min, max, size }, centre, area mm² }, and how many elements and dimensions are on it. No inputs. With no scan open it answers scan: null and a note, not a refusal. Call it after scan_open, an alignment or scan_scale to learn where the coordinates now lie — every place given to the other tools is in this frame. Once ScanRuler's state has been written into the document it also answers kept { bytes, ms, arrays, packedAgain }: the size and time of the last write of that state (the copy FreeCAD's Save carries), how many arrays it holds and how many of them had changed and were compressed again for that write — after a call that changed no mesh (a rename, a dimension, a limit) packedAgain is 0 or a few small ones and ms a few tens; a large packedAgain or ms on such a call is worth reporting. Changes nothing.",
+   "inputs": []
+  },
+  "element_fit": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Fit an element on the scan and keep it. kind (needed): plane, sphere, cylinder, cone or torus grows its surface from the place or places in at and is best-fitted to it (a robust first estimate, region growing, then a Gaussian best fit with a sigma cut-off); point is the place itself; circle goes through three or more places. Inputs: at — a place { vertex } or { point: [x, y, z] } (mm, current frame; the nearest vertex is taken), or a list of them; name; sigma 3 (default), 2, 1 or 0 (no cut-off); mark: true leaves the grown region marked for element_fit_marked; to say what is sought — side inside (a bore) or outside (a shaft), radius { min, max }, axis (cylinder, cone: roughly, within 20°), within { min, max } (the surface stays in this box); knownDiameter (sphere: a gauge ball's diameter held, the centre alone fitted); assumed (sphere, cylinder: the designed diameter, kept beside the fit). Gotchas: a seed near an edge can land on the neighbouring surface — the reply's seeds (inRegion, offMm, deg) and warning say so, and side, radius, axis or within pass over what does not match; a circle through exactly three places has sigma and formError null, and under six its form is not to be judged; on a CAD tessellation fit only after mesh_densify, and a polygonal bore reads a hair under its true diameter (its facets' chords); a plane's region stops at the face's edges, so its centre is the region's, not the face's. Reply: element { id, name, kind, fit, source } — fit holds center and normal (plane), axis, radius, length, coverage° (round ones), sigma (RMS, mm), formError (peak to peak), residualMin / Max, usedPoints of regionSize — with seeds and region { area, box }. Later calls take the element by id or name. Refused when no surface of that kind is found there: the message says what to try. 0.2 s or less on a 137,000-triangle scan (plain Python off the Mac). Changes ScanRuler's state in the document (one undo step), not the model's shapes; element_to_document makes it geometry.",
+   "inputs": [
+    "assumed",
+    "at",
+    "axis",
+    "kind",
+    "knownDiameter",
+    "mark",
+    "max",
+    "min",
+    "name",
+    "point",
+    "radius",
+    "side",
+    "sigma",
+    "vertex",
+    "within"
+   ]
+  },
+  "element_fit_marked": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Fit a plane, sphere, cylinder, cone or torus to exactly the scan vertices given, with no search for the surface — for when element_fit's growing takes too much or too little. Inputs: kind (needed) and one of: vertices (three or more vertex numbers), marked: true (the points the last element_fit { mark: true }, scan_segment { mark } or scan_query { mark: true } left marked), or box { min, max } with normal { dir, withinDeg } to keep only what faces a way (normal goes with box only); name, sigma, knownDiameter and assumed as element_fit. Gotchas: every point given is fitted, so strays in the box bend the fit — the sigma cut-off (3 by default) drops outliers from the fit, but a form tolerance on the element (dimension_add form-flatness …) is read over every point given, strays included; the marked points are replaced by the next call that marks. Reply: element (as element_fit: fit with sigma, formError, usedPoints of regionSize; source.markedPoints) and, with box, how many points it took. Refused when nothing is marked, the box holds too few points, or the points do not span the surface asked for. Changes ScanRuler's state in the document, not the model.",
+   "inputs": [
+    "assumed",
+    "box",
+    "dir",
+    "kind",
+    "knownDiameter",
+    "marked",
+    "max",
+    "min",
+    "name",
+    "normal",
+    "sigma",
+    "vertices",
+    "withinDeg"
+   ]
+  },
+  "element_construct": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Construct an element from others and typed-in numbers. kind and method are needed — point: point-coords, point-centroid, point-midpoint, point-line-plane, point-center, point-three-planes, point-line-line, point-project; line: line-two-points, line-axis, line-plane-plane, line-plane-point, line-project, line-coords; plane: plane-three-points, plane-offset, plane-midplane, plane-offset-point, plane-line-point, plane-angle, plane-line-plane, plane-two-lines, plane-tangent-sphere, plane-tangent-cylinder, plane-coords, plane-symmetry; circle: circle-plane-cylinder, circle-plane-sphere, circle-coords. Inputs: refs fill the method's slots in order, by id or name (in a plane's slot \"XY\", \"YZ\", \"XZ\" become plane elements, listed under made); params are the method's numbers in order or by key (x, y, z; offset; angle; gap; nx, ny, nz, px, py, pz; dx, dy, dz, length; d, cx, cy, cz), mm and degrees; name; vertices confines point-centroid and plane-symmetry to those scan vertices; seed is the plane plane-symmetry starts its search from. Gotchas: a constructed element follows its sources — it moves when they are fitted again and goes when one is removed (element_unlink freezes it); it has no measured surface, so form tolerances refuse it; a wrong count or kind of refs is refused with the slots the method takes; plane-symmetry searches the scan (4,000 sampled points) and answers symmetry { rms, matched, sampled, note } — a mirror RMS past about 0.1 mm is not a symmetry to build on. The RMS is of the matched samples only: matched under sampled means the plane mirrors most of the part, not all of it (a pocket or boss on one side alone), and note says so; it can be taken before the part's exact mirror plane, most easily on a noise-free CAD tessellation, so where the part should have one give seed (\"XY\", \"XZ\", \"YZ\" or a plane element) and compare matched. Reply: element { id, name, kind, fit, source { method, refs, params } }, made. Changes ScanRuler's state in the document, not the model.",
+   "inputs": [
+    "assumed",
+    "kind",
+    "method",
+    "name",
+    "params",
+    "refs",
+    "seed",
+    "vertices"
+   ]
+  },
+  "element_rename": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Give an element another name. Inputs: element (id or name), name. Dimensions and constructions on it keep pointing at it (they hold its id). Gotcha: names are matched without regard to case, and two elements with one name can afterwards be told apart only by id — choose a name not in use (element_list). Reply: the element. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "element",
+    "name"
+   ]
+  },
+  "element_unlink": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Freeze a constructed point, line, plane or circle where it stands: its sources give way to coordinates of its own (point-coords, line-coords, plane-coords, circle-coords), so it no longer moves when they do and stays if they are removed. Input: element (id or name). Refused for an element not built from others (a fitted one has nothing to unlink) and for a constructed kind with no coordinates form. Not undone by a tool: construct it again to link it. Reply: the element with its new source. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "element"
+   ]
+  },
+  "element_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Delete an element — and with it every construction built on it, every dimension on any of them, and the deviation map against it when it was the deviation target (deviationTargetCleared: the map falls back to the reference part's). Input: element (id or name). Gotcha: the cascade is not asked about — element_list shows each element's source.refs first, and element_unlink keeps a construction that should stay. Reply: removed [{ id, name }] (the element and the constructions that went with it), dimensionsRemoved [{ id, name }], deviationTargetCleared. No tool brings them back: fit or construct again. Changes ScanRuler's state in the document, not the model.",
+   "inputs": [
+    "element"
+   ]
+  },
+  "element_set_visible": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Show or hide one element, or all of them. Inputs: visible (needed: true or false) and element (id or name) or all: true. A hidden element still measures and still carries its dimensions; the flag is kept for the report and the views. Reply: element { id, name, visible }, or with all: elements [{ id, name, visible }]. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "all",
+    "element",
+    "visible"
+   ]
+  },
+  "element_list": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The elements on the scan, each with its fit and how it came about: id, name, kind, status, visible, fit (center, normal or axis, radius, sigma, formError, usedPoints of regionSize …) and source (fitted: method, cut-off, seeds; constructed: method, refs, params; picked: points). No inputs. Coordinates are in the frame the scan is measured in now. The answer grows with the count (about 0.5 kB an element): with many, read report_get { format: \"text\" } instead. Changes nothing.",
+   "inputs": []
+  },
+  "align_datum": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A 3-2-1 alignment: move the scan, and everything measured on it, into the part's own coordinates. Inputs: primary levels the part — { element } (a plane), { points: 3 points } or { plane: { origin, normal } } — its outward normal becomes primaryAxis (z- by default: a base plane faces down, the part stands on z = 0); secondary turns it about that normal — { element } (a line, an axis, or a plane) or { points: 2 points } — laid along secondaryAxis (x+ by default); origin is the zero point — { element } (a point, sphere, circle or torus) or { point }; keepFree: true. Axes are x+, x-, y+, y-, z+, z-. Gotchas: a plane as secondary puts its outward NORMAL on secondaryAxis, not its direction along the part; each datum zeroes the coordinates it owns and the origin only those left open (an origin alone moves without turning; secondary needs primary); on a first alignment the coordinates nothing sets are centred on the scan's box unless keepFree; every coordinate given to other tools afterwards is in the new frame (scan_info gives the box); it drops a deviation alignment and its map (deviation_align again). In FreeCAD the scan's mesh object gets the alignment as its Placement; a move made on that object in the window is carried back into the scan before the next call. Reply: applied { rotation, translation, rotationDeg, moveMm }, elements (how many moved), sections (how many sections moved with the part, when any), centred, origin { set, at, note } and parallelFace when a face parallel to the levelling plane holds more of the scan. align_clear undoes it. Changes ScanRuler's state and the scan object's Placement, not the model. Also in the reply when the scan moved: timing { ms, object, mesh } — ms the tool's own work, object the part of it spent writing the scan's mesh object in the FreeCAD document, mesh \"kept\" (the object's Placement only) or \"rebuilt\" (every vertex written again: scan_scale); not in ms: the state kept in the document, written after the answer (scan_info's kept says what that cost), and what the host does round the call.",
+   "inputs": [
+    "element",
+    "keepFree",
+    "normal",
+    "origin",
+    "plane",
+    "point",
+    "points",
+    "primary",
+    "primaryAxis",
+    "secondary",
+    "secondaryAxis"
+   ]
+  },
+  "align_auto": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Read a coordinate system off the scan and apply it (ScanRuler's Auto-align): the directions most faces are square to and the axis round walls run along, the part standing on its base (its largest flat face, the side an open scan is open on, or an end of its main axis), its long side along X, zero under the middle on the base (on the axis for a turned part). Input: level settled (default: all faces laid on the axes at once, by area) or largest (the largest flat face squared exactly, the rest settled about its normal). Gotchas: a drafted wall reads as its draft, not as an alignment error (square.axes lists each face's tilt); which way is +X and which face is the base are its choice — when the drawing's datums matter use align_datum; it moves every coordinate (scan_info after) and drops a deviation alignment and its map. Reply: applied { rotation, translation, rotationDeg, moveMm }, note (what it was read from, in words), method planes | axis | principal, base, planeShare, wallShare, square { largest, axes [{ axis, tiltDeg, area, faces }] }, largestInside when that face looks into the part, elements (how many moved), sections (how many sections moved with it, when any). Reads every vertex: 0.7 s at 137,000 triangles (plain Python off the Mac). Refused when no direction can be read. align_clear undoes it. Changes ScanRuler's state and the scan object's Placement, not the model. Also in the reply when the scan moved: timing { ms, object, mesh } — ms the tool's own work, object the part of it spent writing the scan's mesh object in the FreeCAD document, mesh \"kept\" (the object's Placement only) or \"rebuilt\" (every vertex written again: scan_scale); not in ms: the state kept in the document, written after the answer (scan_info's kept says what that cost), and what the host does round the call.",
+   "inputs": [
+    "level"
+   ]
+  },
+  "align_symmetry": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Settle the part's pose on its mirror plane and apply it: the plane is the newest measured symmetry plane (element_construct plane-symmetry) or one searched for on the scan; the axis of the current frame nearest its normal is turned onto it and the zero point put on the plane — the other two directions stay as they were, so align first (align_auto or align_datum) and call this to centre. No inputs. Refused when the scan has no symmetry plane: the best mirror image stands over 0.5 mm off the scan (RMS), or under half the samples find their mirror image — the message gives the figures. Gotchas: a measured symmetry plane is used even when it is hidden, and even when it mirrors the part only nearly (a block with a pocket in its top mirrors at mid-height but for the pocket): read symmetry.matchedShare, and make the plane meant with element_construct plane-symmetry and seed first; a part with two mirror planes settles on the one found first; wear or damage on one half shifts the plane toward it; it drops a deviation alignment and its map. Reply: note (which plane, the mirror RMS, how far it turned and moved — and, when some samples have no mirror image about the plane, that it is not a mirror of the whole part and what share has none), symmetry { rms, matchedShare, from (the element's name, or \"search\") }, applied (this move), appliedAlignment (the whole alignment since the scan was opened), elements. 0.7 s at 137,000 triangles (plain Python off the Mac). align_clear undoes every alignment. Changes ScanRuler's state and the scan object's Placement. Also in the reply when the scan moved: timing { ms, object, mesh } — ms the tool's own work, object the part of it spent writing the scan's mesh object in the FreeCAD document, mesh \"kept\" (the object's Placement only) or \"rebuilt\" (every vertex written again: scan_scale); not in ms: the state kept in the document, written after the answer (scan_info's kept says what that cost), and what the host does round the call.",
+   "inputs": []
+  },
+  "align_clear": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Put the part back in the coordinates the scanner delivered it in, with everything measured on it: every alignment since scan_open is taken off at once (a scan_scale stays). No inputs. Refused (invalid_state) when the part is in scan coordinates already. It drops a deviation alignment and its map, as every move does. Reply: appliedAlignment: null, elements (how many moved back) and sections (how many sections moved back, when any). Changes ScanRuler's state and the scan object's Placement. Also in the reply when the scan moved: timing { ms, object, mesh } — ms the tool's own work, object the part of it spent writing the scan's mesh object in the FreeCAD document, mesh \"kept\" (the object's Placement only) or \"rebuilt\" (every vertex written again: scan_scale); not in ms: the state kept in the document, written after the answer (scan_info's kept says what that cost), and what the host does round the call.",
+   "inputs": []
+  },
+  "scan_scale": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Scale the scan to its true size — a photogrammetry scan has no size of its own, and a file read in the wrong unit is off by 10, 25.4 or 1000. Inputs — one of: factor (a number: 25.4 for inches read as mm) or references, lengths known two ways, each with true (mm on the real part): { dimension } (a distance or diameter dimension), { element } (a sphere, cylinder or circle: its diameter) or { points: two points }; dryRun: true works the factor out and scales nothing. Several references are averaged by length; each one's own factor and offPct (how far it is off the average) come back, so a bad one shows — a spread over a per cent or so means a reference is wrong, not that the average is right. Gotchas: the scale is about the frame's zero point, so coordinates change (scan_info after); elements and dimensions scale with it; factors multiply, they do not replace (scale by 1/factor to go back); an alignment made with align_datum, align_auto or align_symmetry stays (its move is scaled with the part; align_clear still takes it off); it drops a deviation alignment and its map; in FreeCAD the scan's mesh object is rebuilt at the new size (slow on a large scan, on the window's own thread: 4.4 and 4.9 s at 219,600 triangles on the Mac, run 3 — timing says how much of a call it was); a wall-thickness map taken before the scale is of the unscaled part and is dropped (thickness_measure again). Reply: factor, references [{ label, measured, true, factor, offPct }], spreadPct (with several), size { before, after } (the box diagonal, mm), dryRun, and, when scaled, scan (its summary), sections (how many sections were scaled with it, when any) and timing { ms, object, mesh } — ms the tool's own work, object the part of it spent writing the scan's mesh object in the FreeCAD document (the new mesh and its Placement), mesh \"rebuilt\"; not in ms: the state kept in the document, written after the answer (scan_info's kept says what that cost), and what the host does round the call (a document copy an add-on makes after a change shows in Agent Link's around row, not here). Changes ScanRuler's state and the scan's mesh object.",
+   "inputs": [
+    "dimension",
+    "dryRun",
+    "element",
+    "factor",
+    "points",
+    "references",
+    "true"
+   ]
+  },
+  "dimension_add": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Measure between elements, or a size or tolerance of one, and keep it. Inputs: refs (needed): one to three elements by id or name, in slot order; type — left out, it follows the elements as clicking them does (two planes: their distance; a plane and an axis: theirs; two spheres: centre distance; a point and a cylinder: point to axis); else one of dist-point-point, dist-point-axis, dist-point-plane, dist-axis-axis, dist-axis-plane, dist-plane-plane, angle-axis-axis, angle-axis-plane, angle-plane-plane, size-diameter, form-flatness, form-cylindricity, form-circularity, form-sphericity, orient-parallelism, orient-perpendicularity, orient-angularity, loc-coaxiality; name; anchor for two spheres: center (default), gap or span; basic: an angularity's basic angle, degrees; limit for a verdict — { kind: \"max\", max } (a ceiling) or { kind: \"band\", nominal, plus, minus } (plus and minus both positive); kind is needed. Gotchas: a signed distance (axis to plane, point to plane) is negative on the plane's inner side — judge it with a band about the signed value or read its size; two planes' distance is taken at the first plane's centre, with a warning when the patches do not overlap; a form or orientation tolerance is read as a minimum zone over every point of the element's region, including points the fit's sigma cut-off dropped, so one stray vertex sets it; a constructed element has no surface and form tolerances refuse it. These are GD&T-like readings off fitted elements of a noisy scan — not a certified inspection. Reply: dimension { id, name, type, family dimension | tolerance, title, refs, label, value (mm or degrees), unit, display, limit, verdict { pass, deviation, over, allowance, alarm }, detail, range, warning }. Refused when the elements do not seat in the type (the message names its slots). Changes ScanRuler's state in the document.",
+   "inputs": [
+    "anchor",
+    "basic",
+    "kind",
+    "limit",
+    "max",
+    "minus",
+    "name",
+    "nominal",
+    "plus",
+    "refs",
+    "type"
+   ]
+  },
+  "dimension_set_limit": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Hold a dimension to a limit, or take the limit off. Inputs: dimension (id or name) and limit (needed): { kind: \"max\", max } (a ceiling), { kind: \"band\", nominal, plus, minus } (plus and minus positive, mm or degrees), or null for none. Reply: the dimension with verdict { pass, deviation (from the nominal, or over the ceiling), over (how far past the allowance; 0 when it passes), allowance, alarm (in words, when it fails) }. The value itself does not change. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "dimension",
+    "kind",
+    "limit",
+    "max",
+    "minus",
+    "nominal",
+    "plus"
+   ]
+  },
+  "dimension_set_basic": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The basic angle an angularity tolerance (type orient-angularity) is read against. Inputs: dimension (id or name) and basic (needed): degrees, or null to take it off. The tolerance's value is then the width, mm, of the zone at that angle to the datum that holds the feature; detail says how many degrees the feature stands off the basic. Other types keep the angle and ignore it. Reply: the dimension. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "basic",
+    "dimension"
+   ]
+  },
+  "dimension_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Delete a dimension or tolerance. Input: dimension (id or name). The elements it was measured between stay. Reply: removed { id, name }. Refused with the list of dimensions when there is none of that name. Changes ScanRuler's state in the document.",
+   "inputs": [
+    "dimension"
+   ]
+  },
+  "report_get": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The measurement report: everything measured on the scan in one answer. Inputs: format json (default) or text; workspace measure (the only one here). json: report with what the numbers rest on (units, scale, alignment, fit method, outlier cut-offs), every element with its fit, every dimension with value, unit, limit and verdict, and checks { checked, pass, fail } (dimensions with no limit are not counted). text: the plain-text summary ScanRuler's Copy report gives — per element its point, direction, size, sigma, used points and form error; per dimension its value and verdict. Works with no scan open (an empty report). The answer grows with the count of elements; text is the shorter. Coordinates are in the frame the scan is measured in now. Changes nothing.",
+   "inputs": [
+    "format",
+    "workspace"
+   ]
+  },
+  "export_csv": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the elements and dimensions as a CSV table, one row each, with the columns section (element or dimension), id, name, kind, label, value, unit, nominal, plus, minus, max, deviation, verdict (PASS or FAIL), sigma, formError, x, y, z (mm, the frame the scan is measured in now). Input: path (a relative name goes in the session's folder; left out: <scan>-measurements.csv there). The folder must exist (refused otherwise); a file of that name is written over. Reply: path and rows. Needs a scan open. Changes nothing in the document.",
+   "inputs": [
+    "path"
+   ]
+  },
+  "section_cut": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Cut the scan with a plane and keep the cut as a section (shown on ScanRuler's 2D sheet). Inputs: across (needed) — an element by id or name: a plane element cuts along itself, a cylinder, cone, line or circle square to its axis through its centre; \"XY\", \"YZ\" or \"XZ\" through the part's centre; { axis, angleDeg }: a plane holding an axis (\"X\", \"Y\", \"Z\" or an element with one) turned angleDeg about it — the half section of a turned part; or { origin, normal }. offset slides the plane along its normal, mm (for \"XY\", \"YZ\", \"XZ\" it is the coordinate itself: \"XY\" with offset 10 cuts at z = 10); name. kind \"shadow\": not a cut but the whole scan seen along the plane's normal, its outer boundary — holes filled, never inside the part — with play mm more round it (negative: a press fit) read to tolerance mm (0.1): the outline for a foam cutout, a bin insert or a holder. Gotchas: a section keeps its points as cut — after the part is moved (align_*, scan_scale, deviation_align) cut again; sections belong to the scan and go when another is opened; a closed part gives closed chains, a scan with holes open ones, which section_to_sketch leaves out; the shadow's offset is made with FreeCAD's 2D offset and is refused when play is larger than the outline allows. Reply: section { id, name, across, offset, plane { origin, normal, basisU, basisV }, chains (how many loops) }; for a shadow also shadow { play, tolerance, cell, areas } and note. Refused when the plane misses the scan. 0.03 s at 137,000 triangles for a cut (plain Python off the Mac); a shadow rasterises the whole scan and is not measured. Next: section_get (the points), section_fit (lines and arcs), section_to_sketch. Keeps the section in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "across",
+    "kind",
+    "name",
+    "offset",
+    "play",
+    "tolerance"
+   ]
+  },
+  "section_get": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A section's cut as polylines. Inputs: section (needed: id or name); chains: which, by index from 0 (all by default); space sheet (default: [u, v] mm on the section's sheet, from the plane's origin along basisU and basisV), world ([x, y, z]) or both; limit (4000 points over all chains; 50000 at most). Reply: section, plane { origin, normal, basisU, basisV }, step, and chains: index, closed, points (as cut), kept, length mm, bounds, and sheet and / or world, the points in order (a closed chain ends on its first point). Gotcha: past limit every k-th point is kept and step says k — the lengths and bounds are still of every point; to get shapes rather than points use section_fit, which answers lines and arcs in far fewer tokens. Changes nothing.",
+   "inputs": [
+    "chains",
+    "limit",
+    "section",
+    "space"
+   ]
+  },
+  "section_list": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The sections kept on this scan: id, name, across, offset, plane { origin, normal, basisU, basisV }, chains; a shadow also kind, play, tolerance. No inputs. An empty list after scan_open or mesh_use_edited of another scan is expected: sections belong to the scan they were cut on. Changes nothing.",
+   "inputs": []
+  },
+  "section_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Take a section away. Input: section (id or name). A sketch already made from it (section_to_sketch) stays in the document. Reply: removed (its id) and the sections left. Refused with the list of sections when there is none of that id or name. Keeps the change in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "section"
+   ]
+  },
+  "section_fit": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A section's chains cut into the lines and arcs they are, without making a sketch. Inputs: section (needed); chains by index, or the filters minLength, maxLength (mm), closedOnly and maxChains (12: the longest are kept; leftOut says what the filters dropped); tolerance, mm (by default from each chain's own scatter and point spacing); detail 0 to 1 (0.5: higher follows smaller features); arcs: n fits each chain as n arcs end to end; brief: true answers each piece short (id, kind, radius, world ends, rms). Reply: section, plane, bounds, sketch (how a sketch made on this section counts: its [u, v] is the sheet's plus sketch.add, or a frame of its own), leftOut, and chains: index, closed, points, scatter (mm: the chain's own noise as measured off its second differences — 0 on an exact cut), scatterFloor (only where the measured scatter is under it: 5 % of the point spacing, the least the fits take a chain's noise as, so an exact chain still has a noise to weigh a circle against), spacing (mm between points, the median), tolerance (mm, as given, else the larger of three scatters and 0.6 of the spacing) and pieces in order — a line by a, b, length, angleDeg (from +u, 0 to 180), leanDeg (off the nearest axis); an arc by center, radius, diameter, start and sweep (radians, counter-clockwise from +u), sweepDeg, a, b — each with points, residual { rms, max } and world coordinates. A chain that will not fit answers error in its row. Gotchas: [u, v] are the section's sheet from the plane's origin (the part's centre for \"XY\"), not world coordinates — use the world fields to place things; a full circle comes back as one arc whose a and b coincide; on a CAD tessellation cut after mesh_densify, or a straight side has only its two end points and fits nothing. Size: every point of every chosen chain is fitted; declared heavy, so on its own it runs as a job. 0.07 s for 400 points (plain Python off the Mac); a section with tens of thousands of points is not measured. Changes nothing.",
+   "inputs": [
+    "arcs",
+    "brief",
+    "chains",
+    "closedOnly",
+    "detail",
+    "maxChains",
+    "maxLength",
+    "minLength",
+    "section",
+    "tolerance"
+   ]
+  },
+  "section_to_sketch": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The profile road's last step: a section's chains fitted into lines and arcs (as section_fit) and written as a FreeCAD Sketcher sketch in a PartDesign Body, lying on the section's plane. Inputs: section (needed); body (an existing PartDesign Body by label or name; left out, a new Body is made); name (the sketch's label; \"<section> sketch\" by default); chains, minLength, maxLength, maxChains, tolerance, detail and arcs as section_fit; closedOnly (true by default: only closed chains, unless chains names them). What it makes: one Sketcher::SketchObject, not attached (Map Mode Deactivated) with its Placement on the section's plane — zero at the world origin's foot on the plane, x along the coordinate axis next round; lines, arcs of circle and full circles; neighbouring pieces meet where their carriers cross and are joined by Coincident constraints. No dimensions or other constraints are added: the sketch is under-constrained, as traced. Gotchas: the Placement is written inside the Body's own coordinates, so a Body that has been moved puts the sketch off the scan — use a Body at the origin; the sketch does not follow the section or the scan afterwards; an open chain gives an open wire a pad will refuse; where two neighbouring pieces do not meet, a short bridging line joins them (bridges counts them). Reply: sketch and body (labels), section, frame { origin, xAxis, yAxis, normal }, fitted per chain { index, closed, lines, arcs, circles, bridges, tolerance, scatter (the chain's noise as measured, 0 on an exact cut), scatterFloor (as section_fit: only where the measured scatter is under it) } or error, wires [{ closed, edges }] as FreeCAD built them after a recompute — check every wire is closed — leftOut, and health from the shared check. Then pd_pad: next gives the call with the labels that came out. A new Body takes FreeCAD's next free label (\"Body002\" where objects named Body and Body001 exist), so read the answer's body, never assume \"Body\" — or make the Body first (pd_body_new { name }) and give it as body. Refused when the section has no closed chain (give chains, or closedOnly: false). One undo step.",
+   "inputs": [
+    "arcs",
+    "body",
+    "chains",
+    "closedOnly",
+    "detail",
+    "maxChains",
+    "maxLength",
+    "minLength",
+    "name",
+    "section",
+    "tolerance"
+   ]
+  },
+  "mesh_parts": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "What Mesh Tools holds beside the scan; read it before and after edits. Needs a scan open (scan_open). Reply: scan { name, triangles, edits (those taken into use) }, edited { triangles, edits (pending) } or null, reduced (mesh_reduce's report) or null, wrap { triangles } and piece { name, triangles } (the previews mesh_wrap and mesh_trim leave) or null, undo (the step mesh_undo would take back, or null). None of these is a FreeCAD document object: object_list does not show them and FreeCAD's undo does not touch them; mesh_export { to: \"document\" } puts one in the document. Changes nothing.",
+   "inputs": []
+  },
+  "mesh_inspect": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "What the tools would find on the mesh worked on (the edited copy, or the scan while there is none). Reply: working, vertices, triangles, bounds { min, max }, open (open edges; 0 = closed), bad (edges more than two triangles share), volume (mm³, only when closed, else null; negative = inside out: mesh_flip_normals), islands { size, pieces (connected pieces), islands (those smaller than size), islandTriangles, largestIsland, smallestKept, centres } and holes { size, rims (open rims in all), holes (those smaller than size), largestHole, smallestOpen, centres } — centres are [x, y, z] mm, the first 40; a hole's centre is what mesh_fill_holes { at } takes. A piece's size is its bounding box's diagonal, a hole's the widest span of its rim. pieceSize defaults to a hundredth of the part's diagonal and holeSize to a twentieth, both rounded to 1-2-5 steps (the reply says them). Run it before and after each edit. Reads every triangle: about 2 s at 130,000 triangles and 13 s at 520,000 where this pass timed it (a Linux container, not the Mac); past 45 s it answers as a job (job_status { job }). Changes nothing.",
+   "inputs": [
+    "holeSize",
+    "pieceSize"
+   ]
+  },
+  "mesh_remove_islands": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Delete every connected piece smaller across than size, mm (its bounding box's diagonal) — specks, a patch of turntable; every larger piece stays. size defaults to a hundredth of the part's diagonal (1-2-5 rounded). Refused when no piece is that small (the message gives the smallest piece) or when all are (nothing would be left); mesh_inspect { pieceSize } counts them first. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { pieces, islands, islandTriangles, largestIsland, smallestKept }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": [
+    "size"
+   ]
+  },
+  "mesh_delete_marked": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Delete the surface a region holds: a triangle goes when all three of its corners are in the region; the hole it leaves stays open (mesh_fill_holes closes it). region: exactly one of { box: { min: [x, y, z], max } }, { sphere: { center, radius } } or { vertices: [n, …] } (mm, the frame the scan is in now), narrowed with facing: [x, y, z] and angleDeg (30) to the vertices whose normal points that way. \"marked\" (the person's marking on screen) is refused here: FreeCAD has no such marking. Trap: vertex numbers read on the scan (scan_query, scan_segment) are refused once the edited copy's vertices are numbered differently — use a box or a sphere then. Refused when no triangle lies wholly inside, or all do. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { triangles (deleted) }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits } — open is above 0 afterwards and volume null.",
+   "inputs": [
+    "region"
+   ]
+  },
+  "mesh_flip_normals": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Turn triangles over: every one, or with region (as mesh_delete_marked takes it: box, sphere or vertices, with facing) those with all three corners in it. For a part exported inside out — mesh_inspect shows a negative volume — or patches that face inwards. Flipping a correct closed mesh makes its volume negative; flipping again restores it. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { triangles (turned) }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": [
+    "region"
+   ]
+  },
+  "mesh_cut": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Cut the mesh with a plane and take one side off. plane: \"XY\", \"YZ\" or \"XZ\" (offset is then the plane's coordinate: Z for XY, X for YZ, Y for XZ), or an element with a direction by id or name (a plane, cylinder, cone, line or circle from element_list; offset then slides along its direction from its own position). keep: plus keeps the side the direction points to (above XY, +X of YZ, +Y of XZ), minus the other. cap (true by default) closes the part flat wherever the plane goes all the way round the cut, bridging short gaps of a hole right at the cut; where it cannot, the cut stays open (report.open). Refused when the plane leaves everything on one side: the message gives the offsets the mesh runs between; mesh_cut_preview tries a place without cutting. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { removed, split (triangles), capped (faces closed), capTriangles, open (stretches left open), bridged }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. Clips every triangle the plane crosses in Python: about 5 s at 130,000 triangles and 16 s at 520,000 where this pass timed it (a Linux container, not the Mac); past 45 s it answers as a job.",
+   "inputs": [
+    "cap",
+    "keep",
+    "offset",
+    "plane"
+   ]
+  },
+  "mesh_cut_preview": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "What mesh_cut at this plane would do, without cutting: plane, offset and keep as mesh_cut takes them (keep plus by default). Reply: plane (its words), cuts (false when everything lies on one side — then the rest are 0), capped (faces a cap would close), bridged (gaps bridged), open (stretches a cap would leave open). Costs about what the cut does (it clips the mesh and throws the result away): past 45 s it answers as a job. Changes nothing.",
+   "inputs": [
+    "keep",
+    "offset",
+    "plane"
+   ]
+  },
+  "mesh_mirror": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Reflect the mesh across a plane (plane and offset as mesh_cut takes them; offset left out: through the middle of the bounding box of the mesh worked on, rounded to a 1-2-5 step of about a fiftieth of its diagonal, so not always the exact middle: the edit's text says where, and offset given is taken as it is). mode whole (the default) reflects all of it — the part moves to the other side, mirrored; symmetric keeps the side keep names (plus by default) and replaces the other with its reflection, joined along the plane, so a closed part stays closed: a damaged side rebuilt from the good one. Refused when nothing lies on the side to keep. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit (its text says the plane used), report { mode, mirrored, removed, split, inPlane (triangles) }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": [
+    "keep",
+    "mode",
+    "offset",
+    "plane"
+   ]
+  },
+  "mesh_fill_holes": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Close the holes (open rims) smaller across than size, mm (a twentieth of the part's diagonal by default, 1-2-5 rounded) — or, with at: [x, y, z], only the one of those whose middle is nearest that point (at does not lift the size limit: pass a size above the hole's too; mesh_inspect { holeSize } gives each hole's middle and the sizes). patch: curved (the default) continues the surface's bending across the hole, flat lays the tightest patch; each is triangulated to bend least (Liepa), refined to the density round it and faired. The mesh's own vertices do not move. Trap: an opening the part really has (a bore, a slot seen as a rim) is closed too — fill by at. Refused, with the smallest rim's size, when no rim is under size, and when the mesh has no open rim. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { filled, triangles, vertices (added), failed (rims that could not be patched), left (rims over size) }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits } — closed when open is 0.",
+   "inputs": [
+    "at",
+    "patch",
+    "size"
+   ]
+  },
+  "mesh_smooth": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Smooth a scan's scatter out: each point is moved along its normal onto a quadric fitted to the mesh round it over a patch size across (mm) — bumps smaller than size go, shape larger than it stays. No point moves further than limit, mm. size defaults to the larger of 0.8 % of the part's diagonal and 2.5 mean edge lengths, limit to a thousandth of the diagonal (1-2-5 rounded; the reply's settings say both). keepEdges (true by default) fits each side of an edge sharper than 30° alone and leaves the edge as scanned. region (as mesh_delete_marked takes it) moves only that surface, fading to its edge. Trap: a large size rounds real edges and small features off; keep limit near the scan's noise (scan_qa reads it). A CAD-exact mesh has nothing to smooth: points move by rounding only. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { settings, region, moved, held (points kept on an edge), maxMove, rmsMove (mm), atLimit }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. The slowest edit: it fits a patch per vertex in Python — about 40 s at 130,000 triangles where this pass timed it (a Linux container, not the Mac), so several minutes at a million; past 45 s it answers as a job (job_status). On a large scan mesh_reduce first, or give a region.",
+   "inputs": [
+    "keepEdges",
+    "limit",
+    "region",
+    "size"
+   ]
+  },
+  "mesh_offset": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Move the whole surface along its normal by distance, mm: direction expand (the part grows) or shrink — not a scale: every face ends the distance from where it was and edges stay sharp (a box 40 × 30 × 20 expanded by 1 is 42 × 32 × 22; a corner point moves up to √3 times the distance, never more than 3 times). region is refused (moving only a marked region is not ported): leave it out. Trap: shrinking by more than half a wall's thickness turns that wall inside out — nothing checks it; look at the volume and view_render afterwards. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit, report { distance (signed), moved, maxMove }, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. About 1.5 s at 130,000 triangles and 10 s at 520,000 where this pass timed it (a Linux container, not the Mac); past 45 s it answers as a job.",
+   "inputs": [
+    "direction",
+    "distance",
+    "region"
+   ]
+  },
+  "mesh_reduce": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A light mesh for CAD made from the mesh worked on, by FreeCAD's quadric decimation (Mesh.decimate(targetSize); its other form, decimate(tolerance, reduction), holds no tolerance in millimetres either and is not used), the lightest one that still lies within tolerance of the original, measured both ways. tolerance, mm (a quarter of a thousandth of the part's diagonal by default, 1-2-5 rounded) is held in millimetres: FreeCAD's decimator has no such bound of its own (asked for a count it gives the best mesh of that size, whatever it costs in shape), so the count is searched — each try decimated and measured, a quarter of the triangles at a time while 99.9 % of the sampled points lie within tolerance both ways, then between the last that held and the first that did not (tries says how many decimations; about a dozen). maxTriangles (50,000) is the harder rule: a mesh with more is brought down to it first, and when that does not hold the tolerance the reply says so — capped: true, held: false, won: \"cap\" and a warning with how far off it lies; that mesh is not one to measure or model on (raise maxTriangles or the tolerance). The search then goes on above the cap for the smallest count that does hold the tolerance (halving the gap between a count that does not hold and one that does, 8 tries at most, the whole search 30 s at most): holds { asked, triangles, passes, p999, max, backP999, backMax } is that mesh's row and the warning names its count as the maxTriangles to ask for; notHolding is the largest count tried that did not hold, so the true count lies between the two; with no holds the warning says none was found and in how many tries. The cap is kept exactly, or the reply says it is not: FreeCAD's decimator can stop above the count asked (it makes a hundred rounds at most and never a collapse that would turn a triangle over), and asking it for less changes nothing, so it is run again on what it left (passes: at most 6 runs, until one takes nothing off). When even that stays above the cap — capMet: false, won: \"tolerance\" — the cap cannot win: atCap { asked, triangles, passes, p999, max, backP999, backMax } is what the decimator left there (the true count and how far off), the reply is the lightest mesh found that holds the tolerance (over the cap: triangles says how many), or that try itself when it holds, or the mesh as it is, and the warning says which, with the counts. won is \"both\" when the cap and the tolerance both hold (then the search goes on down from the cap for the lightest), null when the mesh was under the cap to begin with. Every count and distance in the warning is a figure of the reply. When no lighter mesh holds the tolerance the reply is the mesh as it is, with a note. A preview beside the mesh, not an edit: mesh_apply_reduced makes it the edited copy, mesh_export { part: \"reduced\" } writes it, mesh_discard { what: \"reduced\" } drops it; a second mesh_reduce replaces it. Reply: reduced { settings, inputTriangles, triangles, vertices, measured (points sampled, at most 4000), within, p999, max, rms (original to reduced, mm), backP999, backMax (reduced to original, read at the reduced mesh's vertices and at the middles of its triangles: a triangle that cuts a corner off has its vertices on the original), held (99.9 % within tolerance both ways), capped (the cap came first and the tolerance does not hold), capMet (triangles is at most maxTriangles), won, tries, search { tries, ms, ended (\"done\", or \"time\" when the 30 s ran out: what was found by then is kept), seconds }, atCap, holds, notHolding (each only when it applies), method, note | warning }. Cost: one FreeCAD decimation (more when it stops above the count: passes) and two distance checks of 4,000 points for each try, a dozen tries or so and up to 8 more when the cap does not hold the tolerance (the checks about half a second a try at 220,000 triangles in a Linux container; FreeCAD's own decimation on top, not measured on the Mac): past 45 s it answers as a job.",
+   "inputs": [
+    "maxTriangles",
+    "tolerance"
+   ]
+  },
+  "mesh_apply_reduced": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Make the reduced mesh mesh_reduce left the edited copy: one undo step (mesh_undo puts the mesh it was made of back), and the reduced preview is gone. Refused when there is none (mesh_reduce makes one; mesh_parts says). A reduction that did not hold its tolerance (held: false: the cap came first) is applied all the same, with a warning saying how far off it lies and, where mesh_reduce found it, the count that would hold — mesh_undo takes it back. So is one over the cap asked (capMet: false: FreeCAD's decimator stopped above it), with a warning giving its count, the cap and where the decimator stopped. Every vertex number changes. Not a FreeCAD document change. Reply: edit, report (the reduction's), warning (when it did not hold its tolerance, or is over its cap), mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": []
+  },
+  "mesh_discard": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Throw a preview away without applying it: what \"reduced\" (mesh_reduce's light mesh) or \"wrap\" (mesh_wrap's skin). Refused when there is none of that kind (mesh_parts says what is on hand). The mesh worked on is not touched; no undo step. Reply: discarded.",
+   "inputs": [
+    "what"
+   ]
+  },
+  "mesh_use_edited": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Take the edited copy into use: it becomes the scan every tool measures (scan_info, element_fit, sections, deviation, thickness), and the sections kept are cut again on it. Elements fitted before keep their old fits and vertex numbers read before no longer match: fit again where it matters. The scan shown in the FreeCAD document is the edited mesh from then on (its mesh object is put in again). Refused when there is no edited copy. One mesh_undo goes back to the scan before (FreeCAD's undo does not). Reply: scan { name, triangles, edits (all taken into use so far) }, note.",
+   "inputs": []
+  },
+  "mesh_discard_edited": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Throw the edited copy and its pending edits away: the tools work on the scan in use again. Refused when there is no edited copy. One mesh_undo brings the copy back. Previews (reduced, wrap, piece) stay. Reply: mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": []
+  },
+  "mesh_undo": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Take the last Mesh Tools step back: an edit, mesh_use_edited, mesh_discard_edited, mesh_apply_reduced or mesh_apply_wrap. The arrays before each step are kept, 20 steps deep; there is no redo. This is Mesh Tools' own undo: FreeCAD's undo (history_undo) does not take a mesh edit back, and mesh_undo does not undo a document change (a mesh_export to the document stays). Undoing mesh_use_edited cuts the sections again on the scan before. Refused when there is nothing to take back (mesh_parts: undo null). Reply: undone (the step's label), mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": []
+  },
+  "mesh_export": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write one of Mesh Tools' meshes out. part: edited (the edited copy), reduced (mesh_reduce's), piece (mesh_trim's) or wrap (mesh_wrap's preview) — refused when that one does not exist (mesh_parts says); the scan itself is not a part (a mesh edit first makes a copy). to file (the default): a binary STL in millimetres, or format 3mf, at path (relative: the session's folder; the format's extension is added when missing; default <scan name>-<part>.<format> there) — reply: file { path, name, bytes }, format, triangles. to document: a Mesh::Feature labelled \"<scan name> <part>\" in the FreeCAD document, where the meshobj tools, slicing and export work on it and scan_open { object } takes it back in — one FreeCAD undo step; reply: object (its label), triangles, health. A copy as it is now: later mesh edits do not follow into the file or the object. Builds FreeCAD's mesh triangle by triangle in Python: about 5 s at 520,000 triangles where this pass timed it (a Linux container, not the Mac), the write on top.",
+   "inputs": [
+    "format",
+    "part",
+    "path",
+    "to"
+   ]
+  },
+  "mesh_densify": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Cut the triangles until no edge is longer than maxEdge, mm, the surface unchanged: every new vertex is an edge's middle, on the facet it was cut from, and the mesh stays as closed as it was (volume the same). For a mesh exported from CAD, whose vertices lie only on its edges and rims (a box is 8 vertices, 12 triangles): scan_segment's vertex method, a seeded element_fit, section_fit, mesh_smooth and mesh_trim find points inside its faces only after it. A real scan needs none. maxEdge defaults to a hundredth of the part's diagonal on the 1-2-5 steps; each halving of maxEdge is four times the triangles (the 40 × 30 × 20 box at maxEdge 2: 8,192), and a result past 20 million is refused. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit { maxEdge, trianglesBefore, triangles, added (vertices), longest (edge now), passes }, status, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. Vectorised: under a second to half a million triangles where this pass timed it (a Linux container, not the Mac).",
+   "inputs": [
+    "maxEdge"
+   ]
+  },
+  "mesh_boolean": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Make the mesh and solids one: op subtract (take them out of it), add (join them to it) or intersect (keep what both hold). solids: measured cylinders, cones and spheres (elements, by id or name, drawn at their assumed diameter when one is set) or solid bodies in the FreeCAD document (by Name or Label: a shape with a solid, tessellated to 0.01 mm, or a closed mesh object; an App::Part round it is followed); several go as one, their union. The mesh worked on must be closed (mesh_inspect: open 0; mesh_fill_holes first), and so must each solid. Refused, naming the solid: a solid taken away that does not reach the mesh, or lies wholly inside it (it would seal a hollow: carry its end out through the surface); a solid added that lies wholly inside. A solid only grazing the mesh can fail to come out closed: move it a little. For a bore the scanner could not see to the bottom of: fit a cylinder to its wall, make it longer than the bore and out through the surface, subtract it. A document body is read as it stands now: later changes to it do not follow. Dense scans are cut as they are: every triangle the solids do not touch is kept. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit { op, removed, added (triangles), volumeBefore, volumeAfter, solid, volume (the change, mm³) }, status, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. About 2 s on 130,000 triangles with a 400-triangle cylinder where this pass timed it (a Linux container, not the Mac); not declared heavy.",
+   "inputs": [
+    "op",
+    "solids"
+   ]
+  },
+  "mesh_shell": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Hollow a closed part or thicken an open surface; mode left out picks by the mesh. hollow (closed mesh): the outside stays as it is and an inner wall thickness mm in from it seals a cavity; where the part is thinner than twice the wall it stays solid; refused when it is nowhere thicker than that. The inner wall is built on a grid (cell in the reply, about a third of the thickness) and comes out dense — the 40 × 30 × 20 box at thickness 2 gets 68,000 triangles and loses 14,951 mm³ against the exact 14,976. The cavity is sealed: no drain hole is made (mesh_boolean subtract opens one). thicken (open mesh: one side of a part, a sheet): a second skin thickness from it, side in (the default: the scanned surface stays the outside), out or both, and a wall round every rim. A part closed but for holes smaller than mesh_fill_holes' default size is refused unless told which: fill them to hollow it, or pass mode: \"thicken\". mode hollow on an open mesh and thicken on a closed one are refused. thickness defaults to a 125th of the part's diagonal. Works on the edited copy (the first edit makes it from the scan); the measuring tools keep reading the scan until mesh_use_edited. Not a FreeCAD document change: mesh_undo takes it back (20 steps), FreeCAD's undo does not. Reply: edit { mode, thickness, cell, cavities, removed (mm³), volumeBefore, triangles (of the new wall) }, status, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }. Heavy: grid work bounded at 12 million points; 1 to 5 s on the box up to 86,000 triangles where this pass timed it (a Linux container, not the Mac) (larger not measured); past 45 s it answers as a job.",
+   "inputs": [
+    "mode",
+    "side",
+    "thickness"
+   ]
+  },
+  "mesh_wrap": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "One closed skin round the mesh worked on, for a mesh that is a mess inside: an assembly exported as one file, channels inside a casting, overlapping or flipped shells, a scan with cracks. Any triangles do: only the distance to them is used. A ball of diameter gap (mm) is rolled round the mesh from outside; the wrap lies on the part where the ball touched it and bridges every opening narrower than gap — a groove narrower than gap is closed over too, so keep gap small. Everything inside is dropped. grow (0 by default, at most gap) stands the wrap off the part all round: an open sheet wraps to nothing at 0 (refused, saying so) and to a slab 2 × grow thick. edges: sharp (the default) rebuilds the part's sharp edges and corners where the wrap lies on the part; smooth leaves them rounded by the grid, a sixth of the gap. tolerance is accepted and not used yet (no reducer is ported): the wrap comes out dense (the 40 × 30 × 20 box at gap 4: 25,548 triangles) — mesh_apply_wrap then mesh_reduce. Made beside the mesh as a preview: mesh_apply_wrap makes it the edited copy, mesh_export { part: \"wrap\" } writes it, mesh_discard { what: \"wrap\" } drops it; preview: false applies it at once (the reply then also carries the edit and mesh). Reply: wrap { settings, shells, triangles, vertices, area, dropped (input triangles inside it), bridgedArea (mm²), volumeBefore (null when the mesh is open), volume (mm³), cell (the grid, mm), coarsened and fullGap (when the part's size made the grid coarser than a sixth of the gap; a gap too fine for the part is refused with the smallest that works), gridPoints, sharpEdges, sharpCorners, from }, status. Heavy, and the cost grows with the input's triangles as well as the grid (at most 6 million grid points): 2 s for the 12-triangle box but 6 minutes for an 86,000-triangle mesh at the same gap where this pass timed it (a Linux container, not the Mac). It runs as a job (answers with a job id past 45 s; job_status { job, wait }); on a dense mesh mesh_reduce and mesh_apply_reduced first.",
+   "inputs": [
+    "edges",
+    "gap",
+    "grow",
+    "preview",
+    "tolerance"
+   ]
+  },
+  "mesh_apply_wrap": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Make the wrap mesh_wrap left the edited copy: the tools work on it from here, and mesh_use_edited takes it into use for measuring. None of the mesh's own vertices is kept (every vertex number changes). One undo step (mesh_undo), which puts the mesh it was made of back; the wrap preview is gone either way. Refused when there is no wrap (mesh_parts says). Not a FreeCAD document change. Reply: edit { triangles }, status, mesh { working (\"scan\" or \"edited copy\"), vertices, triangles, bounds, open (open edges), bad (edges more than two triangles share), volume (mm³; null unless closed; negative when inside out), edits }.",
+   "inputs": []
+  },
+  "mesh_trim": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Mend a broken part: cut a body — the missing piece, modelled to the part's nominal shape and a few millimetres too long at the break, standing where it belongs — with the scanned fracture, to print and glue in. body: a solid body in the FreeCAD document (Name or Label; read as it stands now) or a measured cylinder, cone or sphere (element id or name). The break is found where the mesh worked on lies deeper inside the body than depth (0.3 mm by default); region ({ box }, { sphere } or { vertices }, optionally with facing, as mesh_delete_marked takes it) marks it instead. offset sets the mating face back from the break, mm (0 cuts on it; 0.1 to 0.2 leaves room for glue); flip: true keeps what is on the other side of the break. The break is read at the mesh's vertices: on a CAD-style mesh with vertices only on its edges it finds nothing until mesh_densify (the refusal says so). Refusals say which step failed: body not reaching into the part, break not coming out of the body (mark it wider), nothing on that side (flip). The piece is made beside the mesh, not an edit of it and not a document object: mesh_export { part: \"piece\" } writes it (to: \"document\" for a mesh object); a second mesh_trim replaces it. Reply: piece { name, solid, triangles, volume (mm³), matingArea (mm²), bodyVolume, offset, pieces, dropped (pieces on the other side), break { depth, triangles, area }, fit { min, median, max … (how far the mating face is from the part, mm) } }, status. Example: a 10 mm cube reaching 5 mm into a densified block gives volume 499 of 1000 and matingArea 100. Heavy (runs as a job past 45 s): under a second to 130,000 triangles where this pass timed it (a Linux container, not the Mac); a mesh over about 4 million triangles can be refused by the surface search (it says so) — mesh_reduce and mesh_apply_reduced first.",
+   "inputs": [
+    "body",
+    "depth",
+    "flip",
+    "offset",
+    "region"
+   ]
+  },
+  "flat_objects": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The separate parts on the flatbed image, parted from the background by a grey level (Otsu's unless threshold 0–255 is given; dark: whether the parts are darker than the background, read from the image's border by default) and numbered from 1 in reading order (rows from the top of the sheet down, left to right) — the number flat_profile { object } takes. Needs an image on the sheet: refused on a section, and before flat_open_image. Reply: units, threshold and dark (as used), count, objects [{ object, area (sheet units², holes taken out), holes, box { min, max }, centroid, equivalentDiameter (of a circle of that area), feret { max, maxAngleDeg, min, minAngleDeg } (largest and smallest caliper widths), axisAngleDeg (long axis), outline (with outline: true: thinned to a few hundred points) }] — the first limit (100; more says how many were left out), note. minArea drops specks (sheet units²; by default 400 pixels' worth), minHoleArea the holes counted (minArea by default). Uncalibrated, every length is in pixels: check units. The numbers are kept for flat_profile until another image, a section or flat_calibrate replaces them. Worked example: a black disc of radius 8 mm at 10 px/mm reads area 201.08 (π·8² = 201.06), equivalentDiameter 16.00, feret.min 16.0. About 1 s at 16 megapixels where this pass timed it (a Linux container, not the Mac). Changes nothing on the sheet's elements.",
+   "inputs": [
+    "dark",
+    "limit",
+    "minArea",
+    "minHoleArea",
+    "outline",
+    "threshold"
+   ]
+  },
+  "flat_profile": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "An outline read against a centre (kind radial, the default: a part seen from above — a knurl's or a gear's teeth round it) or along an axis (axial: a part lying on its side, each side read apart), and its peaks counted by prominence. The outline: object (a number from flat_objects; image only) or chains (edge chains by number from flat_edges — the only way on a section; several are joined in the order given). about: a 2D element by id or name — a circle, arc or point for radial, a line for axial; left out, the object's own centroid or long axis (for chains: their points' mean, and their principal axis). Reply: units, about { kind, center | origin, dir }, prominence (as used), sides [one for radial; two for axial, [0] left of the axis's direction, [1] right]: { peaks (count), max, min, peakMean, valleyMean, depth (peakMean − valleyMean), pitch and pitchUnit (degrees for radial, sheet units for axial; only with peaks) }; detail: \"full\" adds peakList [{ at, position, value, prominence }]. samples (3 to 4096) and prominence override the defaults; the default prominence is never under 1.5 pixels (1.5 mm on a section), so shallow teeth on a section need prominence given. A round disc reads 0 peaks with max and min both near its radius. Refused: object before flat_objects, chain numbers the sheet does not have, about of the wrong kind. Changes nothing.",
+   "inputs": [
+    "about",
+    "chains",
+    "detail",
+    "kind",
+    "object",
+    "prominence",
+    "samples"
+   ]
+  },
+  "flat_open_image": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Open a flatbed scan of a part on the 2D sheet, in place of what was there (its elements, dimensions, notes, alignment and object numbers go), and find its edges. path: a PNG, or a JPEG or other format where Qt's image reader loads it (relative: the session's folder); read as 8-bit grey. Without Qt only a PNG that is not interlaced, 8 or 16 bits a channel, is read (slowly, in Python). The scale the file declares (PNG pHYs, JPEG JFIF density) is taken as millimetres until flat_calibrate sets a measured one — the report calls it nominal; with none declared the sheet is in pixels (units \"px\") and every length reads in pixels until calibrated. The 2D sheet holds one subject: a flatbed image (flat_open_image) or the section cut last (section_cut puts it there). Places are [x, y] in the sheet's units — millimetres once calibrated (a section always is), pixels before; an image's zero is its bottom-left corner, a section's the cutting plane's centre; +X right, +Y up. Reply: flat { subject, image { fileName, width, height (pixels), decoder (\"QImage\" or \"png (zlib)\") }, units, calibration { source (metadata | none | measured), pxPerMm }, edges { chains, sensitivity }, elements, dimensions }. Size: edge finding holds about ten arrays of 8 bytes a pixel (source: flat_core.detect_edges) — near 1.3 GB at 16 megapixels, which took 4 s where this pass timed it (a Linux container, not the Mac); a 600 dpi A4 scan is 35 megapixels, 1200 dpi 140: crop to the part or scan at a lower resolution rather than open those whole (not measured on the Mac). Heavy: past 45 s it answers as a job (job_status). Session state, not a FreeCAD document change: FreeCAD's undo does not take it back. Every flat_ answer names the sheet it read or changed (sheet: kind image or section, name, scale); a refusal here says which sheet stays.",
+   "inputs": [
+    "path"
+   ]
+  },
+  "flat_calibrate": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Set the image's scale against a known length, both axes alike. mode distance: points are exactly two places a known distance apart; mode diameter: three or more places on the edge of a circle of known diameter; mm is that true length. Places are in the sheet's units as they are now (pixels on an uncalibrated image, the nominal millimetres otherwise). Everything on the sheet keeps its place on the image and is scaled to the new units: elements, notes and the alignment; the edges are found again, so chain numbers change, and flat_objects' numbers are dropped (run it again). Refused on a section (already millimetres), for the wrong number of points, and for two points that coincide. Reply: calibration { source: \"measured\", pxPerMm { x, y }, dpi }, chains, units, scaledBy (new place = old place × this), note. Worked example: two points 10 units apart given as mm: 20 doubles every length (scaledBy 2). Costs what finding the edges does (see flat_open_image); heavy. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "mm",
+    "mode",
+    "points"
+   ]
+  },
+  "flat_detect_edges": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Find the image's edges again at a sensitivity from 0 (only the strongest) to 1 (every faint one); left out, the sensitivity last used (0.5 at first). Subpixel Canny chains, gaps bridged, chains under a millimetre (24 pixels when uncalibrated) and texture dropped. Chain numbers change with every detection: read flat_edges again before naming chains. Elements already fitted stay as they are. On a section it changes nothing: the cut is its edges, and the reply says so. Reply: chains (how many), note (on a section). Costs what opening the image did; heavy (a job past 45 s). Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "sensitivity"
+   ]
+  },
+  "flat_curvature": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "How an edge bends, as ScanRuler's curvature comb draws it. Give one of: chains (edge chains by number, as flat_edges lists them — detected edges or a section's cut) or element (a fitted 2D arc or circle, read exactly as 1/R). Reply for chains: unit, window, items [{ chain, closed, from, to (arc length along it), scatter, stretches [...] } or { chain, tooShort }]; for an element: element, kind, unit, closed, from, to, stretches. A stretch is { kind: straight | arc | transition, from, to, start, end } and for an arc radius (from its middle reading), radiusMin, radiusMax and, on a section only (the cut knows its material side), convex: true for a round, false for a fillet's hollow. A chain is read smoothed over window (2 sheet units by default, 0.2 to 20): one window is lost at each end of an open chain (a chain shorter than that answers tooShort), and a sudden change becomes a transition about a window long with the change in its middle — a fillet's tangent point is the middle of the transition before it; a transition much longer than the window is a blend that is no arc. straightBelow (1/unit): curvature under it counts as straight — by default 0.002 or four times the chain's scatter, whichever is larger, so on a noisy edge a gentle round reads straight until it is given; tolerance (0.1): how far an arc's readings may stray, as a share of its curvature; step adds samples [{ at, spot, curvature }] that far apart (at most 2000 a chain). Worked example: a Ø10 bore's cut reads one arc, radius 4.99, convex false; a fitted circle of radius 8 reads one arc of radius 8 from 0 to just under its circumference, 50.27. comb: true also draws the comb into the FreeCAD document as a plain Part object of line segments (name, or \"Curvature comb\"; on the section's plane on the part, or on XY for an image), sized by scale (1) and spacing (a 150th of the edges' extent, at least 0.2): one FreeCAD undo step, the reply then carries comb { object, teeth, mmPerCurvature, cap, spacing } and health; the object is a copy, not linked to the sheet. Without comb it changes nothing. Refused: both or neither of chains and element, a chain number the sheet does not have, an element that is a line or a point, comb with no document open (doc_new).",
+   "inputs": [
+    "chains",
+    "comb",
+    "element",
+    "name",
+    "scale",
+    "spacing",
+    "step",
+    "straightBelow",
+    "tolerance",
+    "window"
+   ]
+  },
+  "flat_edges": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The sheet's edge chains, longest first: each { chain (its number — what flat_fit, flat_profile and flat_curvature take; numbers are NOT in this order), points, length, closed, bounds { min, max } } in the sheet's units, with units and total. limit: how many are listed (50). An image's chains are the detected edges (flat_detect_edges; short specks at a hard edge's diagonals can appear as extra chains), a section's the cut itself: a point only where the cut crosses a triangle's edge, so a straight side of a CAD-style mesh is 2 points (mesh_densify and mesh_use_edited before section_cut give more). Chain numbers change whenever edges are found again (flat_detect_edges, flat_calibrate, another image or section). Refused when nothing is on the sheet. Worked example: the middle cut of a 40 × 30 plate with a Ø10 hole lists a closed chain of length 140 and one of about 31.4. Changes nothing.",
+   "inputs": [
+    "limit"
+   ]
+  },
+  "flat_fit": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Make a 2D element on the sheet — kind point, line, circle or arc — by a method of that kind; left out, the method is the kind's edge method when chains or box is given, else its pick method. Pick methods take points [[x, y], …] (flat-point-pick 1, flat-line-pick 2 or more, flat-circle-pick and flat-arc-pick 3 or more): each snaps to the nearest edge within reach (10 pixels' worth by default) unless snap: false, and picks says where each landed { at, chain, moved }; exactly the minimum goes through each point, so its sigma is 0. Edge methods (flat-line-edge, flat-circle-edge, flat-arc-edge) take chains (whole chains by number, from flat_edges) and/or box { min, max } (only the edge points inside it; alone: of every chain) and best-fit them with strays voted out — the usual way to measure; they need many points, so on a section of a mesh with few triangles they fail with the count (densify the mesh first, or pick points). Construct methods take refs, other 2D elements by id or name: flat-point-midpoint (two points, circles or arcs: their centres), flat-point-intersect (two lines), flat-point-center (one circle, arc or point), flat-circle-centers (three or more: the circle through their centres). The seed methods (flat-line-seed, flat-circle-seed) are not ported and are refused. name: its name, else \"Circle 1\" and so on by kind. Reply: element { id, name, kind, fit } — fit by kind: point { at }, line { center, dir, length }, circle { center, radius, zoneWidth }, arc { center, radius, start, sweep (radians, CCW from +X) }, each with sigma (RMS), usedPoints and formError (peak to peak) — and picks for a pick method. Units are the sheet's: pixels on an uncalibrated image. An element is not a FreeCAD object; flat_export writes it out. Worked example: the edge of a disc of radius 8 at 10 px/mm fits centre within 0.01 and radius 7.998. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "box",
+    "chains",
+    "kind",
+    "max",
+    "method",
+    "min",
+    "name",
+    "points",
+    "reach",
+    "refs",
+    "snap"
+   ]
+  },
+  "flat_dimension_add": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Measure between two 2D elements (refs: two, each by id or name, in order). The types: flat-dist-point-point (centre distance, with ΔX and ΔY), flat-dist-point-line (the point first, then the line: perpendicular distance), flat-dist-line-line (near-parallel lines only: over 3° apart the dimension is kept but reads invalid, saying to use the angle), flat-angle-line-line. A point, circle or arc counts as a point (its centre), a line as a line. Without type, the first type that takes the two in the order given (two lines: the distance, so pass type for their angle). Refused, listing every type's order, when the two do not fit — a line then a point: swap them. name: else \"Distance 1\" / \"Angle 1\". The value follows its elements (it is worked out on every read) and reads invalid once one is removed. Reply: flat (the 2D state: subject, units, calibration, edges, elements, dimensions [{ id, name, type, refs, value }]) and report (the text flat_report gives). Units are the sheet's: pixels when uncalibrated. Worked example: two fitted sides of a 10 × 6 rectangle read 5.97 to 6.00 apart; a circle's centre to a side 13 away reads 13.000. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "name",
+    "refs",
+    "type"
+   ]
+  },
+  "flat_note_add": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write a one-line text note on the 2D sheet: text (not empty), at [x, y] its lower-left corner in sheet units. Listed in flat_report and written into flat_export's SVG and DXF (as TEXT; Ø, ° and ± are spelled for DXF); it is not drawn by flat_render. A note keeps its place on the image when the sheet is calibrated again, and goes when another image or section takes the sheet. flat_edit { note } changes or hides it, flat_remove { notes } deletes it. Refused when nothing is on the sheet. Reply: note { id, text, at, visible }. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "at",
+    "text"
+   ]
+  },
+  "flat_edit": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Change one thing on the 2D sheet — give exactly one of element, dimension (each by id or name) or note (by id; when several are given, note wins, then element). An element or a dimension takes a new name; a note takes new text and/or a new place at; any of them takes visible: false, which leaves an element or a note out of flat_export and flat_render (a hidden dimension is still listed in the report). It does not refit or move an element: flat_remove and flat_fit again for that. Refused: none of the three given, an id or name the sheet does not have, an empty name. Reply: for a note { note }; otherwise the 2D state (subject, units, calibration, edges, elements, dimensions). Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "at",
+    "dimension",
+    "element",
+    "name",
+    "note",
+    "text",
+    "visible"
+   ]
+  },
+  "flat_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Remove elements, dimensions and notes from the 2D sheet: elements and dimensions each by id or name, notes by id; any mix in one call. Nothing is removed when one of them is not found (the refusal names it). A dimension on a removed element stays and reads invalid (invalidDimensions lists it): remove it too, or it shows as invalid in the report. Ids are not reused. Reply: the 2D state with what is left (elements, dimensions), removed { elements, dimensions, notes }, and lostSource / invalidDimensions when they apply. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "dimensions",
+    "elements",
+    "notes"
+   ]
+  },
+  "flat_set_alignment": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Put the part's zero point at origin [x, y] and its X axis through xAxis [x, y] (two places on the sheet, in sheet units; they must differ): flat_report and flat_export then read every place in that frame (y up, turned to match). The tools' own inputs and answers — flat_fit, flat_edges, boxes, picks — stay in the sheet's frame. clear: true takes the alignment off. It follows the image through flat_calibrate and goes with the sheet's subject. Reply: the 2D state, and alignment { origin, angleDeg } when one is set. Worked example: origin at a rectangle's lower-left corner [25, 10] and xAxis [35, 10] gives angleDeg 0, and a point at sheet [30, 13] reports as X 5, Y 3. Session state, not a FreeCAD document change: FreeCAD's undo does not take it back.",
+   "inputs": [
+    "clear",
+    "origin",
+    "xAxis"
+   ]
+  },
+  "flat_render": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A picture of the 2D sheet as a PNG, in its own units, +X right and +Y up: the image, the edge chains (teal), the visible elements in their colours and a grid. path: where to write it (relative: the session's folder; .png is added when missing; default sheet.png there, written over each time). show picks the layers from image, edges, elements, grid (all by default; a section has no image; notes and dimensions are not drawn); frame { min, max } (sheet units) zooms in — refused, with the sheet's extent, when it lies off the sheet; size: the long side in pixels (1200; 200 to 4000). Reply: file { path, name }, units, width, height (pixels), map { left, top, unitsPerPx, note } — pixel (column c, row r from the top) is the sheet place [left + c·unitsPerPx, top − r·unitsPerPx] — and grid (its spacing). The file is for looking at (open it, or send it to the person); the numbers come from flat_report. Needs Agent Link's renderer (always there under Agent Link). Changes nothing on the sheet.",
+   "inputs": [
+    "frame",
+    "max",
+    "min",
+    "path",
+    "show",
+    "size"
+   ]
+  },
+  "flat_report": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The 2D report as ScanRuler's Copy button gives it. Reply: text — the image (name, pixels) or the section (its name, scan and cut), the scale it rests on (a section's millimetres; a measured calibration; \"UNCALIBRATED — nominal … dpi from file metadata\" when only the file's own scale is used; or pixels), the coordinates (the alignment when set), every element with its size and scatter (Ø for circles, L and angle for lines, X · Y for points), every dimension with its value or why it is invalid, and the visible notes — and flat, the 2D state as data (subject, image, units, calibration, edges { chains, sensitivity }, elements [{ id, name, kind, fit }], dimensions [{ id, name, type, refs, value }]). The state's fits are in the sheet's frame; the text's places are in the alignment's when one is set. Refused when nothing is on the sheet. Changes nothing.",
+   "inputs": []
+  },
+  "flat_export": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the sheet at true scale for CAD or a laser. format dxf: AutoCAD 2000, millimetres declared, y up; the edge chains as LWPOLYLINE thinned to 0.01 mm, fits as LINE / CIRCLE / ARC / POINT, their labels and the notes as TEXT. format svg: one unit a millimetre, y down. path: where to write (relative: the session's folder; the format's extension is added when missing); left out, <image name or section name>.<format> in the session's folder, written over when there. What is written: every chain, every visible element with a fit and every visible note, in the alignment's frame when one is set (flat_set_alignment). Trap: on an uncalibrated image the units are pixels, and the file's \"millimetres\" are pixels — flat_calibrate first (the reply's units says which). Refused when nothing is on the sheet, and when the path cannot be written. Reply: file { path, name, bytes }, format, units, elements, chains (counts written). Changes nothing on the sheet. To get a section into the FreeCAD model instead, section_to_sketch.",
+   "inputs": [
+    "format",
+    "path"
+   ]
+  },
+  "deviation_open_reference": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Open the nominal part the scan is compared with, in place of the one there is. Needs a scan open. Inputs — one of: path — a STEP, IGES or BREP from CAD (tessellated finely: 0.002 to 0.01 mm off the surface, by size) or an STL, PLY, OBJ, OFF or 3MF mesh (glTF/GLB, Collada, VRML, 3DS where Agent Link reads them) — or body, a shape in the FreeCAD document by name or label (tessellated the same way, as it stands now: a later change to the body is not followed — open it again). units mm (default), cm, m or in is for mesh files; a CAD file carries its own. Gotchas: any alignment and map against the old reference go; the reference is taken in its own coordinates, so a body inside a moved container is read where its own Placement puts it; an open reference (warnings: n open edges) cannot give a trusted sign near its holes; a reference mesh is welded and turned outward if it came inside out. Size: the fine tessellation of a large or very curved CAD part makes a large mesh and takes time, on the window's own thread (not measured). Reply: deviation { source, reference { fileName, triangles, volume mm³, openEdges }, align: null, map: \"none\", settings } and warnings. A file's reference is put in the document as a mesh object; a body stays itself. Next: deviation_align. Keeps the reference in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "body",
+    "path",
+    "units"
+   ]
+  },
+  "deviation_align": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Rigid best fit (no scale) of the scan onto the reference, then the deviation map under it. Needs deviation_open_reference. Inputs: mode auto (default: finds the pose on its own), points (starts from pairs: three or more { scan: [x, y, z], reference: [x, y, z] } of the same places, not in a line, then refines) or local (refines the fit in hand on a marked surface only: vertices, within searchDistance mm); allowSizeMismatch: true only for a scan that truly is a small piece of the reference. What it does: the scan, with every element measured on it, is MOVED onto the reference (in FreeCAD the scan object's Placement follows) — every coordinate afterwards is in the reference's frame. Gotchas: read warnings every time — a matchedShare under 50 %, a fit that did not converge, ambiguous (a part with a symmetry: two poses fit equally; give pairs), or under 80 % of the points measured each mean the map is not to be trusted as it stands; refused (invalid_input) when the scan and the reference differ in size by more than 2× — a unit mix-up, named when near ×10, ×25.4 or ×1000 — and for vertices that are not numbers; moving the part afterwards (align_clear, align_datum, align_auto, align_symmetry, scan_scale) drops this alignment and its map; on a scan with no noise the automatic colour range comes out near zero — set deviation_settings { range }. Sign: positive where the scan stands outside the reference (excess material on the part), negative inside it (material missing). The automatic search distance is 2 % of the reference's diagonal (readings past it count as unmeasured). Reply: deviation { align { source, rms, meanDistance, matched, sampled, iterations, converged, matchedShare, ambiguous, pairRms, transform }, map, sign, stats { min, max, mean, rms, sigma, percentiles, measured, total, withinTolerancePct (over every scan point, measured or not), withinToleranceOfMeasuredPct, measuredPct }, settings }, moved, warnings. Size: 25,000 sampled points drive the fit, then every vertex is measured. At 137,000 triangles: 32 s for auto, 9 s from points (plain Python off the Mac; the Mac not measured). Declared heavy: on its own it runs as a job, and past 45 s the call answers with a job id — job_status { job } gives the answer. Keeps the result in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "allowSizeMismatch",
+    "mode",
+    "pairs",
+    "reference",
+    "scan",
+    "searchDistance",
+    "vertices"
+   ]
+  },
+  "deviation_measure": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Measure the deviation map again under the alignment in hand — after an element target, or to be sure it is of the reference. deviation_align measures it already, and deviation_settings { facingDeg } measures again itself, so this is seldom needed. No inputs. Refused (invalid_state) when there is no reference, or no alignment — never aligned, or the part was moved since (align_clear, align_datum, align_auto, align_symmetry, scan_scale drop it): run deviation_align again. Reply: deviation { source: \"reference\", align, stats { min, max, mean, rms, sigma, percentiles p5 … p95, measured, total, withinTolerancePct (over every scan point), withinToleranceOfMeasuredPct, measuredPct }, settings } and warnings when under 80 % of the points have a reading within the search distance. Sign: positive where the scan stands outside the reference (excess material), negative inside it (material missing). Size: every scan vertex is measured against the reference: 6.5 s at 68,000 vertices (plain Python off the Mac; the Mac not measured). Declared heavy: on its own it runs as a job. Keeps the map in ScanRuler's state; the model is not changed.",
+   "inputs": []
+  },
+  "deviation_set_target": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Map how far the scan strays from one of its own fitted elements — a plane, cylinder, sphere or torus — instead of from a reference part: a face's flatness or a bore's roundness as a map. Inputs: element (needed): id or name, or null to go back to the reference part's map; side outward (the element's outer side is material's outside: a shaft, a top face) or inward (a bore, a shell) — read off the scan when left out, give it to override; facingDeg (60; 1 to 90, or null for any): only surface facing the element within that many degrees counts. No reference or alignment is needed. Gotchas: only the part of the scan near and facing the element is measured — measuredPct is small and withinTolerancePct, which counts every scan point, is small with it: read withinToleranceOfMeasuredPct; the map replaces the reference's for deviation_hotspots, deviation_export and scan_heightmap { of: \"deviation\" } until element: null; removing the element clears it. Sign: positive past the element's surface on the material's outer side (too much material), negative short of it. Reply: deviation { source: \"element\", target { element, side, facingDeg }, stats, settings }. Size: every vertex is read (0.06 s at 68,000, plain Python off the Mac). Declared heavy: on its own it runs as a job. Keeps the map in ScanRuler's state.",
+   "inputs": [
+    "element",
+    "facingDeg",
+    "side"
+   ]
+  },
+  "deviation_settings": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The deviation map's reading; with nothing, reads it. Inputs: tolerance (± mm the statistics count within; 0.1 by default); maxDistance (search distance, mm: readings past it count as unmeasured; by default 2 % of the reference's diagonal); range (colour scale, ± mm; by default from the map — near zero on a scan without noise, so set it then); bands (2 to 256 colour steps, or null for a smooth scale); facingDeg (1 to 90, or null: how far the scan's surface may face away from the reference's and still count; 90 by default); colormap jet. Gotchas: facingDeg measures the map again at once (as long as deviation_measure); maxDistance and tolerance change how the map in hand is counted, not its values — a too short maxDistance shows as a low measuredPct; setting range or maxDistance turns their automatic values off. Reply: deviation { source, reference, align, map, sign, stats, target, settings { range, maxDistance, maxDistanceAuto, bands, tolerance, facingDeg, colormap } }. Keeps the settings in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "bands",
+    "colormap",
+    "facingDeg",
+    "maxDistance",
+    "range",
+    "tolerance"
+   ]
+  },
+  "deviation_hotspots": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The deviation map read as patches: the vertices past the tolerance gathered into connected regions, the largest and farthest first — where the part is wrong, in a few rows. Needs a map (deviation_align or deviation_set_target). Inputs: tolerance (the map's by default); patches (8; 50 at most); grain (mm: how far apart two points may be and still join; three point spacings by default); on scan (default) or reference. Reply (on scan): source, tolerance, over (vertices past it), found, features { count, shareOfExcess }, spacing, grain, patches — each centroid, box, area mm², count, mean, extreme, depth (the median |deviation|), volume (mm³ past the tolerance: the ranking key), kind (\"feature\": at least 4 mm² and 25 point spacings² and a depth of 2× the tolerance — material missing or misplaced, to model or to name; else \"texture\"), side, at and vertex (the extreme's place), vertices — then far and unmeasured. Gotchas: read far every time — the vertices past the search distance, left out of the patches: far.inside is scan deep inside the reference (a hole, pocket or slot the model lacks), far.outside scan standing off it; area and volume come from the point spacing and run a little over on a densified CAD mesh. Sign: mean and extreme are positive (side outside) where the scan stands outside the reference — excess material — negative (side inside) where material is missing. on: reference reads the map on the reference instead (coveredPct, withinTolerancePct over the reference's area, mostExcess, mostMissing, unscanned — reference surface with no scan facing it), signed the same way; it casts a reading for every small piece of the reference (200,000 at most; spacing says how fine) against the scan's triangles and is slow: minutes on a 137,000-triangle scan in plain Python off the Mac (the Mac not measured), kept afterwards until the map or the settings change — ask for it only when unscanned areas matter. Declared heavy: on its own it runs as a job and job_status { job } gives the answer; on scan answers in under a second. Changes nothing.",
+   "inputs": [
+    "grain",
+    "on",
+    "patches",
+    "tolerance"
+   ]
+  },
+  "deviation_volume": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The scan and the reference part compared as solids, on a grid of small cells: each cell inside one and not the other is an error, touching cells a region. Needs deviation_align. Inputs: tolerance (the map's by default: a cell within it of the scan's surface is noise, never an error); cell, mm (by default from the tolerance and the part's size, widened to keep 16 million cells at most); within { min, max } limits it to a box; regions (8; 50 at most); kinds: any of excess, missing, unsure. TRAP — the words run the other way from the map's: here excess is material the REFERENCE has and the part has not (the model is too big there: a dent, a worn face, a pocket not modelled), missing is material the part has and the reference lacks (a boss or lump to add to the model); unsure is where an open scan does not say (never an error). On the map and in deviation_hotspots \"excess\" means the opposite (the scan outside the reference). Other gotchas: nothing thinner than smallestSeen (two cells) is seen; an open scan gives scanOpen and unsure regions; an open reference gives referenceOpen and a warning. Reply: tolerance, cell, smallestSeen, modelVolume mm³, totals { excess, missing, unsure: { volume mm³, share % of the reference } }, found, regions largest first { kind, volume, maxDepth, thickness, shape layer | lump, centroid, deepest, box, evidence, confidence }, seconds. Size: the cost goes with the cell count, not the scan's: 2.6 s for a 60 mm part at a 0.24 mm cell (plain Python off the Mac). Declared heavy: on its own it runs as a job and job_status { job } gives the answer. Keeps the result for the panel; the model is not changed.",
+   "inputs": [
+    "cell",
+    "kinds",
+    "max",
+    "min",
+    "regions",
+    "tolerance",
+    "within"
+   ]
+  },
+  "deviation_export": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the deviation map as a file. Needs a map (deviation_align or deviation_set_target). Inputs: format ply (default: binary, a vertex per scan vertex with x, y, z, deviation, measured and the map's jet colour), csv (x,y,z,d), npy (N × 4 float32) or report (ScanRuler's plain-text report, also in the answer); side scan (default) or reference (the map read on the reference, a reading per small piece of it; ply, csv or npy only); path (a relative name goes in the session's folder; left out: <scan>-deviation-<side>.<format> there, .txt for the report). Reply: side, format, readings, measured, measuredPct, withinTolerance, withinTolerancePct (over every reading, measured or not), withinToleranceOfMeasuredPct, tolerance, searchDistance, file (the path), and report with its text. Gotchas: the distance is NaN where there is no reading, and a reading past the search distance is kept as it is (measured says which count); coordinates are in the reference's frame, where the alignment put the scan. Sign, both sides: positive where the scan stands outside the reference (excess material), negative inside it (material missing). Size: side scan writes at once (about 20 bytes a vertex in PLY). side reference first reads the map on the reference, the slow reading deviation_hotspots { on: \"reference\" } describes (minutes; kept for the next call). Declared heavy: on its own it runs as a job. Changes nothing in the document.",
+   "inputs": [
+    "format",
+    "path",
+    "side"
+   ]
+  },
+  "thickness_measure": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Measure the wall thickness at the scan's points, with no reference: from each point along the inward normal to the far wall. Inputs (each kept for later calls): method ray (default) or sphere (the largest sphere that fits at the point); maxThickness, mm — the thickest wall searched for; by default a fifth of the scan's diagonal, so a wall thicker than that reads as unmeasured: raise it to read a solid block's size; coneRays (0: one ray; more takes the shortest of a cone) and coneAngleDeg (30); normalDeviationDeg (60, or null: how far the far wall may turn from facing back); maxPoints (300,000; 0 for all): a larger scan is measured at that many, spread evenly, the others taking the thinnest reading among their neighbours. Reply: thickness { status, stats { measured, total, min, max, mean, rms, sigma, belowLimit, limit, belowLimitPct }, settings, sampled { points, of } }, thinSpots { count, found, patches thinnest first: centroid, box, count, area, minThickness, meanThickness, at, vertex, vertices } — the points under the thin-wall limit (1 mm; thickness_settings { limit }) — and report, the plain text. Gotchas: thinSpots.count counts every scan point under the limit, the unmeasured ones with the reading they took from a neighbour, so it can be several times stats.belowLimit (measured points only) when maxPoints sampled the scan; thin readings along open rims are rays escaping, not thin walls; on a solid block the reading across a corner is the distance to the next face met, not a wall; the statistics are over the points measured only. Refused when no wall is found within maxThickness anywhere. Size: a ray for every measured point, walked through a grid of cells over the mesh so only the triangles near its path are tried. Measured live before the grid: 221 s on the Mac for 20,000 points at 25 mm on 219,600 triangles (every leaf of triangles a run of rays swept was tried); the same reading with the grid takes 0.4 s where it was 66 s in a Linux container, the Mac not measured since. Cost grows with the points measured and with maxThickness (the cells each ray crosses); maxPoints 20,000 reads a part's walls well. Declared heavy: on its own it runs as a job, and past 45 s the call answers with a job id — job_status { job } gives the answer. Keeps the map in ScanRuler's state (view_render { map: \"thickness\" } shows it), and FreeCAD's Save carries it: a document opened again still has it; a map taken before the scan was moved or scaled is dropped, not kept. The model is not changed.",
+   "inputs": [
+    "coneAngleDeg",
+    "coneRays",
+    "maxPoints",
+    "maxThickness",
+    "method",
+    "normalDeviationDeg"
+   ]
+  },
+  "thickness_settings": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The wall-thickness settings; with nothing, reads them. Search settings — method, maxThickness, coneRays, coneAngleDeg, normalDeviationDeg, maxPoints, as thickness_measure takes them — take effect at the next thickness_measure, not on the map in hand. Reading settings act at once: low and high (the ends of the colour scale, mm; setting one turns the automatic scale off), bands (2 or more colour steps, or null), limit (the thin-wall limit the statistics count under, mm; 1 by default). Reply: thickness { status ready | none, stats, settings } and, when limit was given and there is a map, thinSpots under the new limit. Keeps the settings in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "bands",
+    "coneAngleDeg",
+    "coneRays",
+    "high",
+    "limit",
+    "low",
+    "maxPoints",
+    "maxThickness",
+    "method",
+    "normalDeviationDeg"
+   ]
+  },
+  "scan_noise": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "This scan's own noise, measured: the median scatter of small plane fits over 4,000 sampled places (sigmaMm), with p90 and spacingMm (the median edge length). Kept with the scan as its measured noise. No inputs. Reply: sigmaMm, p90, spacingMm, sampled, next, and plan — the noise to plan with: the larger of the named scanner's usual noise and this scan's — { sigmaMm, source profile | measured, from, finestMm (three times the noise: nothing finer is to be trusted or modelled), warning when no scanner is named or the scan reads 1.5× its scanner or more }. scan_thread, wear_diff and fit_scan_measure read plan. Gotchas: refused for a CAD tessellation (half or more of its vertices sit between exactly coplanar triangles): it has no scan noise, and its numbers are exact; a textured or knurled surface reads as noise — scanner { action: \"use\" } names the scanner's known figure instead. scan_qa gives the same median beside its other checks. Keeps the reading in ScanRuler's state; the model is not changed.",
+   "inputs": []
+  },
+  "scanner": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Your scanners, kept across projects in scanners.json in the session's folder: each { name, noiseMm (one standard deviation of its usual noise, over 0 to 5 mm), spacingMm, note }. action (needed): list; add { scanner: { name, noiseMm, spacingMm?, note? }, use?: true } (a scanner of that name is replaced); remove { name }; use { name } names the scanner this scan came from, or use { measured: true } names none (the plan then rests on scan_noise alone); export { path? } (scanners-export.json in the session's folder by default); import { path } (merged by name, the file's entries winning). Reply: list answers scanners, using, measured, file; each other action what it did; and plan, the noise to plan with ({ sigmaMm, source, from, finestMm, warning } — or null with a note when no scanner is named and nothing is measured), which scan_thread, wear_diff and fit_scan_measure read. Gotchas: the choice is kept with the scan by value, so removing or editing a scanner afterwards does not change a project that named it; a scanner's figure is what it usually gives on a flat, matte part, not its catalogue accuracy. Writes scanners.json (and the export file); the model is not changed.",
+   "inputs": [
+    "action",
+    "measured",
+    "name",
+    "noiseMm",
+    "note",
+    "path",
+    "scanner",
+    "spacingMm",
+    "use"
+   ]
+  },
+  "scan_thread": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Name a scanned thread: the points about a cylinder's axis are read for pitch, crests and roots and the hand, then folded along the helix for a sharper pitch, starts, the flank angle and the taper, and decided against ISO metric, UNC, UNF, UNEF, NPT, G/R pipe, Tr, ACME and the 45° print form. Inputs: axis (needed): { element } — a cylinder fitted in the bore or on the boss (element_fit kind cylinder; give it radius or side so it lands on the thread, not the wall beside it) — or { origin, direction, radius, length? } in mm; band (mm either side of the radius a point counts; max(0.6, 0.2 × radius)); length (mm along the axis, centred on its origin; the cylinder's by default); families (which to try; all by default); pitchFloor (0.01: the least share a pitch is resolved to; raise it for a scanner whose scale you trust less); detail full adds candidates and the tooth profile. Reply: verdict — match (with confidence high or low), ambiguous (tied: the sizes this scan cannot tell apart; deciding: the hand measurement that would, and what each reads) or none — best { designation, family, form, major, pitch, tpi, angle, taper, pitchOff, diameterOff }, ruledOut, reads { pitch, pitchSigma, tpi, major, minor, internal, leftHanded, starts, lead, flankAngle, flankConfidence, taper, noise, length, points }, scanNoise, tolerance, note (the verdict in words), next. A plain wall answers verdict none with thread: false. Gotchas: a bore is matched on its crests (the minor diameter), a boss on its own (the major); the diameter tolerance widens with the noise to plan with (scan_noise, scanner), so a noisy scanner ties sizes it cannot resolve — ask the person for the deciding measurement rather than pick. Size: at most 200,000 points are read (every k-th past that); 0.25 s on a plain bore (plain Python off the Mac). Notes the result in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "axis",
+    "band",
+    "detail",
+    "direction",
+    "element",
+    "families",
+    "length",
+    "origin",
+    "pitchFloor",
+    "radius"
+   ]
+  },
+  "wear_setup": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Settings, tags and the reference for wear repair, in one call; with nothing, reads them. Inputs: tolerance (0.05 mm: what counts as worn, and the pre-warp's target); blendMm (1: how far outside a worn region a repair fades out); maxMm (2: how far the reference may be and still be the same surface); mode add (default: only lost material comes back) or both (what stands proud is trimmed too); reset: true puts these four back (and wins over values given in the same call); tag: [{ action set | remove | clear, name, kind worn | keep, region }] with region { kind: \"box\", min, max } or { kind: \"sphere\", center, radius } in the frame the part is measured in now — keep is never moved (a fit face, a datum, a feature meant to differ from the other half); a tag of a name in use replaces it; reference: { source: \"mirror\", plane: \"x\" | \"y\" | \"z\" } (the part's own other half across that coordinate plane through the zero point — align_symmetry first, so the mirror plane is one of them), { source: \"mirror\", point, normal }, or { source: \"deviation\" } (the reference part as the scan is aligned to it: deviation_open_reference and deviation_align first, or it is refused). Gotchas: regions are boxes and spheres in current coordinates and do not follow the part — tag after aligning, and tag again after any move; a mirror reference repairs only damage the other half does not share. Reply: settings, tags, reference. Then wear_diff. Keeps them in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "action",
+    "blendMm",
+    "center",
+    "kind",
+    "max",
+    "maxMm",
+    "min",
+    "mode",
+    "name",
+    "normal",
+    "plane",
+    "point",
+    "radius",
+    "reference",
+    "region",
+    "reset",
+    "source",
+    "tag",
+    "tolerance"
+   ]
+  },
+  "wear_diff": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "How worn each region tagged worn is, against the reference chosen in wear_setup. Input: names (only these worn regions; all by default). Reply: reference, tolerance, and regions: name, points, lost (the deepest the scan stands in from the reference, negative mm), added (the most it stands out), mean, rms, pointsLost and pointsAdded (points past the tolerance either way); scatter (the scan's own spread against the reference off the worn regions), scanNoise (the noise to plan with: scan_noise, scanner), floor (the least tolerance they support: twice the scatter or three times the noise, the larger) and note when the tolerance is under it — then the wear read is partly noise: raise wear_setup { tolerance }. Gotchas: a point further than maxMm from the reference is not counted (a piece broken off reads as nothing there, not as deep wear); the mean is over every point in the region, worn or not. Refused when no region is tagged worn or no reference is chosen (wear_setup), or the deviation reference is no longer aligned. Every vertex is read against the reference: 1.4 s at 68,000 vertices (plain Python off the Mac). Changes nothing.",
+   "inputs": [
+    "names"
+   ]
+  },
+  "wear_rebuild": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the scan with each worn region brought back onto the reference: every vertex there is moved to it, fading out over blendMm outside the region, never inside a keep region, never where the reference is past maxMm. Inputs: names (only these worn regions); mode add or both (wear_setup's by default); path (an STL; a relative name goes in the session's folder; left out: <scan>-repaired.stl there). Reply: file { path, name, bytes }, moved (vertices), largestMoveMm, before and after per region { name, lost, added, pointsLost }, note, next. Gotchas: it writes a file and leaves the open scan as it is — scan_open the file (discard: true) to measure the repair, or import_file to bring it into the document; a dent comes back, a piece broken off (no scan surface there) does not — model that from the reference; the mesh keeps the scan's triangles, so it is as open or closed as the scan was; coordinates are those the part is measured in now. A binary STL is 50 bytes a triangle (6.8 MB for 137,000). Changes nothing in the session or the document.",
+   "inputs": [
+    "mode",
+    "names",
+    "path"
+   ]
+  },
+  "wear_prewarp": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Pre-warp a model against a print of it. Set-up: the target (the CAD, or a repaired part) open as the deviation reference, a scan of a print of it as the scan, aligned (deviation_align) — refused otherwise. The target is moved back at every point by the error the print shows there, smoothed over smooth neighbour rings (2; 0 to 10) so scan scatter is not printed in, times gain (1; 0.2 to 1.5), and written as an STL in the target's own frame to print next. Inputs: gain, smooth, fresh: true (start the run count again), path (an STL; left out: <target>-prewarp-<run>.stl in the session's folder). Reply: file, run, rms (this print's error against the target, mm), largest, unread (target points with no scan within wear_setup's maxMm), seenFromPrint { largest, rms } (the same error read from the print's own points to the target), runs [{ run, rms }], stop and why — stop is true once the print is within the tolerance, a run gained less than a fifth on the one before, or three runs are made — warning, and note. Gotchas: the error is read, and corrected, at the target's own vertices only — a target tessellated from CAD has them on its edges and rims, so an error in the middle of a face reads rms 0 there: when the print's own points lie further off than the tolerance and than anything the target's vertices show, the reply carries warning, stop is false, and the target is to be opened again as a mesh fine enough to carry the error; each call counts as a run, so call it once per scanned print; the written mesh is the reference's tessellation moved, not a CAD solid; it corrects shape error that repeats from print to print, not warping that differs each time. Starting the print is the person's call. Notes the run in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "fresh",
+    "gain",
+    "path",
+    "smooth"
+   ]
+  },
+  "catalog_part": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Standard parts offline: socket head and button head screws, hex nuts, washers and deep-groove bearings, nominal dimensions in mm. Three uses. designation: a part's sizes by name — \"M5 socket head\", \"608\", \"M8 washer\", \"M4\" for every M4 part, \"ISO 4762\" for a standard (limit 20 by default, 100 at most): reply parts [{ designation, kind, standard, dims }]. dims (kind narrows it): the sizes measured, by each kind's own names — d, dk, k, s for screws; d, s, m for nuts; d1, d2, h for washers; d, D, B for bearings — each matched as a share of its nominal: reply matches [{ designation, kind, standard, dims, agree [{ dim, nominal, measured, off }], worst }] (limit 5 by default), and named when one fits within 5 % and clearly better than the next; else note says which two tie and what else to measure, or that nothing is within 5 %. Neither: the kinds and their dimension names. Gotchas: dims' names are case-sensitive (bearing D and d differ); a scanned size carries the scan's noise — measure diameters with element_fit, not from two points; the table is small, so no match is not proof the part is special. Needs no scan and no document. Changes nothing.",
+   "inputs": [
+    "designation",
+    "dims",
+    "kind",
+    "limit"
+   ]
+  },
+  "catalog_links": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Search pages for a part's CAD on the catalogues and model libraries, for the person to open — nothing is fetched or downloaded from here. Inputs: query (needed: a designation or description); sources: any of traceparts, mcmaster, misumi, printables, thangs, grabcad (all by default; an unknown one is refused with the list). Reply: links [{ source, label, kind catalogue | library, url, terms (what the source allows for a downloaded model, in a line) }] and note. Next: the person downloads a file; import_file brings it into the document; catalog_provenance { action: \"record\" } notes where it came from, so pack_plan knows whether it may be passed on. Changes nothing.",
+   "inputs": [
+    "query",
+    "sources"
+   ]
+  },
+  "catalog_provenance": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Where each file brought into the project came from, kept in provenance.json in the session's folder. Inputs: action list (default) or record with record { file, source (both needed), page, licence, shareable }. A record of a file name already there replaces it, and the date is added (at). shareable: false keeps the file out of anything pack_write shares (it is linked in the README instead). Reply: files [{ file, source, page, licence, shareable, at }], path, note. pack_setup takes these records as the pack's upstream parts until upstream is set there. Writes provenance.json; the model is not changed.",
+   "inputs": [
+    "action",
+    "file",
+    "licence",
+    "page",
+    "record",
+    "shareable",
+    "source"
+   ]
+  },
+  "manual_plan": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The assembly manual's plan, as data kept with the project; with nothing, reads it. Inputs: settings { title, explode (how far new parts are drawn out along their move, a share of their travel; 1), view, product, version, publisher, safety, intendedUse, disposal }; style { name ste100 (default: short sentences, one instruction each, the verb first), plain or custom, custom: your own rules as Markdown lines (\"maxWords: 25\", \"passive: off\", \"- avoid -> use\"), words: the project's word list }; parts [{ name, body (a body's label in the document), kind part | hardware, designation, source, qty }] — a part of a name in use is replaced; fromBodies: true adds every body not yet a part; removeParts [names]; steps (the whole list, replacing it) or step [{ … }] (each added, or replacing the step of the same id; at: a position from 1). A step: id, place [{ part, move (the direction it moves in to its place; [0, 0, -1] by default), travel mm (clear of itself by default) }], sub (build a sub-assembly apart under this name; a later step places it by that name), tools, torque, warnings [{ level danger | warning | caution | notice, text }], text, notes, view. export: a file path to write the plan as JSON; import: one to read (it replaces the plan in hand). Gotchas: parts are placed where their bodies stand in the document — the model must be assembled; a step naming a part that is not listed is reported under problems, and parts no step places under unplaced; hardware without a body is listed but not drawn or checked. Reply: settings, style, parts, steps, problems, unplaced, exported. Then manual_check, then manual_render. Keeps the plan in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "at",
+    "body",
+    "custom",
+    "designation",
+    "export",
+    "fromBodies",
+    "id",
+    "import",
+    "kind",
+    "level",
+    "move",
+    "name",
+    "notes",
+    "part",
+    "parts",
+    "place",
+    "qty",
+    "removeParts",
+    "settings",
+    "source",
+    "step",
+    "steps",
+    "style",
+    "sub",
+    "text",
+    "tools",
+    "torque",
+    "travel",
+    "view",
+    "warnings",
+    "words"
+   ]
+  },
+  "manual_check": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Check the manual before rendering it. Each part is swept in along its move against the parts already there (in its sub-assembly, or the main one) at 17 places along its travel: overlapsInPlace (it sits in another where it ends: an interference fit, or the model is wrong — read first, and the way in is then not swept), blockedShortBy mm (clear where it sits, but it runs into a part that far short of its place: another way in, or an earlier step), or clear; and each step's words are linted to the style (length, passive, one instruction, the verb first, the word list). No inputs. Reply: steps [{ step, parts [{ part, clear | blockedShortBy | overlapsInPlace, note, move, travel, checked, why }], lint }], blocked (how many placements are blocked or overlap), lintFindings, problems, unplaced. Gotchas: an overlap under a ten-thousandth of the part's volume is let through, so touching faces are clear; a body over 5,000 faces (a mesh brought in as a solid) is named as not checked; hardware without a body is not checked; the sweep is straight along move only. Size: up to 17 boolean cuts of FreeCAD's kernel for each placed part against everything in place, so it grows with parts × their faces — not measured; declared heavy, so on its own it runs as a job and job_status { job } gives the answer past 45 s. Refused with no steps. Changes nothing.",
+   "inputs": []
+  },
+  "manual_render": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the manual as one HTML page with its pictures inside: the parts list, then each step's picture — parts in place grey, the step's own in colour drawn out along their moves with arrows in — its parts, tools, torque, safety messages and words. Inputs: width (900) and height (640) of each picture in pixels (200 to 2000); path (an .html file; a relative name goes in the session's folder; left out: <title>.html there). Reply: file { path, name, bytes }, steps, pictures, lint (the style findings per step), note. Print it to PDF from a browser. Gotchas: it does not check the ways in — manual_check first; a step whose view is not one of the renderer's views is refused, naming them; pictures are drawn by Agent Link's own renderer from the bodies' shapes (0.1 mm tessellation), not from the window. Size: a picture a step; declared heavy, so on its own it runs as a job (job_status { job } gives the answer past 45 s). Not measured. Refused with no steps. Changes nothing in the document.",
+   "inputs": [
+    "height",
+    "path",
+    "width"
+   ]
+  },
+  "pack_setup": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The library pack — the design made ready to share; with nothing, reads it. Inputs: title, author (the copyright holder), summary, printSettings (free text); licence — an id: CC-BY-4.0, CC-BY-SA-4.0, CC-BY-NC-4.0, CC-BY-NC-SA-4.0, CC-BY-ND-4.0, CC-BY-NC-ND-4.0, CC0-1.0, MIT, GPL-3.0-only or ARR (all rights reserved) — or as a page wrote it (\"CC BY-SA\"); an unknown one is refused with the list; includeStep and include3mf (true), renders (0 to 6 pictures; 4), bodies (labels; every body by default), files (paths of files to add: a sliced 3MF, photos, the manual's HTML — each must exist), upstream — the parts taken from others: [{ part, body?, title, author, url, licence, source, redistribute, modified, permission }]; catalog_provenance's records are used until it is set here. Reply: settings, bodies, files, upstream, licences (the ids with their short names), note. Then pack_plan says whether it can go out, and pack_write writes it. Keeps the pack in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "author",
+    "bodies",
+    "files",
+    "include3mf",
+    "includeStep",
+    "licence",
+    "printSettings",
+    "renders",
+    "summary",
+    "title",
+    "upstream"
+   ]
+  },
+  "pack_plan": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Whether the pack can go out under its licence. No inputs. Each upstream part is checked against the pack's licence: credited (with what the pack must carry for it), blocked (with why: a licence that does not allow it, share-alike that does not match, no licence known), or leftOut (from a source whose terms do not allow passing files on: linked in the README instead of packed); and what is missing (problems: no author, no title …). Reply: ok, licence, problems, credited, blocked, leftOut, bodies, files, note. pack_write refuses while ok is false. A guide from each licence's terms as commonly read, not legal advice: the person confirms each upstream licence. Changes nothing.",
+   "inputs": []
+  },
+  "pack_write": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the pack as a zip: models/ (STL, and 3MF and STEP when asked, of each body), images/ (renders), files/, README.md with attribution, LICENSE. Input: path (a .zip; a relative name goes in the session's folder; left out: <title>.zip there). Every file is scrubbed first — absolute paths and the user name in them, access codes, keys, tokens, printer serials and addresses, e-mails, a STEP header's author, an STL header's text, picture metadata — and each kind of change is reported. Reply: file { path, name, bytes }, contents, scrubbed [{ what, count }], credited, leftOut, note. Gotchas: refused while pack_plan says it cannot go out (the message lists why) and with no body to pack; bodies of upstream parts that may not be passed on are left out; the scrub is by pattern — the person reads README.md and looks over the files before uploading, and the upload is theirs to do. Size: each body is meshed and exported by FreeCAD and each render drawn, on the window's own thread — not measured; many bodies or 6 renders take a while. Changes nothing in the document.",
+   "inputs": [
+    "path"
+   ]
+  },
+  "fit_scan_setup": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Settings for reading a scanned print against the CAD it was printed from; with nothing, reads them. Inputs: up — which way of the CAD stood up on the bed: +z (default), -z, +x, -x, +y, -y; band (1 mm: how far off the surface a point still counts); footBand (0.2: the first layer's height) and footAbove (2.5: where the wall is read to compare the foot with); slicer — the key map: bambustudio (default), orcaslicer, prusaslicer, or one of your own; current { key: value } — the slicer's values in use, which the changes are added to; inner [wall ids] — walls of pockets, which take the hole offset; ignore [feature ids] — left out; keymap { id, label, keys: { contour | hole | foot | scaleXY | scaleZ: { key, kind add | percentMeasured | percentShrink | objectScale | unsupported, sign?, section?, note? } } } adds your own map, kept in fit-keymaps.json in the session's folder; removeKeymap: its id. Feature ids (+X1, -Z2, H1, B1) come from fit_scan_features. Reply: settings, keymaps [{ id, label, checked }], runs. Keeps the settings in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "band",
+    "current",
+    "footAbove",
+    "footBand",
+    "ignore",
+    "inner",
+    "keymap",
+    "removeKeymap",
+    "slicer",
+    "up"
+   ]
+  },
+  "fit_scan_features": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The features of the reference the print will be read on, in the build frame (up as fit_scan_setup has it). Needs the CAD open as the deviation reference and the scan aligned to it (deviation_open_reference, deviation_align); refused otherwise. No inputs. Reply: planes — flat walls, floors and tops square to an axis: { id (+X1, -X1, +Z1 … numbered along the axis), axis, sign, offset mm, area, min, max } — circles — upright holes and bosses: { id H1 … or B1 …, kind hole | boss, center, radius, zMin, zMax, coverage° } — zMin, zMax, inner, note. Use it to choose what to tag: a pocket's walls go in fit_scan_setup { inner } (they take the hole offset, not the contour's), and a feature that misleads (a chamfered wall, a hole with supports in it) goes in ignore. Gotcha: only faces square to the build axes and round features standing along up are found — a part of slopes and freeform gives too few to fit. Changes nothing.",
+   "inputs": []
+  },
+  "fit_scan_measure": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Read the scanned print against its CAD (the deviation reference, aligned): each feature is found on the scan, then one weighted least-squares fit gives scale X, Y, Z; the contour offset (outer walls out, mm); the hole offset (holes closed, mm); and the elephant foot — each { value, se, determined (whether this part separates it) }. Kept as a run. Input: calibrate: true asks that a good run become the printer's fit calibration. Reply: run, fit (χ²/dof), dof, poor, scale { x, y, z }, contour, hole, foot, corrections [{ quantity, read, se, change, why }], noise, missed (features with too few scan points), outliers, readings { planes, circles }, scanNoise and nearNoise (corrections no larger than the noise to plan with), slicer { keymap, changes } — the slicer's new values, added to fit_scan_setup { current } — and with calibrate: calibrated, calibrateWhy, calibrateNext. Gotchas: a fit over 4 is poor — warping, a lifted corner or a poor alignment: the offsets are not to be used, slicer is left out and fit_scan_export refuses; a part with no hole or no outer wall pair cannot separate hole from contour (determined: false) — print a coupon with both; calibrate needs a good run with hole and contour both determined; the calibration itself is kept by Workshop's fit tool — where this session cannot set it, calibrateNext gives the exact fit { action: \"calibrate\", hole, shaft } call (diametral mm) to make. Refused when the reference is not open and aligned, or no feature has enough scan points within band. 0.1 s at 68,000 vertices (plain Python off the Mac). Keeps the run in ScanRuler's state; the model is not changed.",
+   "inputs": [
+    "calibrate"
+   ]
+  },
+  "fit_scan_export": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Write the last good run. Inputs: what ini (default: the slicer's keys, one a line, for its key map), json (the changes and corrections) or stl (the reference pre-compensated: scaled by the inverse, walls moved back by the contour offset, holes opened by the hole offset, the first layer drawn in); slicer chooses another key map for ini and json; path (a relative name goes in the session's folder; left out: fit-run-<n>-<slicer>.<what>, or <reference>-compensated.stl). Reply: file { path, name }, and changes (the slicer's keys with their new values) with note, or for stl applied { sx, sy, sz, contour, hole, foot, footFade } with note. Gotchas: use one or the other — print the compensated STL with the slicer's own compensations at zero, or the error is undone twice; the ini values are added to fit_scan_setup { current }, so set current first when the slicer already compensates; the STL is in the reference's own frame. Refused with no run yet (fit_scan_measure) or when the last run is poor. Changes nothing in the document.",
+   "inputs": [
+    "path",
+    "slicer",
+    "what"
+   ]
+  },
+  "element_to_document": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Put the measured elements into the FreeCAD document as analytic geometry, to model on: a plane as a rectangular face of its measured extent; a cylinder, cone, sphere or torus as a solid (style solids, the default) or as its surface alone (style surfaces); a line or circle as an edge; a point as a vertex. Inputs: elements (ids or names; all with geometry by default); style; group (the group's label, \"Scan elements\" by default: an existing group of that label is used, else one is made); export: a .step path to write them too (a relative name goes in the session's folder; .step is added). What it makes: one Part::Feature per element, labelled with the element's name, in an App::DocumentObjectGroup, then a recompute. They are plain shapes, not parametric: they do not follow the element, a later fit or an alignment — remove them (object_delete) and call again after the scan moves. Gotchas: geometry is written in the frame the scan is measured in now — align first (align_datum) to model in the part's own frame; calling twice makes a second set (FreeCAD numbers a label already in use; the reply's label is the one given); an assumed diameter is drawn in place of the fitted one; a cylinder or cone is as long as the measured surface, a plane as large as its patch — use them as references (a sketch on a face, a pad up to a face), not as the part's faces. Reply: group, made [{ element, kind, object (the internal name), label, shape solid | face | edge | vertex }], style, note, file { path, name, bytes } with export, and health from the shared check. Refused with no element to bring over, or no document. One undo step.",
+   "inputs": [
+    "elements",
+    "export",
+    "group",
+    "style"
+   ]
+  },
+  "scan_snapshot_list": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The screenshots the person took with ScanRuler's camera key (the toolbar's camera, or Alt+Shift+S), newest first, without the pictures. No inputs. Reply: shots [{ index (0 the newest), id, at (the time), workspace, note (the person's words), width, height, marks (how many), pins [numbered, with their comments], savedTo }]. Only the person takes a shot — no tool does; none is kept in the project unless they saved it, and they are gone when FreeCAD closes. An empty list means none was taken yet: ask the person to press the camera key. scan_snapshot_latest shows one. Changes nothing.",
+   "inputs": []
+  },
+  "scan_snapshot_latest": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "One of the person's screenshots as a picture, with their marks drawn in. Inputs: index (0, the newest, by default; 1 the one before …) or id (from scan_snapshot_list); original: true gives it as taken, without the marks. Reply: the picture itself, and index, id, at, workspace, note, width, height, marks, pins (numbered: what the person points at and says of each), savedTo, of (how many shots there are), picture (\"with the marks\" or \"as taken\"), file. Read the note and the pins before the picture: they say what the person wants looked at. Refused (not_found) when there is none — ask the person to press the camera key (ScanRuler toolbar, or Alt+Shift+S) — or when index or id names none (the message gives the range). Changes nothing.",
+   "inputs": [
+    "id",
+    "index",
+    "original"
+   ]
+  },
+  "scan_snapshot_wait": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Wait for the person's next screenshot or finished mark-up, then say what scan_snapshot_list says of it. Input: timeout (or timeoutSeconds, the same): seconds, 120 by default, 600 at most. Gotcha — how to call it: a plain call runs on FreeCAD's own thread, where waiting would hold the window still so the person could not press the camera key; so a plain call does not wait at all and answers came: false, waited: 0 and next. To wait, start it beside the window: job_start { tool: \"scan_snapshot_wait\", arguments: { timeoutSeconds: 300 }, wait: false }, tell the person to take the shot, then job_status { job } (with no long wait of its own: that holds the window too) reads the answer. Simpler still: ask the person, and call scan_snapshot_latest when they say it is done. Reply: came: true with index, id, at, workspace, note, width, height, marks, pins, savedTo and next; or came: false and a note when none came in time. A shot still open in the mark-up view does not count until the person finishes it. Changes nothing.",
+   "inputs": [
+    "timeout",
+    "timeoutSeconds"
+   ]
+  },
+  "reverse_feature_add": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Add a feature to the Reverse engineer's list, at the rollback bar (or right after the feature named by after), and rebuild. feature: one record { kind, name?, …fields }, or features: several, added one after another in one step. Read reverse_feature_schema { kind } before using a kind for the first time: it gives the fields and their defaults. The kinds: sketch, extrude, revolve, coil, shell, fillet, chamfer, hole, thread, extract, cutPlane, mirror, boolean, sheet, split, loft, sweep, thicken, pattern, offsetBody, moveBody, draft, moveFace, deleteFace, surface, network, trim (import comes through reverse_import_step). The usual road: a sketch on a plane — { kind: \"sketch\", plane: { kind: \"world\", axis: \"z\", offset: 0 } (axis z = the XY plane at Z offset, x = YZ, y = XZ; or a section's or a measured plane's, which needs that scan open), sketch: { entities: [{ id, kind: \"line\", a: [x, y], b } | { id, kind: \"circle\", c, r } | { id, kind: \"arc\", c, r, start, sweep (radians) }], constraints: [], nextId } } in the sketch plane's millimetres; lines that meet at their ends close a region — then { kind: \"extrude\", sketchId, extent: { kind: \"distance\", from: 0, to: 20 }, op: \"new\" | \"join\" | \"cut\" } (regions may be left out when the sketch has exactly one), then features on the bodies (fillet, chamfer, shell, hole …) with body (id or name) and their picks. A body's id is the id of the feature that made it (a further piece: id + n/1024); its name that feature's name. Picks (edges, faces, a thread's face, a draft's groups): whole numbers are indices into reverse_body_describe { body } as the body is built NOW, and are stored as fingerprints (kind, place, direction, size, maker) which the build finds again; the indices change with every build, so read them again after every change and never reuse old ones; a fingerprint object may be given instead. Feature fields can read parameters through exprs: { \"extent.to\": \"h * 2\" }. One FreeCAD undo step (history_undo puts the list and the bodies back). It returns once the bodies are rebuilt: read each added row's status — a feature can be added and still fail to build (it stays in the list, failed, until mended, suppressed or removed). A sketch's row is ok with a note (nothing is built for a sketch alone). Refused, nothing added: an unknown kind, a name already used, fields that do not fit the kind, a feature that is not ready (no closed region, no edges, no body), an index the body does not have, a body that is not built. Reply: added (each feature's id, name, status ok | failed with message | rolledBack, warning when a pick was found another way), failed [{ id, name, message }], bodies [{ id, name, volume mm³, closed, surface, faces, box }], steps { recomputed, restored, of }, and health (red when a feature failed). The part lives in one FreeCAD object, \"Reverse engineer\" (ScanRulerReverse), with a ReverseBody object under it for every body; the build writes their shapes. Do not change those objects with other tools (a cut, a fillet, a placement written into a ReverseBody is lost at the next build: add a feature instead — moveBody moves a body); to work on a body elsewhere make a copy (part_transform { copy: true }) or export it. Builds run inside FreeCAD and cannot be stopped; a long list is rebuilt from the changed feature on, earlier steps being kept.",
+   "inputs": [
+    "after",
+    "feature",
+    "features",
+    "kind",
+    "name"
+   ]
+  },
+  "reverse_feature_update": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Change fields of a feature: feature (id or name), set { field: value, … } with the fields as reverse_feature_add takes them (reverse_feature_list { feature } shows the record as stored); the part is rebuilt from that feature on. kind and id cannot be changed (remove it and add the other kind); name must stay unique; suppressed: false brings it back. Bodies may be given by name and picks by index, as in reverse_feature_add — but mind which body the indices count on: reverse_body_describe shows the body as built now, which already carries this feature's own work (a filleted edge is no longer there). To pick on the body the feature starts from: reverse_feature_rollback { after: the feature before it } (or top: true), reverse_body_describe, this update, then reverse_feature_rollback {} to build all again; the reply's note says so whenever indices were given. A sketch is changed by setting its whole sketch record. exprs: { \"radius\": \"r\" } ties a field to a parameter; setting the field's number does not remove its expression — set exprs without it. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: feature (the record as stored now), result (its build row: status, message, warning), failed, bodies, steps, note, health. Refused: a feature not found, an empty set, a changed kind or id, a taken name, an index or body that is not there.",
+   "inputs": [
+    "feature",
+    "set"
+   ]
+  },
+  "reverse_feature_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Remove a feature (id or name) from the list and rebuild. One that others build on — a sketch an extrude uses, a body a fillet works on — is refused, naming them, unless dependents: true, which removes them too. To leave it out for a while without losing it, reverse_feature_suppress instead. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: removed (the ids that went), results, failed, bodies, steps, health. The bodies it made are gone from the document with it; body ids of other features do not change.",
+   "inputs": [
+    "dependents",
+    "feature"
+   ]
+  },
+  "reverse_feature_move": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Move a feature (feature) or several (features), each by id or name, to just after another (after; left out: to the top of the list), and rebuild. Refused, saying which, when a feature would then come before something it builds on, or when after is itself one of those moved. The rollback bar stays at the same count from the top. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: results, failed, bodies, steps, health — check the statuses: a feature that now plays on a different body state can fail or find its picks another way (warning).",
+   "inputs": [
+    "after",
+    "feature",
+    "features"
+   ]
+  },
+  "reverse_feature_suppress": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Suppress a feature (id or name): it is left out of the build but kept in the list with its fields and picks; suppressed: false brings it back (true is the default). Features that build on a suppressed one fail until it is back (their rows say so). The quick way to find which feature breaks a build, or to step past a slow one. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: results (the suppressed feature has no row), failed, bodies, steps, health.",
+   "inputs": [
+    "feature",
+    "suppressed"
+   ]
+  },
+  "reverse_feature_rollback": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Move the rollback bar: only the features above it are built, and reverse_feature_add inserts at it. after: the last feature built (id or name); top: true builds none; neither (an empty call) rolls all the way down again, building everything. Nothing is removed: the features below the bar keep their fields and read rolledBack in reverse_feature_list. Use it to see the body as it stood before a feature (reverse_body_describe then counts on that state — the way to re-pick an existing feature's edges) or to add a feature in the middle. While rolled back, the bodies in the document are those of the built part only. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: rollback { after (the last built feature's id, or null), built, of }, results, failed, bodies, steps, health.",
+   "inputs": [
+    "after",
+    "top"
+   ]
+  },
+  "reverse_feature_clear": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Take every feature and every parameter away: the part is empty again and its bodies leave the document. confirm: true is required (refused without it). One FreeCAD undo step (history_undo puts all of it back). Imported STEP texts stay stored with the container. Reply: results [], failed [], bodies [], steps.",
+   "inputs": [
+    "confirm"
+   ]
+  },
+  "reverse_feature_list": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The feature list in order. Reply: features [{ id, name, kind, status (ok | failed), message (why it failed), suppressed, rolledBack (below the bar), key { value, unit } (its main number), exprs }], rollback { built, of } and parameters (how many). A sketch has no status of its own (nothing is built for it alone). feature: one feature (id or name) whole, as stored — every field, its picks as fingerprints — with result (its last build row) or rolledBack; detail: \"brief\" gives that one as a row. detail: \"full\" gives every feature whole (long: sketches carry all their entities). Read it after any change that reported a failure, and before reverse_feature_update to see the field names. Changes nothing.",
+   "inputs": [
+    "detail",
+    "feature"
+   ]
+  },
+  "reverse_feature_schema": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "One feature kind's fields as reverse_feature_add takes them, with the defaults the panel's box opens with: kind is one of sketch, extrude, revolve, coil, shell, fillet, chamfer, hole, thread, extract, cutPlane, mirror, boolean, sheet, split, loft, sweep, thicken, pattern, offsetBody, import, moveBody, draft, moveFace, deleteFace, surface, network, trim (another is refused with this list). Reply: kind, label, fields { name: default } (null marks what must be given: a body, an axis, a plane), picks (how edges and faces are given). The defaults follow the part as it is now (extrude and revolve offer the last sketch and its region when it has exactly one). It lists field names, not every allowed value: an extent's kinds are distance, toPlane, toFace, toBody, betweenPlanes; an op is new, join or cut (a boolean's: join, cut, intersect); a revolve's axis is { kind: \"world\", axis: \"x\" | \"y\" | \"z\" } or { kind: \"sketchLine\", entity: id }. Read it before adding a kind for the first time. Changes nothing.",
+   "inputs": [
+    "kind"
+   ]
+  },
+  "reverse_build": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Rebuild the part from its feature list and say how it went: results (every built feature's status, message, warning), failed, bodies, steps { recomputed, restored, of } — steps whose inputs did not change are taken from the kept state (restored), not played again — and health. The other reverse tools rebuild by themselves; this is for after a scan, a section or an element a feature rests on changed (they are read at build time), after doc_open, or to read the whole build's answer. It writes the bodies' shapes into the document: one FreeCAD undo step (history_undo puts the list and the bodies back). Runs inside FreeCAD and cannot be interrupted (reverse_build_stop is not available in this port); a body of many faces with fillets, shells or patterns can take a long time (not measured).",
+   "inputs": []
+  },
+  "reverse_build_stop": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Not available in this port: always refused (unavailable). The original stops a hung build by throwing its kernel worker away; here builds run inside FreeCAD's own process, so there is nothing to stop from outside. What to do instead: a build that answered but was slow — reverse_feature_suppress the slow feature or reverse_feature_rollback above it; a FreeCAD that no longer answers is Agent Link's to restart (app_force_restart; history_undo afterwards takes the last edit back). Changes nothing.",
+   "inputs": []
+  },
+  "reverse_parameter_list": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The part's named parameters. Reply: parameters [{ id, name, kind (length | angle | integer | number), expression (as written), value (worked out: mm for a length, degrees for an angle), error (when the expression cannot be worked out — then value is null), comment }]. Features read them through their exprs (reverse_feature_list shows which). An empty list when there are none. Changes nothing.",
+   "inputs": []
+  },
+  "reverse_parameter_add": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Add a named parameter: name (a letter or underscore, then letters, digits, underscores; not a word the expressions keep — a unit, a constant like pi, a function like sin; not differing from another name by capitals alone), expression (a number, or a formula over the other parameters: + − × ÷, parentheses, sin cos tan asin acos atan atan2 sqrt abs min max floor ceil round pow), kind length (the default, mm), angle (degrees), integer or number, and a comment. A feature reads it through exprs — reverse_feature_update { feature, set: { exprs: { \"extent.to\": \"h\" } } } — and is rebuilt whenever it changes. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: parameter { id, name, kind, expression, value, error? }, results, failed, bodies, steps, health. An expression that cannot be worked out is still added, with its error in the reply: check it. Refused: a name that will not do (the message says why), an unknown kind, no expression.",
+   "inputs": [
+    "comment",
+    "expression",
+    "kind",
+    "name"
+   ]
+  },
+  "reverse_parameter_set": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Give a parameter (by name, matched exactly, or by id) a new expression and/or comment; every feature that reads it is rebuilt. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: parameter { id, name, kind, expression, value, error? }, results, failed, bodies, steps, health — read failed: a new value can make a feature fail (a fillet too large, an extrude of nothing), and it stays failed until the value or the feature is changed. Worked example: a block 40 × 30 whose height reads h goes from 24000 to 12000 mm³ when h is set from 20 to 10. Refused: a parameter not found (the message lists them).",
+   "inputs": [
+    "comment",
+    "expression",
+    "parameter"
+   ]
+  },
+  "reverse_parameter_rename": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Rename a parameter (parameter: its name or id; to: the new name), in every expression and every feature that reads it; values do not change. The new name follows reverse_parameter_add's rules and is refused, saying why, when it will not do. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: results, failed, bodies, steps, health (nothing should change in them).",
+   "inputs": [
+    "parameter",
+    "to"
+   ]
+  },
+  "reverse_parameter_remove": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Remove a parameter (name or id) that nothing reads. One that an expression or a feature reads is refused, naming the readers: change them first (reverse_feature_update { set: { exprs: { … } } } without it, or reverse_parameter_set on the parameter that reads it). One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: results, failed, bodies, steps, health.",
+   "inputs": [
+    "parameter"
+   ]
+  },
+  "reverse_body_names": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "The bodies the build left, as built now (above the rollback bar). Reply: bodies [{ id (the id of the feature that made it; a further piece of a split: id + n/1024), name (that feature's name), volume (mm³; 0 for a surface), closed (a closed solid), surface (a sheet, not a solid), faces (count), box { min, max } (read off the geometry itself for a body of up to 400 faces, so a round face reads its true size; off its triangulation above that, a little large), style { name, color } (what reverse_body_set gave it), visible }]. A body is named in the other reverse tools by id, by name, or by its style name. The part lives in one FreeCAD object, \"Reverse engineer\" (ScanRulerReverse), with a ReverseBody object under it for every body; the build writes their shapes. They are the build's output: object_list shows them, measuring, rendering and export tools may read them, but a change made to one by another tool is lost at the next build. An empty list: nothing is built — no features, the bar at the top, or every feature failed (reverse_feature_list). Changes nothing.",
+   "inputs": []
+  },
+  "reverse_body_describe": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "A body's faces and edges, each with its index and fingerprint — what a fillet's edges, a shell's faces or a thread's face are picked by. body: its id or name. Reply: body { id, name, volume, closed, surface, faces, box }, faces [{ index, kind (plane, cylinder, cone, sphere …), centroid, dir (a plane's normal, a cylinder's axis), area, radius (round ones), origin (the id of the feature that made it) }], edges [{ index, kind (line, circle, arc …), mid, dir, length, radius, faces (the two it lies between: kind and dir), origin }]; detail: \"brief\" gives only the counts. Indices start at 0 and are NOT FreeCAD's Face1 / Edge1 numbers (which start at 1 and are ordered differently): use them only in the reverse tools. They count on the body as it is built now and change with every build, so describe again after every change before picking; a pick is stored as its fingerprint, which the build finds again. A box has 6 faces and 12 edges; its four upright edges are the lines whose dir is [0, 0, ±1]. A long list on a body with many faces (every edge is listed: several hundred rows on a filleted, patterned part): take brief first. Changes nothing.",
+   "inputs": [
+    "body",
+    "detail"
+   ]
+  },
+  "reverse_body_check": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Whether a body (id or name) is a valid closed solid, by the kernel's own check. Reply: body (id), name (its feature's), shownAs (the name reverse_body_set gave it, when it has one), closed (a closed solid), valid (OCCT's shape check), solids (count; more than 1: pieces that do not touch), shells (per solid: 1 is a plain solid, 2 or more means a sealed cavity inside), volume (mm³), surface (a sheet). A sound printable body reads closed true, valid true, solids 1. Agent Link's body_check gives a fuller reading of the same body's document object (slivers, short edges), by its label. Changes nothing.",
+   "inputs": [
+    "body"
+   ]
+  },
+  "reverse_body_clearance": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "How two bodies (a, b: each an id or a name; both must be built) stand to each other. Reply: a, b (ids), gap (the least distance between them, mm; 0 when they touch or overlap) and overlap (the volume they share, mm³; 0 when apart or only touching). gap above 0: clear by that much; gap 0 and overlap 0: touching; overlap above 0: they interfere. Worked example: two blocks whose facing sides are 5 mm apart read gap 5, overlap 0. Exact (OCCT's distance and common volume): slow on bodies with many curved faces (not measured). Changes nothing.",
+   "inputs": [
+    "a",
+    "b"
+   ]
+  },
+  "reverse_body_set": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Name a body, colour it or show and hide it: body (id or name), and at least one of name (its label in the document's tree and a name the reverse tools then also find it by; its id and its build name stay), color (#rrggbb, #rgb or a swatch: red, orange, yellow, green, teal, blue, purple) and visible (false hides it in the window and leaves it out of the container's combined shape; it is still built and can still be named). Kept with the part, by body id, so it survives rebuilds. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: bodies (as reverse_body_names: each with style { name, color } and visible). Refused: none of the three given, a colour that is not one, a body not built.",
+   "inputs": [
+    "body",
+    "color",
+    "name",
+    "visible"
+   ]
+  },
+  "reverse_import_step": {
+   "src": "scanrulerfc/data/tools.json",
+   "description": "Bring a STEP file in as bodies of the Reverse engineer part: a body for every solid in the file, in the frame the file was drawn in (a file of faces alone comes in as a surface body) — a bought-in part, a mating part, the CAD model to check the scan against. path: the .step / .stp file (relative: the session's folder, where export { objects, path: \"part.step\" } writes one); it must begin as STEP (ISO-10303-21) — a mesh or another CAD format is refused. name: the Import feature's name (default the file's, less its extension; must be unused). The feature goes in at the rollback bar and the file's text is stored with the part, so the document no longer needs the file (a large STEP makes a large document). Bodies get the feature's id (further solids: id + n/1024) and its name. Put them in place with reverse_feature_add { feature: { kind: \"moveBody\", bodies: [id or name], translate: [x, y, z], rotate: [rx, ry, rz] (degrees), copy: false } }; combine them with kind boolean. This is not import_file: the bodies belong to the feature list and are rebuilt with it. One FreeCAD undo step (history_undo puts the list and the bodies back). Reply: added [{ id, name, kind, status, bodies }], failed, bodies (all built now, the new ones among them), steps, health. A file with no solid and no surface is added and fails, saying so. OCCT's STEP reader runs inside FreeCAD and cannot be stopped: a file of tens of megabytes can take minutes (not measured).",
+   "inputs": [
+    "name",
+    "path"
+   ]
+  }
+ }
+}
