@@ -351,6 +351,8 @@ def simplify_run(points, lo, hi, tolerance):
 SCATTER_FLOOR = 0.05
 SCATTER_FROM_MEDIAN = 1 / (0.6745 * math.sqrt(1.5))
 SAMPLE = 2048
+COINCIDENT = 1e-7  # of a chain's extent: two points nearer than this are one point written twice
+CLUSTERED = 1e-3  # of a chain's largest gap: with its median gap under this, the chain is clusters of points and the gaps between them
 
 
 def _median(v):
@@ -368,7 +370,23 @@ def _viewed(chain):
     step = max(1, n0 // SAMPLE)
     idx = np.arange(step, n0, step)
     gaps = np.hypot(*(C[idx] - C[idx - step]).T) / step if len(idx) else np.zeros(0)
-    spacing = _median(gaps) or 1.0
+    spacing = _median(gaps)
+    one = COINCIDENT * float(np.hypot(*(C.max(axis=0) - C.min(axis=0)))) if n0 >= 2 else 0.0
+    if len(gaps):
+        # Clusters need not coincide to the last digit: a plane a hundredth
+        # of a micrometre off a row of vertices cuts each vertex's edges
+        # that far apart. A median gap under a thousandth of the chain's
+        # largest gap says the same thing — most gaps are inside clusters —
+        # whatever the chain's size.
+        one = max(one, CLUSTERED * float(gaps.max()))
+    if n0 >= 2 and not spacing > one:
+        # More than half the gaps are between points that coincide (a
+        # chain with each point written twice, or clusters where a cut ran
+        # along a row of mesh vertices): the spacing is that of the points
+        # that are apart, not 0 — a spacing of 0 made the default
+        # tolerance 0 and the scatter's floor 0 (found live, run 3).
+        spacing = _median(gaps[gaps > one])
+    spacing = spacing or 1.0
     pts = C
     closed = False
     if n0 >= 4:

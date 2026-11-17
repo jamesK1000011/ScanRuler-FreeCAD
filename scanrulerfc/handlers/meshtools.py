@@ -27,6 +27,11 @@ from .sections import cut_section, element_cut_axis, element_named
 LIST = 40
 DEFAULT_TRIANGLE_LIMIT = 50_000
 UNDO_DEPTH = 20
+# mesh_reduce: runs of FreeCAD's decimator on its own result when it stops
+# above the count asked, and the time its whole search may take (the try at
+# the cap is always made; a search cut short says so).
+REDUCE_PASSES = 6
+REDUCE_SEARCH_S = 30.0
 
 
 def obj(props, required=()):
@@ -283,6 +288,8 @@ def bind(session):
         return edit(f"{a['direction']} by {a['distance']} mm", lambda V, F: M.offset_mesh(V, F, d))
 
     def mesh_reduce(a):
+        import time
+
         import Mesh
 
         from ..dev_surface import NominalSurface
@@ -291,17 +298,21 @@ def bind(session):
         tol = a.get("tolerance", M.default_tolerance(M.diagonal(V)))
         cap = a.get("maxTriangles", DEFAULT_TRIANGLE_LIMIT)
         # FreeCAD's own quadric decimation (Mesh.decimate) in place of the
-        # meshoptimizer simplifier ScanRuler runs. Its (tolerance,
-        # reduction) form does not hold a tolerance in millimetres: the
-        # tolerance only stops it once no triangle's quadric error is under
-        # it, and a flat face's is always 0, so with reduction 1.0 it went
-        # on to almost nothing (found live, run 2: asked 0.05 mm, got a
-        # mesh 14 mm off and a third of the volume; FreeCAD 1.1 source:
-        # src/Mod/Mesh/App/Core/Simplify.h, simplify_mesh). So the count
-        # form is used, decimate(targetSize), and the count searched: each
-        # try measured against the original both ways, as ScanRuler
-        # measures it, and the lightest that holds the tolerance kept
-        # (mesh_core.lightest_within).
+        # meshoptimizer simplifier ScanRuler runs. It has two forms
+        # (FreeCAD 1.1 source: src/Mod/Mesh/App/MeshPyImp.cpp, decimate;
+        # Core/Decimation.cpp; Core/Simplify.h, simplify_mesh):
+        # decimate(tolerance, reduction) and decimate(targetSize). Neither
+        # holds a tolerance in millimetres. In the first the tolerance is
+        # only a reason to stop early — it stops once no triangle's
+        # cheapest collapse costs less, in the quadric's squared units —
+        # and a flat face's is always 0, so with reduction 1.0 it went on
+        # to almost nothing (found live, run 2: asked 0.05 mm, got a mesh
+        # 14 mm off and a third of the volume). The second is the same
+        # loop with no such stop. So the count form is used,
+        # decimate(targetSize), and the count searched: each try measured
+        # against the original both ways, as ScanRuler measures it, and
+        # the lightest that holds the tolerance kept
+        # (mesh_core.reduction_search).
         try:
             base = Mesh.Mesh((np.asarray(V, dtype=float).tolist(), np.asarray(F, dtype=np.int64).tolist()))
         except Exception:  # noqa: BLE001 — an older Mesh: facet by facet
@@ -309,29 +320,45 @@ def bind(session):
             base.addFacets([[tuple(V[i]) for i in t] for t in F.tolist()])
         original = NominalSurface(V, F)
         sample = _sampled(V)
+        started = time.monotonic()
 
         def attempt(target):
+            target = int(target)
             m = base.copy()
-            m.decimate(int(target))
-            # FreeCAD stops a little above the count asked where a collapse
-            # would flip a triangle: asked again lower, the cap is kept.
-            ask = int(target)
-            for _ in range(3):
-                if m.CountFacets <= target or ask < 8:
+            m.decimate(target)
+            # The count is not a promise. simplify_mesh makes a hundred
+            # rounds at most and never makes a collapse that would turn a
+            # triangle over, so it can stop above the count asked. Asking
+            # it for less changes nothing: the count only says when to
+            # stop, so every lower count walks the same collapses to the
+            # same mesh (found live, run 3: asked 2,000 and then lower
+            # three times, 2,142 each time). What can go further is
+            # another run on the mesh it left, which starts its rounds and
+            # its error measure afresh — until one takes nothing off.
+            passes = 1
+            while m.CountFacets > target and passes < REDUCE_PASSES:
+                before = m.CountFacets
+                m.decimate(target)
+                passes += 1
+                if m.CountFacets >= before:
                     break
-                ask = max(4, int(ask * target / m.CountFacets * 0.97))
-                m = base.copy()
-                m.decimate(ask)
             pts, tris = m.Topology
             RV = S.points_array(pts)
             RF = np.array(tris, dtype=np.int64).reshape(-1, 3)
             if len(RF) < 4:
                 return None
             there = NominalSurface(RV, RF).closest(sample).distance
-            back = original.closest(_sampled(RV)).distance
-            return {"triangles": int(len(RF)), "worst": float(max(np.quantile(there, 0.999), np.quantile(back, 0.999))), "RV": RV, "RF": RF, "there": there, "back": back}
+            # Back the other way at the reduced mesh's vertices and at the
+            # middles of its triangles: a triangle that cuts a corner off
+            # has all three vertices on the original (found live, run 3:
+            # backMax 0.0099 mm on a mesh that had lost a quarter of its
+            # volume).
+            back = original.closest(np.vstack([_sampled(RV, 2000), _sampled(RV[RF].mean(axis=1), 2000)])).distance
+            return {"triangles": int(len(RF)), "asked": target, "passes": passes, "worst": float(max(np.quantile(there, 0.999), np.quantile(back, 0.999))),
+                    "RV": RV, "RF": RF, "there": there, "back": back}
 
-        best, capped, tries = M.lightest_within(len(F), cap, tol, attempt)
+        found = M.reduction_search(len(F), cap, tol, attempt, seconds=REDUCE_SEARCH_S)
+        best = found["best"]
         if best is None:
             # Nothing lighter holds the tolerance (or FreeCAD's decimator
             # gave nothing back): the mesh as it is, and the reply says so.
@@ -340,14 +367,21 @@ def bind(session):
         else:
             RV, RF, there, back = best["RV"], best["RF"], best["there"], best["back"]
         held = bool(np.quantile(there, 0.999) <= tol and np.quantile(back, 0.999) <= tol)
+        cap_kept = bool(len(RF) <= cap)
         report = {"settings": {"tolerance": tol, "maxTriangles": cap}, "inputTriangles": int(len(F)), "triangles": int(len(RF)), "vertices": int(len(RV)),
                   "measured": int(len(sample)), "within": int((there <= tol).sum()) if best is not None else int(len(sample)), "p999": r(np.quantile(there, 0.999)), "max": r(there.max()), "rms": r(math.sqrt((there ** 2).mean())),
-                  "backP999": r(np.quantile(back, 0.999)), "backMax": r(back.max()), "held": held, "capped": capped, "tries": tries, "method": "FreeCAD Mesh.decimate"}
-        if best is None:
-            report["note"] = f"No lighter mesh holds {tol:g} mm: this is the mesh as it is. A larger tolerance lets triangles go."
-        elif not held:
-            report["warning"] = (f"Brought down to the cap of {cap} triangles, this lies up to {report['max']:g} mm from the original (tolerance {tol:g} mm): not a mesh to measure or model on. "
-                                 "A higher maxTriangles or a larger tolerance; mesh_discard { what: \"reduced\" } drops it.")
+                  "backP999": r(np.quantile(back, 0.999)), "backMax": r(back.max()), "held": held, "capped": bool(found["won"] == "cap" and not held), "capMet": cap_kept,
+                  "won": found["won"] if len(F) > cap else None, "tries": found["tries"],
+                  "search": {"tries": found["tries"], "ms": int(round((time.monotonic() - started) * 1000)), "ended": found["ended"], "seconds": REDUCE_SEARCH_S},
+                  "method": "FreeCAD Mesh.decimate(targetSize)"}
+        at = found["atCap"]
+        if at is not None and at is not best:
+            report["atCap"] = _try_row(at)
+        if found["holds"] is not None and found["holds"] is not best:
+            report["holds"] = _try_row(found["holds"])
+        if found["notHolding"] is not None:
+            report["notHolding"] = int(found["notHolding"])
+        report.update(M.reduce_words(report))
         mt_state(session)["reduced"] = {"V": RV, "F": RF, "report": report, "from": which}
         return {"reduced": report}
 
@@ -358,12 +392,12 @@ def bind(session):
             raise ToolError("invalid_state", "There is no reduced mesh — mesh_reduce makes one.")
         out = edit("apply the reduction", lambda V, F: (red["V"], red["F"], None, red["report"]))
         ms["reduced"] = None
-        if not red["report"].get("held", True):
-            # Found live (run 2): a reduction 14 mm off its tolerance of
-            # 0.05 mm was applied without a word.
-            rep = red["report"]
-            out["warning"] = (f"The reduction applied does not hold its tolerance: up to {max(rep['max'], rep['backMax']):g} mm from the mesh it was made of (tolerance {rep['settings']['tolerance']:g} mm). "
-                              "mesh_undo puts that mesh back.")
+        # Found live (run 2): a reduction 14 mm off its tolerance of 0.05 mm
+        # was applied without a word. The same words as the preview's, from
+        # the same numbers.
+        said_so = M.reduce_applied_words(red["report"])
+        if said_so:
+            out["warning"] = said_so
         return out
 
     def mesh_discard(a):
@@ -487,6 +521,13 @@ def _added(session):
     from ..meshtools import handlers as ADDED
 
     return {n: functools.partial(ADDED.HANDLERS[n], session) for n in ADDED.NAMES}
+
+
+def _try_row(got):
+    """One try of mesh_reduce's search, as the reply shows it."""
+    there, back = got["there"], got["back"]
+    return {"asked": int(got["asked"]), "triangles": int(got["triangles"]), "passes": int(got["passes"]), "p999": r(np.quantile(there, 0.999)), "max": r(there.max()),
+            "backP999": r(np.quantile(back, 0.999)), "backMax": r(back.max())}
 
 
 def _sampled(P, sample=4000):

@@ -387,5 +387,126 @@ class Scatter(unittest.TestCase):
         self.assertAlmostEqual(row["tolerance"], 0.6 * row["spacing"], delta=1e-4)  # the fit's tolerance is as it was
 
 
+def crossed_sheet(nx=40, nz=20, cell=0.5):
+    """A flat sheet in the XZ plane, every cell cut by both its diagonals
+    (a vertex in its middle): each grid vertex has eight edges, three to
+    either side of a line of vertices. Centred on the origin."""
+    V, at = [], {}
+    for i in range(nx + 1):
+        for k in range(nz + 1):
+            at[i, k] = len(V)
+            V.append([(i - nx / 2) * cell, 0.0, (k - nz / 2) * cell])
+    F = []
+    for i in range(nx):
+        for k in range(nz):
+            m = len(V)
+            V.append([(i + 0.5 - nx / 2) * cell, 0.0, (k + 0.5 - nz / 2) * cell])
+            a, b, c, d = at[i, k], at[i + 1, k], at[i + 1, k + 1], at[i, k + 1]
+            F += [[a, b, m], [b, c, m], [c, d, m], [d, a, m]]
+    return np.array(V, dtype=float), np.array(F, dtype=np.int64)
+
+
+class APlaneWithinRoundingOfTheVertices(unittest.TestCase):
+    """Found live (run 3, measure model call 55): section_fit on "Half",
+    the cut through the fitted bore's axis, answered spacing 0.0, tolerance
+    0.0 and scatterFloor 0.0 on chains of 303 and 464 points. The plane of
+    a fitted axis passes the mesh's own vertices at about 1e-13 mm, not at
+    0: slice_mesh took a vertex as on the plane only at exactly 0, so each
+    of that vertex's edges was cut on its own — a cluster of points 1e-13
+    mm apart for every vertex — and with more than half of a chain's gaps
+    of that kind its median spacing read 0."""
+
+    OFF = 3e-13
+
+    def cut(self, x):
+        V, F = crossed_sheet()
+        P, off, _ = SC.slice_mesh(V, F, [x, 0, 0], [1, 0, 0], 1.0)
+        self.assertEqual(len(off), 2)
+        return P[:, [2, 1]]  # the chain along Z
+
+    def test_the_cut_is_the_one_through_the_vertices(self):
+        from scanrulerfc import geom2d as G
+
+        exact, near = self.cut(0.0), self.cut(self.OFF)
+        self.assertEqual(len(exact), 21)
+        self.assertEqual(len(near), 21)  # 61 before: three points for every vertex
+        self.assertGreater(float(np.hypot(*np.diff(near, axis=0).T).min()), 0.49)
+        self.assertAlmostEqual(G.view_chain(near)[2], 0.5, places=9)
+        # A plane that is really off the vertices is cut as before.
+        self.assertEqual(len(self.cut(0.01)), 61)  # each vertex's three edges, 0.01 mm and more apart
+
+    def test_the_snap_is_a_billionth_of_the_mesh_and_no_more(self):
+        V, F = crossed_sheet()
+        diag = float(np.linalg.norm(V.max(axis=0) - V.min(axis=0)))
+        self.assertEqual(len(self.cut(0.5 * SC.PLANE_SNAP * diag)), 21)
+        self.assertGreater(len(self.cut(50 * SC.PLANE_SNAP * diag)), 21)
+
+    def test_a_chain_of_points_written_three_times_has_its_real_spacing(self):
+        # What view_chain was handed before the cut was put right, and what
+        # any chain with coinciding points still hands it.
+        from scanrulerfc import geom2d as G
+        from scanrulerfc.handlers import sections as H
+
+        z = np.repeat(np.arange(0, 20.01, 0.5), 3) + np.tile([0.0, 1e-13, 2e-13], 41)
+        chain = np.c_[z, np.zeros(len(z))]
+        gaps = np.sort(np.abs(np.diff(z)))
+        self.assertLess(gaps[len(gaps) >> 1], 1e-9)  # the median gap: what the spacing was read as
+        _pts, _closed, spacing, used = G.view_chain(chain)
+        self.assertAlmostEqual(spacing, 0.5, places=9)
+        self.assertAlmostEqual(used, 0.025, places=9)
+        cut = segment_chain(chain)
+        self.assertAlmostEqual(cut["tolerance"], 0.3, places=9)  # 0.6 of the spacing; 0 before
+        self.assertEqual(len(cut["segments"]), 1)
+        self.assertEqual(H.scatter_out(chain), {"scatter": 0.0, "scatterFloor": 0.025})
+        # Clusters a hundredth of a micrometre wide (the plane that far off
+        # the vertices: more than the cut's own rounding takes in, and more
+        # than a ten-millionth of the chain) are clusters still.
+        z = np.repeat(np.arange(0, 20.01, 0.5), 4) + np.tile([0.0, 1e-5, 2e-5, 3e-5], 41)
+        wide = np.c_[z, np.zeros(len(z))]
+        self.assertGreater(1e-5, G.COINCIDENT * 20)
+        self.assertAlmostEqual(G.view_chain(wide)[2], 0.5, places=3)
+        self.assertAlmostEqual(segment_chain(wide)["tolerance"], 0.3, places=3)
+        # A chain that really has short and long steps (1 to 50 here, as a
+        # mesh's slivers beside its full edges) keeps its median.
+        steps = np.tile([0.01, 0.5, 0.02, 0.4, 0.01], 20)
+        mixed = np.c_[np.cumsum(steps), np.zeros(len(steps))]
+        self.assertAlmostEqual(G.view_chain(mixed)[2], 0.02, places=9)
+        # Evenly stepped chains read as they did.
+        even = np.c_[np.arange(0, 20.01, 0.5), np.zeros(41)]
+        self.assertAlmostEqual(G.view_chain(even)[2], 0.5, places=12)
+        # Every point the same point: no spacing to read, 1 as before.
+        self.assertEqual(G.view_chain(np.zeros((6, 2)))[2], 1.0)
+
+    def test_a_floor_that_rounds_to_the_scatter_is_not_shown(self):
+        from scanrulerfc.handlers import sections as H
+
+        # 20 points 0.0004 mm apart: the floor is 0.00002, 0.0 as answered.
+        tiny = np.c_[np.arange(20) * 0.0004, np.zeros(20)]
+        self.assertEqual(H.scatter_out(tiny), {"scatter": 0.0})
+
+    def test_section_fit_on_the_cut_through_a_row_of_vertices(self):
+        import fakedoc
+        from scanrulerfc import runner
+        from scanrulerfc import scanstate as S
+
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        V, F = crossed_sheet()
+        ctx = runner.Context(doc=fakedoc.Doc("Sheet"), out_dir=tempfile.mkdtemp())
+        run = runner.local(ctx=ctx)
+        S.state(ctx)["scan"] = S.Scan("sheet.stl", V, F)
+        ok, out = run("section_cut", {"across": "YZ", "offset": self.OFF, "name": "Half"})
+        self.assertTrue(ok, out)
+        ok, out = run("section_fit", {"section": "Half", "brief": True})
+        self.assertTrue(ok, out)
+        row = out["chains"][0]
+        self.assertEqual(row["points"], 21)
+        self.assertEqual(row["spacing"], 0.5)  # 0.0 live
+        self.assertEqual(row["tolerance"], 0.3)  # 0.0 live
+        self.assertEqual((row["scatter"], row["scatterFloor"]), (0.0, 0.025))
+        self.assertEqual([p["kind"] for p in row["pieces"]], ["line"])
+
+
 if __name__ == "__main__":
     unittest.main()

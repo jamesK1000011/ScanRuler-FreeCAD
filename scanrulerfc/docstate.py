@@ -65,6 +65,17 @@ ARRAYS = "arrays/"
 PACKED = ".npy.z"
 # Left out: they are worked out again (caches) or say only that something moved.
 SKIP_KEYS = frozenset({"version", "last_tool", "onReference"})
+# Beside a "scan" in the same dict: the scan's points (scan.V itself) as
+# they stood when a reading was taken, there to tell a reading of the pose
+# the scan is in from one taken before it moved. It was written out as an
+# array like any other: a second copy of every vertex in the document's
+# state (2.6 MB at 109,800 vertices), compressed again after each
+# alignment and each scan_scale — the unscaled points beside the scaled
+# scan until the next wall-thickness call noticed — and useless once read
+# back, because a copy is never the scan's own array, so a reopened
+# document lost its thickness reading (found while looking for what
+# scan_scale leaves in the state, run 3).
+POSE_KEY = "V"
 _READ_ONLY, _HIDDEN, _OUTPUT, _NO_RECOMPUTE = 1, 4, 8, 16
 
 
@@ -181,6 +192,13 @@ class _Enc:
                         continue
                     if k == "surface" and type(v).__name__ == "NominalSurface":
                         out[k] = {"__nominal__": True}  # built again from V and F beside it
+                        continue
+                    if k == POSE_KEY and isinstance(v, np.ndarray) and isinstance(x.get("scan"), Scan):
+                        # Not data: the scan's points as they stood when
+                        # this reading was taken, kept only to tell whether
+                        # the scan has moved since (handlers/thickness.py).
+                        # Written as that answer, never as the points.
+                        out[k] = {"__pose__": v is x["scan"].V}
                         continue
                     got = self.value(v, f"{path}.{k}")
                     if got is not _DROP:
@@ -305,6 +323,13 @@ def decode(data, scan_points=None):
             s = scans[rec["id"]] = scan(rec)
             return s
         out = {k: value(v) for k, v in x.items()}
+        mark = out.get(POSE_KEY)
+        if isinstance(mark, dict) and "__pose__" in mark:
+            # A reading taken in the pose the scan is saved in is still of
+            # that pose (the very array, as the check reads it); one taken
+            # before a move is of no pose the scan has now.
+            sc = out.get("scan")
+            out[POSE_KEY] = sc.V if mark["__pose__"] and sc is not None else np.zeros((0, 3))
         if isinstance(out.get("surface"), dict) and out["surface"].get("__nominal__") and "V" in out and "F" in out:
             from .dev_surface import NominalSurface
 
@@ -596,6 +621,8 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
         return
 
     def write(s):
+        t0 = time.perf_counter()
+        rebuilt = False
         try:
             o = doc.getObject(s.object)
             if o is None:
@@ -610,10 +637,15 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
             if getattr(s, "meshed_k", s.k) != s.k:  # scaled: the mesh holds k·V0
                 o.Mesh = _mesh_of(s.k * s.V0, s.F)
                 s.meshed_k = s.k
+                rebuilt = True
             o.Placement = _placement(s.R, s.t)
             s.placed = _read_placement(o)
         except Exception as e:  # noqa: BLE001 — the view only: the measurement holds
             _report(f"the scan's placement could not follow its alignment: {e}")
+        # What this write into the document cost, for the tool that moved
+        # the scan to answer (handlers/align.py: timing): a new record each
+        # time, so a call can tell its own write from an earlier one.
+        s.wrote = {"ms": int(round((time.perf_counter() - t0) * 1000)), "mesh": "rebuilt" if rebuilt else "kept"}
 
     def push(s):
         # From a worker thread (a best fit run as a job) the write waits

@@ -336,7 +336,9 @@ def scatter_out(chain):
     side read "scatter 0.0469"."""
     measured, floor = chain_scatter(chain)
     out = {"scatter": r4(measured)}
-    if measured < floor:
+    # As the answer reads: a floor that rounds to the scatter itself (0.0
+    # beside 0.0, seen live in run 3) says nothing.
+    if r4(measured) < r4(floor):
         out["scatterFloor"] = r4(floor)
     return out
 

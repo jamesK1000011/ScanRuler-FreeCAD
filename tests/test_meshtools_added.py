@@ -684,19 +684,32 @@ class _Pt:
 
 class CountDecimator:
     """A stand-in for FreeCAD's Mesh with decimate(targetSize) as the
-    1.1 source has it (src/Mod/Mesh/App/Core/Simplify.h): it comes down to
-    about the count asked whatever that costs in shape — here a 40 x 30 x
-    20 box regridded to that count, its faces bulged by 40 / count mm (so
-    4,000 triangles lie 0.01 mm off, 400 lie 0.1 mm off) — and stops a
-    little above the count."""
+    1.1 source has it (src/Mod/Mesh/App/Core/Simplify.h, simplify_mesh):
+    it comes down to the count asked whatever that costs in shape — here a
+    40 x 30 x 20 box regridded to at most that count, its faces bulged by
+    40 / count mm (so 4,000 triangles lie 0.01 mm off, 400 lie 0.1 mm off).
+
+    And, as that loop reads and as the same source compiled by itself did
+    on a densified block with a bore (asked 500 and asked 100 it left the
+    same 704 triangles, 11 mm off; run again on those, 688; a third run,
+    688): it can have a count it will not go under. FLOOR is that count
+    for a mesh's first run — asking for less changes nothing, the count
+    only says when to stop — AGAIN the count a run on its own result
+    reaches, and under WRECK triangles what it leaves is OFF mm out (the
+    last rounds collapse whatever does not turn a triangle over)."""
 
     asked = []
+    FLOOR = 0
+    AGAIN = 0
+    WRECK = 0
+    OFF = 10.0
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, runs=0):
         self.V, self.F = (np.asarray(data[0], float), np.asarray(data[1], np.int64)) if data is not None else (np.zeros((0, 3)), np.zeros((0, 3), np.int64))
+        self.runs = runs
 
     def copy(self):
-        return CountDecimator((self.V, self.F))
+        return CountDecimator((self.V, self.F), self.runs)
 
     @property
     def CountFacets(self):
@@ -711,13 +724,45 @@ class CountDecimator:
             raise AssertionError("mesh_reduce must use decimate(targetSize): the (tolerance, reduction) form holds no tolerance in mm")
         target = int(args[0])
         CountDecimator.asked.append(target)
-        n = max(1, int(math.sqrt(target * 1.05 / 12)))  # a little above the count, as FreeCAD's
+        floor = self.FLOOR if self.runs == 0 else self.AGAIN
+        self.runs += 1
+        want = max(target, floor)
+        n = max(1, int(math.sqrt(want / 12)))
+        if 12 * n * n >= len(self.F):
+            return  # nothing it can take off
         V, F = box_mesh(40, 30, 20, n)
         V = np.asarray(V, float)
-        bulge = 40.0 / max(12 * n * n, 1)
+        bulge = self.OFF if 12 * n * n < self.WRECK else 40.0 / max(12 * n * n, 1)
         inner = (np.abs(np.abs(V) - np.array([20, 15, 10])) > 1e-9).sum(axis=1) == 2  # a face's own points, not its rim
         V[inner] *= 1 + bulge / np.linalg.norm(V[inner], axis=1)[:, None]
         self.V, self.F = V, np.asarray(F, np.int64)
+
+
+def figures(text):
+    """Every number in a sentence, as floats (a full stop ending the
+    sentence is not part of one)."""
+    import re
+
+    return [float(m) for m in re.findall(r"(?<![\w.])\d+(?:\.\d+)?", text)]
+
+
+def report_figures(report):
+    """Every number a mesh_reduce report holds, and each count's distance
+    over the cap (the words give that too)."""
+    out = set()
+
+    def walk(v):
+        if isinstance(v, bool) or v is None:
+            return
+        if isinstance(v, (int, float)):
+            out.add(float(v))
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+
+    walk(report)
+    out.add(float(report["triangles"] - report["settings"]["maxTriangles"]))
+    return out
 
 
 class Reduce(unittest.TestCase):
@@ -792,9 +837,15 @@ class Reduce(unittest.TestCase):
             # tolerance under it is said to, in the preview and on applying.
             s, t = self.tools(np.asarray(V, float), np.asarray(F, np.int64))
             red = t["mesh_reduce"]({"tolerance": 0.05, "maxTriangles": 200})["reduced"]
-            self.assertLessEqual(red["triangles"], 200)  # asked again lower when FreeCAD stops above the count
-            self.assertEqual((red["held"], red["capped"]), (False, True))
+            self.assertLessEqual(red["triangles"], 200)
+            self.assertEqual((red["held"], red["capped"], red["capMet"], red["won"]), (False, True, True, "cap"))
             self.assertIn("maxTriangles", red["warning"])
+            # … and the reply says what count would hold the tolerance
+            # (40 / n mm here: 0.05 mm from 800 triangles up).
+            self.assertGreaterEqual(red["holds"]["triangles"], 800)
+            self.assertLess(red["holds"]["triangles"], 1000)
+            self.assertLess(red["notHolding"], red["holds"]["triangles"])
+            self.assertIn(f"maxTriangles: {red['holds']['triangles']}", red["warning"])
             out = t["mesh_apply_reduced"]({})
             self.assertIn("does not hold its tolerance", out["warning"])
             self.assertIn("mesh_undo", out["warning"])
@@ -804,6 +855,224 @@ class Reduce(unittest.TestCase):
             self.assertEqual(red["triangles"], len(F))
             self.assertTrue(red["held"])
             self.assertIn("No lighter mesh holds", red["note"])
+
+
+class ReduceKeepsItsWord(unittest.TestCase):
+    """Found live (run 3, Mesh Tools model calls 39 and 42): asked
+    tolerance 0.05 and maxTriangles 2,000 on 10,022 triangles, mesh_reduce
+    answered 2,142 triangles — over the cap — 10.4 mm off, with capped:
+    true, held: false, tries: 1 and "Brought down to the cap of 2000
+    triangles". Three things were wrong: asking FreeCAD's decimator for
+    less does not make it go lower (the count only says when to stop:
+    src/Mod/Mesh/App/Core/Simplify.h, simplify_mesh), so the cap was
+    not kept; the search ended at the first try that did not hold, so
+    nothing said where the tolerance starts to hold; and the words named
+    the cap, not the count."""
+
+    TOL = 0.05
+
+    def search(self, triangles, cap, off, floor=0, **kw):
+        tried = []
+
+        def attempt(target):
+            tried.append(target)
+            got = max(int(target), floor)
+            return None if got >= triangles else {"triangles": got, "worst": off(got)}
+
+        out = M.reduction_search(triangles, cap, self.TOL, attempt, **kw)
+        self.assertEqual(out["tries"], len(tried))
+        return out, tried
+
+    def test_cap_and_tolerance_both_hold_and_the_search_goes_on_down(self):
+        out, tried = self.search(200_000, 50_000, lambda n: 40.0 / n)
+        self.assertEqual((out["won"], out["capMet"], out["ended"]), ("both", True, "done"))
+        self.assertEqual(tried[0], 50_000)
+        self.assertLessEqual(out["best"]["worst"], self.TOL)
+        self.assertLess(out["best"]["triangles"], 1400)  # 800 just hold
+        self.assertGreaterEqual(out["best"]["triangles"], 800)
+        self.assertIsNone(out["holds"])
+
+    def test_the_cap_wins_and_the_count_that_would_hold_is_found(self):
+        out, tried = self.search(200_000, 500, lambda n: 40.0 / n)
+        self.assertEqual((out["won"], out["capMet"]), ("cap", True))
+        self.assertEqual(out["best"]["triangles"], 500)
+        self.assertIs(out["best"], out["atCap"])
+        self.assertGreater(out["best"]["worst"], self.TOL)
+        # 800 triangles is where 0.05 mm starts to hold: found from above,
+        # with the largest count that did not hold beside it.
+        self.assertGreaterEqual(out["holds"]["triangles"], 800)
+        self.assertLess(out["notHolding"], 800)
+        self.assertLessEqual(out["holds"]["triangles"], out["notHolding"] * 1.12)
+        self.assertLessEqual(len(tried), 1 + M.REDUCE_CLIMB)
+
+    def test_the_cap_cannot_be_met_so_the_tolerance_wins(self):
+        # The decimator stops at 2,142 whatever is asked, and what it
+        # leaves there is wrecked; from 2,600 up the tolerance holds.
+        out, tried = self.search(10_022, 2000, lambda n: 10.4 if n < 2600 else 0.004, floor=2142)
+        self.assertEqual((out["won"], out["capMet"]), ("tolerance", False))
+        self.assertEqual(out["atCap"]["triangles"], 2142)
+        self.assertGreaterEqual(out["best"]["triangles"], 2600)
+        self.assertLess(out["best"]["triangles"], 2600 * 1.12)
+        self.assertLessEqual(out["best"]["worst"], self.TOL)
+        self.assertGreater(out["tries"], 1)  # tries: 1 was the live fault
+        self.assertGreaterEqual(out["notHolding"], 2142)
+
+    def test_stopped_above_the_cap_where_it_holds(self):
+        out, tried = self.search(10_022, 2000, lambda n: 0.004, floor=2142)
+        self.assertEqual((out["won"], out["capMet"]), ("tolerance", False))
+        self.assertIs(out["best"], out["atCap"])
+        self.assertEqual(tried, [2000])
+
+    def test_stopped_above_the_cap_and_nothing_lighter_holds(self):
+        out, tried = self.search(10_022, 2000, lambda n: 10.4, floor=2142)
+        self.assertEqual((out["won"], out["capMet"]), ("tolerance", False))
+        self.assertIsNone(out["best"])  # the mesh as it is
+        self.assertIsNone(out["holds"])
+        self.assertLessEqual(len(tried), 1 + M.REDUCE_CLIMB)
+
+    def test_a_decimator_that_gives_nothing_back(self):
+        out = M.reduction_search(10_022, 2000, self.TOL, lambda target: None)
+        self.assertIsNone(out["best"])
+        self.assertFalse(out["capMet"])
+        self.assertIsNone(out["atCap"])
+
+    def test_the_time_allowed_ends_the_search_and_says_so(self):
+        now = [0.0]
+
+        def clock():
+            now[0] += 4.0  # every look at the clock is four seconds on
+            return now[0]
+
+        out, tried = self.search(200_000, 500, lambda n: 40.0 / n, seconds=10.0, clock=clock)
+        self.assertEqual(out["ended"], "time")
+        self.assertEqual(tried[0], 500)  # the try at the cap is always made
+        self.assertLess(len(tried), 1 + M.REDUCE_CLIMB)
+        self.assertEqual((out["won"], out["best"]["triangles"]), ("cap", 500))
+        out, tried = self.search(200_000, 500, lambda n: 40.0 / n, seconds=1e9)
+        self.assertEqual(out["ended"], "done")
+
+    # ---- the tool, on a decimator that stops where the source says it can ----
+
+    def reduce(self, args, floor=0, again=0, wreck=0, n=29):
+        from unittest import mock
+
+        from scanrulerfc import handlers
+
+        fake = type(sys)("Mesh")
+        fake.Mesh = CountDecimator
+        V, F = box_mesh(40, 30, 20, n)  # n 29: 10,092 triangles (10,022 live)
+        s = Session(np.asarray(V, float), np.asarray(F, np.int64))
+        s.out_dir = "."
+        t = handlers.bound(s, "meshtools")
+        with mock.patch.dict(sys.modules, {"Mesh": fake}), mock.patch.multiple(CountDecimator, FLOOR=floor, AGAIN=again, WRECK=wreck, asked=[]):
+            red = t["mesh_reduce"](args)["reduced"]
+            asked = list(CountDecimator.asked)
+            applied = t["mesh_apply_reduced"]({})
+        return red, applied, asked
+
+    def words_match(self, red, text):
+        have = report_figures(red)
+        for x in figures(text):
+            self.assertTrue(any(abs(x - h) < 1e-9 for h in have), f"{x:g} is in the words and not in the report: {text}")
+
+    def test_the_live_call_again(self):
+        # Asked 2,000; the decimator stops at 2,142 on its first run (12 x
+        # 13² = 2,028 here), a run on its own result takes nothing more
+        # off, and under 2,500 triangles what it leaves is 10 mm out.
+        red, applied, asked = self.reduce({"tolerance": 0.05, "maxTriangles": 2000}, floor=2142, again=2100, wreck=2500)
+        self.assertEqual(red["inputTriangles"], 10_092)
+        self.assertFalse(red["capMet"])
+        self.assertEqual(red["won"], "tolerance")
+        self.assertFalse(red["capped"])  # the cap did not come first: it could not be met
+        self.assertTrue(red["held"], red)
+        self.assertLessEqual(max(red["p999"], red["backP999"]), 0.05)
+        self.assertEqual(red["triangles"], 2700)  # 12 x 15²: the lightest this decimator makes that holds
+        self.assertGreater(red["tries"], 1)
+        self.assertEqual(red["search"]["tries"], red["tries"])
+        self.assertEqual(red["search"]["ended"], "done")
+        # The true count at the cap, how it was reached and how far off.
+        self.assertEqual((red["atCap"]["asked"], red["atCap"]["triangles"], red["atCap"]["passes"]), (2000, 2028, 2))
+        self.assertGreater(red["atCap"]["max"], 5)
+        self.assertEqual(asked[:2], [2000, 2000])  # run again on what it left, not asked for less
+        w = red["warning"]
+        self.assertIn("maxTriangles 2000 could not be met", w)
+        self.assertIn("stops at 2028 triangles", w)
+        self.assertIn("The tolerance won", w)
+        self.assertIn("2700 triangles", w)
+        self.assertNotIn("rought down to", w)
+        self.words_match(red, w)
+        # Applied, it says the same: over the cap, and why.
+        self.assertEqual(applied["mesh"]["triangles"], 2700)
+        self.assertIn("2700 triangles, over the maxTriangles of 2000", applied["warning"])
+        self.assertIn("stops at 2028", applied["warning"])
+        self.assertIn("holds its tolerance", applied["warning"])
+        self.assertIn("mesh_undo", applied["warning"])
+        self.words_match(red, applied["warning"])
+
+    def test_a_second_run_gets_under_the_cap(self):
+        # 2,142 on the first run, under 2,000 on a run of what that left:
+        # the cap is kept, the mesh is 10 mm out, and the cap wins.
+        red, applied, asked = self.reduce({"tolerance": 0.05, "maxTriangles": 2000}, floor=2142, again=1000, wreck=2500)
+        self.assertLessEqual(red["triangles"], 2000)
+        self.assertEqual((red["capMet"], red["won"], red["capped"], red["held"]), (True, "cap", True, False))
+        self.assertNotIn("atCap", red)  # the try at the cap is the answer itself
+        self.assertEqual(red["holds"]["triangles"], 2700)
+        self.assertGreaterEqual(red["notHolding"], 2000)
+        w = red["warning"]
+        self.assertIn("The cap won over the tolerance", w)
+        self.assertIn(f"brought down to {red['triangles']} triangles (maxTriangles 2000)", w)
+        self.assertIn("mesh_reduce { maxTriangles: 2700 }", w)
+        self.assertIn("mesh_discard", w)
+        self.words_match(red, w)
+        self.assertIn("does not hold its tolerance", applied["warning"])
+        self.assertIn("2700 triangles would hold it", applied["warning"])
+        self.words_match(red, applied["warning"])
+
+    def test_stopped_above_the_cap_with_a_mesh_that_holds(self):
+        red, applied, asked = self.reduce({"tolerance": 0.05, "maxTriangles": 2000}, floor=2142, again=2100)
+        self.assertEqual((red["triangles"], red["capMet"], red["won"], red["held"]), (2028, False, "tolerance", True))
+        self.assertIn("could not be met", red["warning"])
+        self.assertIn("stops at 2028 triangles", red["warning"])
+        self.assertIn("28 over the cap", red["warning"])
+        self.words_match(red, red["warning"])
+        self.assertIn("2028 triangles, over the maxTriangles of 2000", applied["warning"])
+        self.words_match(red, applied["warning"])
+
+    def test_the_cap_cannot_be_met_and_no_lighter_mesh_holds(self):
+        red, applied, asked = self.reduce({"tolerance": 0.05, "maxTriangles": 2000}, floor=2142, again=2100, wreck=10 ** 9)
+        self.assertEqual((red["triangles"], red["capMet"], red["held"]), (10_092, False, True))
+        self.assertIn("this is the mesh as it is, 10092 triangles", red["warning"])
+        self.assertIn("could not be met", red["warning"])
+        self.words_match(red, red["warning"])
+        self.assertIn("10092 triangles, over the maxTriangles of 2000", applied["warning"])
+
+    def test_both_hold_and_nothing_is_said(self):
+        red, applied, asked = self.reduce({"tolerance": 0.05, "maxTriangles": 2000})
+        self.assertEqual((red["capMet"], red["won"], red["held"], red["capped"]), (True, "both", True, False))
+        self.assertLessEqual(red["triangles"], 2000)
+        self.assertLess(red["triangles"], 1300)  # it went on down: 800 just hold
+        self.assertNotIn("warning", red)
+        self.assertNotIn("note", red)
+        self.assertNotIn("warning", applied)
+
+    def test_a_corner_cut_off_shows_the_way_back(self):
+        # Every vertex of the reduced mesh on the original, and a triangle
+        # through the solid: read at the triangles' middles too.
+        from scanrulerfc.handlers import meshtools as HM
+
+        self.assertEqual(len(HM._sampled(np.zeros((9000, 3)), 2000)), 2000)
+        red, _, _ = self.reduce({"tolerance": 0.05, "maxTriangles": 2000}, floor=2142, again=1000, wreck=2500)
+        self.assertGreater(red["backMax"], 5)  # the bulged faces' middles, not only their rims
+
+    def test_the_description_says_what_the_reply_does(self):
+        import json
+
+        with open(os.path.join(HERE, "..", "scanrulerfc", "data", "tools.json"), encoding="utf-8") as f:
+            doc = json.load(f)["entries"]
+        d = doc["mesh_reduce"]["description"]
+        for word in ("capMet", "won", "atCap", "holds", "notHolding", "search", "passes", "decimate(targetSize)", "decimate(tolerance, reduction)"):
+            self.assertIn(word, d)
+        self.assertIn("over the cap asked", doc["mesh_apply_reduced"]["description"])
 
 
 class Hardened(unittest.TestCase):
