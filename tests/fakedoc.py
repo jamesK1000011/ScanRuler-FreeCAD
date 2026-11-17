@@ -3,8 +3,8 @@
 # document (scanrulerfc/docstate.py) and the view keys that set FreeCAD's
 # own view properties (scanrulerfc/viewprops.py): objects with properties
 # and a ViewObject, a Placement as a 4 x 4 matrix, a Mesh module whose mesh
-# keeps its points, and a PropertyFileIncluded that copies the file in, as
-# FreeCAD's does. Installed as FreeCAD and Mesh only while a test runs
+# takes points and triangles the way FreeCAD's does (MeshData), and a
+# PropertyFileIncluded that copies the file in, as FreeCAD's does. Installed as FreeCAD and Mesh only while a test runs
 # (installed()).
 import contextlib
 import os
@@ -45,13 +45,73 @@ def placement(R, t):
     return Placement(m)
 
 
+class Vector:
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        self.x, self.y, self.z = float(x), float(y), float(z)
+
+    def __iter__(self):
+        return iter((self.x, self.y, self.z))
+
+    def __len__(self):
+        return 3
+
+    def __getitem__(self, i):
+        return (self.x, self.y, self.z)[i]
+
+
 class MeshData:
+    """A mesh that takes what FreeCAD's takes, the way FreeCAD's does
+    (FreeCAD 1.1 source: src/Mod/Mesh/App/MeshPyImp.cpp, MeshPy::PyInit and
+    MeshPy::addFacets; Core/MeshKernel.cpp; Core/Builder.cpp):
+
+      a tuple (points, triangles)   the points appended as given, in
+          order — but only those that are Vector objects (any other is
+          passed over without a word), and each triangle must be a tuple
+          (a list is a TypeError);
+      a list of loose triangles     each three points: the mesh's points
+          are numbered by where they first come up, equal ones are one
+          point, a triangle with two equal corners is dropped.
+    """
+
     def __init__(self, data=None):
-        V, F = data if data is not None else ([], [])
-        self.Topology = ([tuple(p) for p in V], [tuple(f) for f in F])
+        self.Topology = ([], [])
+        if data is not None:
+            self.addFacets(data)
+
+    def addFacets(self, data, check=True):
+        pts, tris = list(self.Topology[0]), list(self.Topology[1])
+        if isinstance(data, tuple):
+            V, F = data
+            base = len(pts)
+            pts += [(p.x, p.y, p.z) for p in V if isinstance(p, Vector)]
+            for f in F:
+                if not isinstance(f, tuple):
+                    raise TypeError(f"expected a tuple, not {type(f).__name__}")
+                tris.append(tuple(base + int(i) for i in f))
+        elif isinstance(data, list):
+            known = {p: i for i, p in enumerate(pts)}
+            for t in data:
+                corners = [tuple(float(x) for x in p) for p in t]
+                if len(set(corners)) < 3:
+                    continue
+                tris.append(tuple(known.setdefault(c, len(known)) for c in corners))
+            pts = sorted(known, key=known.get)
+        else:
+            raise TypeError(f"Cannot create a mesh out of a '{type(data).__name__}'")
+        self.Topology = (pts, tris)
+
+    @property
+    def CountPoints(self):
+        return len(self.Topology[0])
+
+    @property
+    def CountFacets(self):
+        return len(self.Topology[1])
 
     def copy(self):
-        return MeshData((self.Topology[0], self.Topology[1]))
+        m = MeshData()
+        m.Topology = (list(self.Topology[0]), list(self.Topology[1]))
+        return m
 
 
 class View:
@@ -142,7 +202,7 @@ class Doc:
 
 def modules():
     app = types.ModuleType("FreeCAD")
-    app.Matrix, app.Placement = Matrix, Placement
+    app.Matrix, app.Placement, app.Vector = Matrix, Placement, Vector
     app.warnings = []
     app.Console = types.SimpleNamespace(PrintWarning=app.warnings.append, PrintMessage=lambda m: None)
     app.ActiveDocument = None
