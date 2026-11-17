@@ -41,6 +41,23 @@ GHOST_TRANSPARENCY = 0.6
 FONT_SIZE = 13.0
 
 
+def _where(e):
+    """' (file:line)' of the frame that raised, for the Report view."""
+    try:
+        import os
+        import traceback
+
+        fr = traceback.extract_tb(e.__traceback__)[-1]
+        return f" ({os.path.basename(fr.filename)}:{fr.lineno})"
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _seq(x):
+    """x, or an empty list for None: `x or []` fails on a numpy array."""
+    return [] if x is None else x
+
+
 class Builder:
     """Coin nodes for one plan, from a coin module (pivy's or a stand-in)."""
 
@@ -115,7 +132,7 @@ class Builder:
         style.pointSize.setValue(POINT_PX + (2 if sh.get("new") else 0))
         over.addChild(style)
         over.addChild(self._colour(colour))
-        lines = [np.asarray(x, dtype=float) for x in sh.get("lines") or [] if len(x) >= 2]
+        lines = [np.asarray(x, dtype=float) for x in _seq(sh.get("lines")) if len(x) >= 2]
         if lines:
             co = coin.SoCoordinate3()
             pts = np.vstack(lines)
@@ -124,7 +141,7 @@ class Builder:
             ls = coin.SoLineSet()
             ls.numVertices.setValues(0, len(lines), [len(x) for x in lines])
             over.addChild(ls)
-        points = [np.asarray(p, dtype=float) for p in sh.get("points") or []]
+        points = [np.asarray(p, dtype=float) for p in _seq(sh.get("points"))]
         if points:
             co = coin.SoCoordinate3()
             co.point.setValues(0, len(points), np.vstack(points).tolist())
@@ -172,12 +189,12 @@ class Builder:
             if len(layer["rgb"]) == len(V):
                 root.addChild(self.mesh(V, F, rgb=layer["rgb"], offset=True))
                 drawn += 1
-        for _name, V, F in plan.get("previews") or []:
+        for _name, V, F in _seq(plan.get("previews")):
             root.addChild(self.mesh(V, F, colour=SC.GHOST, transparency=GHOST_TRANSPARENCY))
             drawn += 1
         lift = 0.0
         for group in ("sections", "elements", "dimensions", "items"):
-            for sh in plan.get(group) or []:
+            for sh in _seq(plan.get(group)):
                 root.addChild(self.shape(sh, lift))
                 drawn += 1
         if layer is not None and layer.get("legend") is not None and drawn:
@@ -323,7 +340,7 @@ def after_call(session, tool, args=None, body=None):
         got = window().show(session, tool, args, body)
     except Exception as e:  # noqa: BLE001 — the view only: the call has answered
         try:
-            FreeCAD.Console.PrintWarning(f"ScanRuler: the results of {tool} could not be drawn in the 3D view: {type(e).__name__}: {e}\n")
+            FreeCAD.Console.PrintWarning(f"ScanRuler: the results of {tool} could not be drawn in the 3D view: {type(e).__name__}: {e}{_where(e)}\n")
         except Exception:  # noqa: BLE001
             pass
         return None
