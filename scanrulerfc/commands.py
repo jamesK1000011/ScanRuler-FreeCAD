@@ -779,6 +779,15 @@ class SnapshotCommand(KeyCommand):
         super().__init__(W.SNAPSHOT)
 
     def Activated(self, checked=None):
+        if _hooks["ui"] is _no_ui:
+            # No panel to hand the key to (it could not open, or the key is
+            # pressed before it has): a screenshot needs none.
+            from . import dock
+
+            why = dock.snapshot_key(current_workspace())
+            if why:
+                _say(f"ScanRuler: {why}", warn=True)
+            return why is None
         return _hooks["ui"]("snapshot")
 
 

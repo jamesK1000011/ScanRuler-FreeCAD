@@ -756,7 +756,77 @@
   {
    "tool": "history_undo",
    "arguments": {},
-   "expect": "the clear is taken back: reverse_body_names lists the four bodies again"
+   "expect": "done 'undo', steps ['Reverse: clear'] (the edit's own undo step: Agent Link counts it, it holds real records), redoCount 1; its own bodies field lists FreeCAD's parts only ('Reverse engineer', 'Gauge'), never the Reverse engineer's bodies — the next four calls read them back (nothing did in run 2)"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "the four bodies again, as at call 53: Block 23845.49, the dowel 1000 (style { name 'Dowel', color '#0f9b9b' }), gauge 512, Ring 1963.50; boxes [0,0,0]-[40,30,20] and [35,0,0]-[45,10,10]"
+  },
+  {
+   "tool": "object_list",
+   "arguments": {
+    "type": "Part::FeaturePython"
+   },
+   "expect": "'Reverse engineer' (4 solids, volume 27320.98) and the four ReverseBody objects back in the document with their volumes (23845.49, 1000, 512, 1963.50) — none empty, none with error: true; the dowel labelled 'Dowel'"
+  },
+  {
+   "tool": "reverse_feature_list",
+   "arguments": {},
+   "expect": "every feature row as before the clear (ids, names and order as at call 44's build), each status ok; rollback { built = of }; parameters 1"
+  },
+  {
+   "tool": "reverse_parameter_list",
+   "arguments": {},
+   "expect": "parameters [{ id 1, name 'height', expression '2 * 10', value 20 }]: the list is back with the features"
+  },
+  {
+   "tool": "history_redo",
+   "arguments": {},
+   "expect": "done 'redo', steps ['Reverse: clear']: the clear again"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "bodies []: cleared again (and object_list would show no ReverseBody)"
+  },
+  {
+   "tool": "history_undo",
+   "arguments": {},
+   "expect": "done 'undo', steps ['Reverse: clear']"
+  },
+  {
+   "tool": "reverse_body_names",
+   "arguments": {},
+   "expect": "the four bodies and volumes once more: undo, redo and undo leave the part as it was; health of the undo calls green"
+  },
+  {
+   "tool": "reverse_parameter_add",
+   "arguments": {
+    "name": "spare",
+    "expression": 5,
+    "comment": "read by nothing"
+   },
+   "expect": "parameter { id 2, name 'spare', kind 'length', expression '5', value 5, comment 'read by nothing' }; results all ok; the four bodies unchanged; health green"
+  },
+  {
+   "tool": "reverse_parameter_remove",
+   "arguments": {
+    "parameter": "spare"
+   },
+   "expect": "ACCEPTED (run 2 only ever saw this tool refuse): results every built feature ok, failed [], bodies the same four with the same volumes, steps, health green; one undo step"
+  },
+  {
+   "tool": "reverse_parameter_list",
+   "arguments": {},
+   "expect": "parameters: 'height' alone again"
+  },
+  {
+   "tool": "reverse_parameter_remove",
+   "arguments": {
+    "parameter": "spare"
+   },
+   "expect": "refused (not_found): no parameter is 'spare' — the message lists 'height' and names reverse_parameter_list"
   }
  ],
  "notCovered": [
@@ -764,6 +834,8 @@
   "sketches on a section's or a measured plane, extract, surface, network, trim, split: they need a scan with sections and elements (the other ScanRuler agent's families)",
   "reverse_feature_update with picks by index on a rolled-back part (the road its description gives)",
   "reverse_body_set { visible: false }",
-  "a build slow enough to matter, and a failing feature (health red): set Round's radius to 30 with reverse_feature_update to see one"
+  "a build slow enough to matter, and a failing feature (health red): set Round's radius to 30 with reverse_feature_update to see one",
+  "reverse_build_stop answering anything but its refusal: the tool is always refused in this port by design (builds run inside FreeCAD's own process; its description says so), so no call of it can succeed — call 45's refusal, with the three tools it names, is all there is to prove",
+  "Edit › Undo pressed in the window (no recompute follows it, unlike history_undo): the reads then build the part the undo put back in memory first (reverse/doc.py current_build; tests/test_reverse_doc.py AfterAnUndo on stand-ins) — to see it live: reverse_feature_clear { confirm: true }, cmd_run { name: 'Std_Undo' }, then reverse_body_names (the four bodies) before any recompute"
  ]
 }

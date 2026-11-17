@@ -27,6 +27,14 @@
 # arrays); the deviation reference's search structure is built again from
 # its points; caches are left out. Nothing is unpickled: arrays load with
 # allow_pickle=False.
+#
+# What a write costs follows what changed, not how large the state is: each
+# array is packed (compressed) on its own and its packed bytes are kept
+# beside the document for as long as the state holds an array of the same
+# content (Packs), so a call that renames an element on a dense scan packs
+# the small JSON part again and none of the scan's arrays. Found live
+# (run 2, 16 Nov 2026): every changing call took 1.2 to 1.6 s once the scan
+# had 219,600 triangles, the whole state compressed again each time.
 
 import hashlib
 import io
@@ -35,7 +43,9 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import zipfile
+import zlib
 
 import numpy as np
 
@@ -45,13 +55,73 @@ SCAN_OBJECT = "ScanRulerScan"
 REFERENCE_OBJECT = "ScanRulerReference"
 ROLE_PROPERTY = "ScanRulerRole"
 CREDIT = "ScanRuler by Stefan Hermann (CNC Kitchen), ported to FreeCAD"
-FORMAT = 1
+# The format written. 1: state.json and arrays.npz (numpy's compressed
+# archive of every array, compressed a second time by the zip around it).
+# 2: state.json and one member per array, arrays/<key>.npy.z (the array as
+# numpy's .npy, zlib-compressed, stored in the zip as it is), so an array
+# that did not change is not compressed again. Both are read.
+FORMAT = 2
+ARRAYS = "arrays/"
+PACKED = ".npy.z"
 # Left out: they are worked out again (caches) or say only that something moved.
 SKIP_KEYS = frozenset({"version", "last_tool", "onReference"})
 _READ_ONLY, _HIDDEN, _OUTPUT, _NO_RECOMPUTE = 1, 4, 8, 16
 
 
 # ---- the codec (pure) --------------------------------------------------------------------------
+
+
+def array_digest(a):
+    """What tells one array's content from another's: its type, shape and
+    bytes (BLAKE2, about a gigabyte a second: a few milliseconds for a
+    dense scan's arrays, where compressing them takes a second)."""
+    a = np.ascontiguousarray(a)
+    h = hashlib.blake2b(digest_size=16)
+    h.update(f"{a.dtype.str}{a.shape}".encode())
+    h.update(a.data if a.size else b"")
+    return h.hexdigest()
+
+
+def pack_array(a):
+    """An array as numpy's .npy, zlib-compressed. Never pickled."""
+    buf = io.BytesIO()
+    np.lib.format.write_array(buf, np.ascontiguousarray(a), allow_pickle=False)
+    return zlib.compress(buf.getvalue(), 6)
+
+
+def unpack_array(data):
+    return np.lib.format.read_array(io.BytesIO(zlib.decompress(data)), allow_pickle=False)
+
+
+class Packs:
+    """The packed bytes of the arrays of one document's state, by content:
+    an array met again unchanged (the scan's triangles, an element's
+    region, a deviation's readings) is not compressed again. Only what the
+    last write used is kept (keep_used), so it never holds more than the
+    state's own arrays, packed."""
+
+    def __init__(self):
+        self.kept = {}
+        self.used = {}
+        self.packed_again = 0
+
+    def take(self, a):
+        key = array_digest(a)
+        blob = self.used.get(key)
+        if blob is None:
+            blob = self.kept.get(key)
+            if blob is None:
+                blob = pack_array(a)
+                self.packed_again += 1
+            self.used[key] = blob
+        return blob
+
+    def keep_used(self):
+        """After a write: (arrays written, of them packed again); what was
+        not used is let go."""
+        n, again = len(self.used), self.packed_again
+        self.kept, self.used, self.packed_again = self.used, {}, 0
+        return n, again
 
 
 class _Enc:
@@ -94,6 +164,12 @@ class _Enc:
         if isinstance(x, np.floating):
             return self.value(float(x), path)
         if isinstance(x, np.ndarray):
+            if x.dtype.hasobject:
+                # An array of Python objects could only be pickled, and is
+                # never unpickled on the way back (one such array used to
+                # make the whole state unreadable): left out, and said.
+                self.dropped.append(f"{path} (an array of objects)")
+                return _DROP
             return self.array(x)
         if isinstance(x, Scan):
             return self.scan(x)
@@ -124,17 +200,22 @@ class _Enc:
 _DROP = object()
 
 
-def encode(st, scan_points=None):
-    """The state as bytes (a zip of state.json and arrays.npz) and what
-    could not be kept, as paths."""
+def encode(st, scan_points=None, packs=None):
+    """The state as bytes (a zip of state.json and one packed member per
+    array) and what could not be kept, as paths. packs (Packs): the packed
+    arrays kept from the last write of this state; one whose content is
+    unchanged is written from there and not compressed again."""
     e = _Enc(scan_points)
     body = e.value(st, "state")
+    packs = packs if packs is not None else Packs()
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("state.json", json.dumps({"format": FORMAT, "state": body, "dropped": e.dropped}, allow_nan=False))
-        arr = io.BytesIO()
-        np.savez_compressed(arr, **e.arrays)
-        z.writestr("arrays.npz", arr.getvalue())
+    # The JSON part is small and changes with every call: deflated here.
+    # The arrays are packed already: stored as they are.
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("state.json", json.dumps({"format": FORMAT, "state": body, "dropped": e.dropped}, allow_nan=False),
+                   compress_type=zipfile.ZIP_DEFLATED)
+        for key, a in e.arrays.items():
+            z.writestr(f"{ARRAYS}{key}{PACKED}", packs.take(a), compress_type=zipfile.ZIP_STORED)
     return buf.getvalue(), e.dropped
 
 
@@ -177,10 +258,14 @@ def decode(data, scan_points=None):
 
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         head = json.loads(z.read("state.json").decode("utf-8"))
-        with np.load(io.BytesIO(z.read("arrays.npz")), allow_pickle=False) as npz:
-            arrays = {k: npz[k] for k in npz.files}
-    if head.get("format", 0) > FORMAT:
-        raise ValueError("The ScanRuler state in this document was written by a newer version.")
+        if head.get("format", 0) > FORMAT:
+            raise ValueError("The ScanRuler state in this document was written by a newer version of ScanRuler for FreeCAD: update the add-on to read it.")
+        names = z.namelist()
+        if "arrays.npz" in names:  # format 1
+            with np.load(io.BytesIO(z.read("arrays.npz")), allow_pickle=False) as npz:
+                arrays = {k: npz[k] for k in npz.files}
+        else:
+            arrays = {n[len(ARRAYS):-len(PACKED)]: unpack_array(z.read(n)) for n in names if n.startswith(ARRAYS) and n.endswith(PACKED)}
     scans, missing = {}, []
 
     def scan(rec):
@@ -616,21 +701,60 @@ def _file_bytes(path):
         return f.read()
 
 
+# Per open document: the packed arrays its last write used and what that
+# write cost. {document name: {"doc": the document, "packs": Packs, "last": {…}}}
+_KEPT = {}
+
+
+def _kept_for(doc):
+    """The record kept for doc (see _KEPT); the records of documents closed
+    since are let go, and a document reopened under an old name starts a
+    new one."""
+    from . import scanstate
+
+    for name in [n for n, r in _KEPT.items() if r["doc"] is not doc and not scanstate.doc_open(r["doc"], n)]:
+        del _KEPT[name]
+    name = getattr(doc, "Name", None) or f"#{id(doc)}"
+    rec = _KEPT.get(name)
+    if rec is None or rec["doc"] is not doc:
+        rec = _KEPT[name] = {"doc": doc, "packs": Packs(), "last": None}
+    return rec
+
+
+def last_write(doc):
+    """What the last write of ScanRuler's state into doc cost, or None when
+    nothing was written since the document was opened: { bytes, ms,
+    arrays, packedAgain } — arrays the state holds, packedAgain how many of
+    them had changed (or were new) and were compressed for this write."""
+    rec = _KEPT.get(getattr(doc, "Name", None) or f"#{id(doc)}")
+    return dict(rec["last"]) if rec is not None and rec["doc"] is doc and rec["last"] else None
+
+
 def write(doc, st):
     """The state into the document's ScanRulerState (made if missing).
-    Returns what could not be kept."""
+    Returns what could not be kept. An array whose content is as it was at
+    the last write into this document is written from its packed bytes
+    (Packs), so the cost follows what changed."""
+    t0 = time.perf_counter()
     o = state_object(doc)
     scan_points = lambda s: s is st.get("scan") and getattr(s, "on_pose", None) is not None and doc.getObject(getattr(s, "object", "") or "") is not None  # noqa: E731
-    data, dropped = encode(st, scan_points)
+    rec = _kept_for(doc)
+    data, dropped = encode(st, scan_points, rec["packs"])
     folder = tempfile.mkdtemp(prefix="scanruler-state-")
     path = os.path.join(folder, "scanruler-state.zip")
     with open(path, "wb") as f:
         f.write(data)
     try:
         o.State = path  # FreeCAD copies it into the document's own folder
+    except Exception:
+        rec["packs"].used.clear()  # not written: what was kept before still stands for the file there
+        rec["packs"].packed_again = 0
+        raise
     finally:
         shutil.rmtree(folder, ignore_errors=True)
     o.Revision = int(o.Revision or 0) + 1
+    arrays, again = rec["packs"].keep_used()
+    rec["last"] = {"bytes": len(data), "ms": int(round((time.perf_counter() - t0) * 1000)), "arrays": arrays, "packedAgain": again}
     return dropped
 
 

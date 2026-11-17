@@ -238,6 +238,7 @@ class Dock:
         self.timer.timeout.connect(self.tick)
         self.timer.start()
         C.set_ui(self.handle)
+        install_shortcut(lambda: self.handle("snapshot"))
         _dock["live"] = self
         self.refresh(force=True)
 
@@ -339,6 +340,15 @@ class Dock:
             self.refresh(force=True)
 
     def handle(self, key, *args):
+        if key == "snapshot":
+            # The camera key (ScanRuler_Snapshot: the view bar's camera and
+            # the View menu's Snapshot) and Alt+Shift+S: the shot is taken
+            # here. Until 16 Nov 2026 nothing took it — the key only reached
+            # ui_action, which noted it as a group to open — so no shot was
+            # ever kept and scan_snapshot_latest could only say there was none.
+            self.error = snapshot_key(self.current)
+            self.refresh(force=True)
+            return True
         self.current, self.ui = ui_action(key, args, self.ui, self.current)
         if key.startswith("reverse:"):
             kind = key.split(":", 1)[1]
@@ -350,6 +360,50 @@ class Dock:
                 self.error = why  # in the panel's header until the next press
         self.refresh(force=True)
         return True
+
+
+def snapshot_key(workspace=None, take=None):
+    """The camera key's press: one frame of FreeCAD's window kept as a shot
+    with the workspace it was taken in, and its card opened for the note and
+    the marks (snapshot/card.take_shot; scan_snapshot_list and
+    scan_snapshot_latest then give it to the agent, and Agent Link's next
+    answer carries the notice of it). None, or why no shot could be taken,
+    for the panel's header."""
+    try:
+        if take is None:
+            from .snapshot import card
+
+            take = card.take_shot
+        take(workspace=workspace)
+        return None
+    except Exception as e:  # noqa: BLE001 — a key never raises into FreeCAD's command loop
+        return f"The screenshot could not be taken ({type(e).__name__}: {e})."
+
+
+# The Alt+Shift+S shortcut on FreeCAD's window, kept so Qt does not let it
+# go, and the press it stands for: the newest dock's.
+_shortcut = {"key": None, "press": None}
+
+
+def install_shortcut(press, install=None):
+    """Alt+Shift+S on FreeCAD's main window presses the camera key (the
+    tools' descriptions and the key's tip name it; until 16 Nov 2026 it was
+    never installed). Once a window: a dock made again (ScanRuler's own, or
+    its tab under Agent Link) only takes the press over. True when the
+    shortcut is there."""
+    _shortcut["press"] = press
+    if _shortcut["key"] is not None:
+        return True
+    try:
+        if install is None:
+            from .snapshot import card
+
+            install = card.install
+        _shortcut["key"] = install(press=lambda: _shortcut["press"] and _shortcut["press"]())
+    except Exception as e:  # noqa: BLE001 — no window, or a Qt without the shortcut: the camera key still works
+        C._say(f"ScanRuler: the screenshot shortcut could not be set ({type(e).__name__}: {e}); the camera key takes the shot.", warn=True)
+        _shortcut["key"] = None
+    return _shortcut["key"] is not None
 
 
 SPLIT_WORKSPACE = "deviation"

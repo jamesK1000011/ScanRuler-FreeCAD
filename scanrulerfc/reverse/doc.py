@@ -180,11 +180,60 @@ def restored_build(obj):
     b.built = True
     ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
     b.step_files = step_texts(obj)
+    b.inputs = b.memory_inputs = _inputs(obj)
     try:
         b.restored_results = build_part(part_of(obj.PartJson), b, ctx)["results"]
     except Exception:  # noqa: BLE001 — unreadable: the next edit says why
         b.restored_results = []
     return b.restored_results
+
+
+def current_build(obj):
+    """The build of a container whose part is no longer the one its last
+    build was made from, made again in memory without writing the
+    document; the build's results, or None when the build stands.
+
+    An undo or a redo puts another PartJson (and the bodies) back, and the
+    builder — which lives in memory, outside FreeCAD's undo — still holds
+    the build of the part as it was before: until the container is
+    recomputed, every read (reverse_body_names, reverse_feature_list's
+    results, a body's own shape when a recompute reaches it before its
+    container) would answer from the other part. Agent Link's history_undo
+    recomputes straight after, so its reads were right already; Edit › Undo
+    in the window does not. Inside an edit nothing is built here: the
+    edit's own build follows (_SETTLED). A builder that keeps no record of
+    what it was built from (a stand-in) is left alone."""
+    b = builder_of(obj)
+    was = getattr(b, "inputs", None)
+    if was is None:
+        return None
+    try:
+        key = _key(obj)
+    except Exception:  # noqa: BLE001 — not a document object
+        return None
+    now = _inputs(obj)
+    if key in _SETTLED or now == was:
+        return None
+    ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
+    b.step_files = step_texts(obj)
+    b.inputs = b.memory_inputs = now
+    try:
+        b.restored_results = build_part(part_of(obj.PartJson), b, ctx)["results"]
+    except Exception:  # noqa: BLE001 — unreadable: the container's own recompute says why
+        b.restored_results = []
+    return b.restored_results
+
+
+def results_of(obj):
+    """What the last build said of each feature: the container's Results,
+    or the in-memory build's where that is the newer one (a document just
+    opened, whose Results are transient; a part an undo put back and no
+    recompute has built yet)."""
+    b = builder_of(obj)
+    memory = getattr(b, "restored_results", None)
+    if memory is not None and getattr(b, "memory_inputs", None) == _inputs(obj):
+        return memory
+    return json.loads(obj.Results) if obj.Results else (memory or [])
 
 
 class Container:
@@ -241,6 +290,10 @@ class Container:
         ctx = CONTEXT["of"](obj.Document) if CONTEXT["of"] else None
         builder_of(obj).step_files = step_texts(obj)
         builder_of(obj).built = True
+        # What this build is made from, for current_build: the builder
+        # outlives an undo, the part does not. From here on the document's
+        # own Results are the newest (results_of).
+        builder_of(obj).inputs, builder_of(obj).memory_inputs = _inputs(obj), None
         out = build_part(part, builder_of(obj), ctx)
         obj.Results = json.dumps(out["results"])
         obj.Status = status_of(out["results"])
@@ -299,6 +352,11 @@ class Body:
             # the file held, and nothing would put it back until the next
             # edit. restored_build builds once, in memory, writing nothing.
             restored_build(src)
+            # And a part that is no longer the one last built (an undo or
+            # a redo put it back): the body runs before its container here
+            # too, and would take its shape — or none — from the other
+            # part's build.
+            current_build(src)
         shape = builder_of(src).body(obj.BodyId) if src else None
         obj.Shape = shape.copy() if shape is not None else Part.Shape()
 

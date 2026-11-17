@@ -364,6 +364,117 @@ class Reopened(unittest.TestCase):
         self.assertEqual(c.Results, "")
 
 
+class AfterAnUndo(unittest.TestCase):
+    """An undo or a redo puts PartJson and the bodies back; the builder
+    lives in memory, outside FreeCAD's undo, and still holds the build of
+    the part as it was. Agent Link's history_undo recomputes straight
+    after (the container builds again); Edit › Undo in the window does
+    not, and in a recompute a body runs before its container. Either way
+    what is read is the build of the part the document holds now.
+    (Run 2: history_undo after reverse_feature_clear was never read back.)
+    A real kernel is stood in for; the undo is the PartJson put back."""
+
+    def setUp(self):
+        from unittest import mock
+
+        from scanrulerfc.reverse.handlers import DocStore
+
+        self.doc = FakeDocument()
+        self.c = c = FakeObject(self.doc, D.CONTAINER)
+        self.doc.Objects.append(c)
+        for name in ("PartJson", "Results", "StepFiles"):
+            c.addProperty("App::PropertyString", name, mode=24)
+        self.four = dumps(part([*cube_features(), *cube_features(side=5, at=20, sid=3, eid=4)]))
+        c.PartJson, c.Results, c.StepFiles = self.four, "", ""
+        self.builds = []
+        real = D.build_part
+
+        def counted(p, builder, ctx=None):
+            self.builds.append(len(p["features"]))
+            return real(p, builder, ctx)
+
+        builders = {}
+        for pt in (mock.patch.object(D, "builder_of", lambda o: builders.setdefault(o.Name, Builder(FakeKernel()))),
+                   mock.patch.object(D, "CONTEXT", {"of": None}), mock.patch.object(D, "build_part", counted)):
+            pt.start()
+            self.addCleanup(pt.stop)
+        self.store = DocStore(type("S", (), {"doc": self.doc})())
+        self.assertEqual([b["id"] for b in self.store.builder.briefs()], [2, 4])  # the part as opened, built once
+        self.assertEqual(self.builds, [4])
+
+    def clear_as_an_edit_leaves_it(self):
+        """reverse_feature_clear: the container built from the empty part
+        (what Container.execute does: its record and its Results)."""
+        c, b = self.c, D.builder_of(self.c)
+        c.PartJson = dumps(D.empty_part())
+        b.inputs, b.memory_inputs = D._inputs(c), None
+        c.Results = json.dumps(D.build_part(D.part_of(c.PartJson), b)["results"])
+        self.builds.clear()
+
+    def test_the_part_an_undo_put_back_is_built_before_it_is_read(self):
+        self.clear_as_an_edit_leaves_it()
+        self.assertEqual(self.store.last()["bodies"], [])
+        self.assertEqual(self.builds, [])  # the build stands: nothing built for a read
+        self.c.PartJson = self.four        # the undo: FreeCAD puts the property back, and recomputes nothing
+        results_before = self.c.Results
+        last = self.store.last()
+        self.assertEqual([b["id"] for b in last["bodies"]], [2, 4])
+        self.assertEqual([r["status"] for r in last["results"]], ["ok", "ok"])  # the build's, not the cleared part's "[]"
+        self.assertEqual([b["id"] for b in self.store.builder.briefs()], [2, 4])
+        self.assertEqual(self.builds, [4])  # once, however many reads follow
+        self.assertEqual(self.c.Results, results_before)  # in memory: the document is not written
+        # the redo: the empty part back, and read as empty
+        self.c.PartJson = dumps(D.empty_part())
+        self.assertEqual(self.store.last()["bodies"], [])
+        self.assertEqual(self.store.last()["results"], [])
+
+    def test_a_body_that_runs_before_its_container_takes_the_new_parts_shape(self):
+        from unittest import mock
+
+        self.clear_as_an_edit_leaves_it()
+        self.c.PartJson = self.four  # the undo
+        part_mod = type(sys)("Part")
+        part_mod.Shape = lambda: "empty"
+        body = type("Obj", (), {"BodyId": 2.0, "Shape": None})()
+        self.assertIsNone(D.builder_of(self.c).body(2.0))  # the builder still holds the cleared part's build
+        with mock.patch.dict(sys.modules, {"Part": part_mod}), mock.patch.object(D, "container_of", lambda o: self.c):
+            built = []
+            real = D.current_build
+            with mock.patch.object(D, "current_build", lambda c: built.append(real(c))):
+                shape_cls = None
+                try:
+                    D.Body.execute(None, body)
+                except AttributeError:  # the stand-in kernel's shape has no copy(): the body did get a shape
+                    shape_cls = type(D.builder_of(self.c).body(2.0))
+        self.assertEqual(len(built), 1)
+        self.assertIsNotNone(D.builder_of(self.c).body(2.0))  # before: none, and the body emptied itself
+        self.assertTrue(shape_cls is not None or body.Shape != "empty")
+        self.assertEqual(self.builds, [4])
+
+    def test_inside_an_edit_nothing_is_built_ahead_of_the_edits_own_build(self):
+        self.clear_as_an_edit_leaves_it()
+        self.c.PartJson = self.four
+        D._SETTLED[D._key(self.c)] = None  # an edit under way
+        try:
+            self.assertIsNone(D.current_build(self.c))
+            self.assertEqual(self.builds, [])
+        finally:
+            D._SETTLED.pop(D._key(self.c), None)
+        self.assertEqual([r["status"] for r in D.current_build(self.c)], ["ok", "ok"])
+        self.assertIsNone(D.current_build(self.c))  # and it stands
+
+    def test_once_the_container_recomputes_its_own_results_are_the_ones_read(self):
+        self.clear_as_an_edit_leaves_it()
+        self.c.PartJson = self.four
+        self.store.last()  # built in memory
+        b = D.builder_of(self.c)
+        self.assertEqual(b.memory_inputs, D._inputs(self.c))
+        # Container.execute's record and write, as after Agent Link's recompute
+        b.inputs, b.memory_inputs = D._inputs(self.c), None
+        self.c.Results = json.dumps([{"id": 2, "status": "failed", "message": "from the document"}])
+        self.assertEqual(D.results_of(self.c)[0]["message"], "from the document")
+
+
 @unittest.skipUnless(HAVE_FC, "needs FreeCAD")
 class InADocument(unittest.TestCase):
     def setUp(self):
@@ -506,6 +617,38 @@ class HardenedInADocument(unittest.TestCase):
             doc.recompute()
             self.assertAlmostEqual(D.bodies_of(c)[0].Shape.Volume, 1000, 3)
             self.assertAlmostEqual(c.Shape.Volume, 1000, 3)
+        finally:
+            D.forget(c)
+            FreeCAD.closeDocument(doc.Name)
+
+    def test_a_clear_undone_has_its_bodies_back_with_their_shapes(self):
+        # Run 2's unread step: reverse_feature_clear, then history_undo
+        # (Agent Link: undo, then a document recompute) — and Edit › Undo,
+        # which recomputes nothing. Written without a FreeCAD to run it on.
+        doc = FreeCAD.newDocument("ReverseClearUndo")
+        try:
+            doc.UndoMode = 1
+            c = D.make_container(doc)
+            doc.recompute()
+            D.edit(c, "add", "Cubes", lambda p: {**p, "features": [*cube_features(), *cube_features(side=5, at=20, sid=3, eid=4)], "nextFeatureId": 5})
+            self.assertEqual(sorted(round(b.Shape.Volume, 3) for b in D.bodies_of(c)), [125.0, 1000.0])
+            D.edit(c, "clear", None, lambda p: D.empty_part())
+            self.assertEqual((D.bodies_of(c), D.builder_of(c).briefs()), ([], []))
+            self.assertEqual(doc.UndoNames[0], "Reverse: clear")
+            doc.undo()  # as Edit › Undo: no recompute yet
+            self.assertEqual(len(D.part_of(c.PartJson)["features"]), 4)
+            self.assertEqual(sorted(round(b.Shape.Volume, 3) for b in D.bodies_of(c)), [125.0, 1000.0])  # the objects are back as they were
+            self.assertIsNotNone(D.current_build(c))  # the builder still held the cleared part
+            self.assertEqual(sorted(b["id"] for b in D.builder_of(c).briefs()), [2, 4])
+            for o in doc.Objects:
+                o.touch()  # the worst order: every body runs before its container
+            doc.recompute()
+            self.assertEqual(sorted(round(b.Shape.Volume, 3) for b in D.bodies_of(c)), [125.0, 1000.0])
+            self.assertAlmostEqual(c.Shape.Volume, 1125.0, 3)
+            self.assertEqual([o.Name for o in doc.Objects if "Touched" in o.State], [])
+            doc.redo()
+            doc.recompute()
+            self.assertEqual((D.bodies_of(c), D.builder_of(c).briefs()), ([], []))
         finally:
             D.forget(c)
             FreeCAD.closeDocument(doc.Name)

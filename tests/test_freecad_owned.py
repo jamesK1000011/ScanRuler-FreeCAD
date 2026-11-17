@@ -592,5 +592,297 @@ class SectionAndElements(unittest.TestCase):
         self.assertNotIn("ViewElements", C._state["view"])
 
 
+class WhatAWriteCosts(unittest.TestCase):
+    """Found live (run 2): once the scan had 219,600 triangles every call
+    that changed the state took 1.2 to 1.6 s — a rename, a limit, a
+    dimension removed — because the whole state was compressed again and
+    copied into the document each time. A write now follows what changed:
+    an array as it was at the last write goes in from its packed bytes."""
+
+    def state(self):
+        sc = box_scan()
+        return {"scan": sc, "elements": [{"id": 1, "name": "Top", "region": np.arange(500, dtype=np.int64)}],
+                "deviation": {"values": np.linspace(0.0, 1.0, 4000)}}
+
+    def packed(self, st, packs):
+        """(bytes, how often an array was compressed) for one encode."""
+        import unittest.mock
+
+        with unittest.mock.patch.object(D, "pack_array", wraps=D.pack_array) as p:
+            data, _dropped = D.encode(st, packs=packs)
+        return data, p.call_count
+
+    def test_an_unchanged_array_is_not_packed_again(self):
+        st, packs = self.state(), D.Packs()
+        _data, n = self.packed(st, packs)
+        # the scan's R, t, F and V0, the region and the readings
+        self.assertEqual((n, packs.keep_used()), (6, (6, 6)))
+        st["elements"][0]["name"] = "Lid"  # what a rename changes: no array
+        data, n = self.packed(st, packs)
+        self.assertEqual((n, packs.keep_used()), (0, (6, 0)))
+        got, _notes = D.decode(data)  # and the bytes written are the whole state all the same
+        self.assertEqual(got["elements"][0]["name"], "Lid")
+        np.testing.assert_array_equal(got["elements"][0]["region"], st["elements"][0]["region"])
+        np.testing.assert_allclose(got["deviation"]["values"], st["deviation"]["values"])
+        np.testing.assert_allclose(got["scan"].V, st["scan"].V)
+        np.testing.assert_array_equal(got["scan"].F, st["scan"].F)
+
+    def test_only_what_changed_is_packed_and_a_change_in_place_counts(self):
+        st, packs = self.state(), D.Packs()
+        self.packed(st, packs)
+        packs.keep_used()
+        st["deviation"]["values"][7] = 99.0  # the same array object, another content
+        data, n = self.packed(st, packs)
+        self.assertEqual((n, packs.keep_used()), (1, (6, 1)))
+        self.assertEqual(D.decode(data)[0]["deviation"]["values"][7], 99.0)
+        st["deviation"]["values"] = st["deviation"]["values"].copy()  # another object, the same content
+        _data, n = self.packed(st, packs)
+        self.assertEqual(n, 0)
+
+    def test_only_the_last_writes_arrays_are_kept(self):
+        st, packs = self.state(), D.Packs()
+        self.packed(st, packs)
+        packs.keep_used()
+        self.assertEqual(len(packs.kept), 6)
+        del st["deviation"]
+        st["elements"] = []
+        self.packed(st, packs)
+        packs.keep_used()
+        self.assertEqual(len(packs.kept), 4)  # the scan's own: nothing of what the state let go
+
+    def test_the_earlier_format_is_still_read(self):
+        # Format 1 (state.json and numpy's arrays.npz), as every document
+        # saved before 16 Nov 2026 holds it.
+        import io
+        import json
+        import zipfile
+
+        st = self.state()
+        e = D._Enc()
+        body = e.value(st, "state")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("state.json", json.dumps({"format": 1, "state": body, "dropped": []}))
+            arr = io.BytesIO()
+            np.savez_compressed(arr, **e.arrays)
+            z.writestr("arrays.npz", arr.getvalue())
+        got, notes = D.decode(buf.getvalue())
+        self.assertEqual(notes, {"dropped": [], "missing": []})
+        np.testing.assert_allclose(got["scan"].V, st["scan"].V)
+        np.testing.assert_array_equal(got["elements"][0]["region"], st["elements"][0]["region"])
+
+    def test_a_newer_format_says_what_to_do(self):
+        import io
+        import json
+        import zipfile
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("state.json", json.dumps({"format": D.FORMAT + 1, "state": {}}))
+        with self.assertRaises(ValueError) as cm:
+            D.decode(buf.getvalue())
+        self.assertIn("update the add-on", str(cm.exception))
+
+    def test_an_array_of_objects_is_left_out_and_said(self):
+        # It could only be pickled, and nothing is unpickled on the way
+        # back: one such array used to make the whole state unreadable.
+        st = {"scan": None, "elements": [], "odd": np.array([{"a": 1}, None], dtype=object), "fine": np.arange(3)}
+        data, dropped = D.encode(st)
+        self.assertEqual(dropped, ["state.odd (an array of objects)"])
+        got, notes = D.decode(data)
+        self.assertNotIn("odd", got)
+        np.testing.assert_array_equal(got["fine"], [0, 1, 2])
+
+    def test_in_a_document_a_rename_packs_nothing_and_scan_info_says_so(self):
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        D._SIGS.clear()
+        D._KEPT.clear()
+        doc = fakedoc.Doc("Dense")
+        ctx = runner.Context(doc=doc, out_dir=tempfile.mkdtemp())
+        run = runner.local(ctx=ctx)
+        self.assertIsNone(D.last_write(doc))
+        S.state(ctx)["scan"] = box_scan()
+        ok, out = run("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+        self.assertTrue(ok, out)
+        first = D.last_write(doc)
+        self.assertGreater(first["packedAgain"], 0)
+        self.assertEqual(first["bytes"], os.path.getsize(D.find_state(doc).State))
+        ok, out = run("element_rename", {"element": "Top", "name": "Lid"})
+        self.assertTrue(ok, out)
+        ok, out = run("scan_info", {})
+        self.assertTrue(ok, out)
+        kept = out["kept"]
+        self.assertEqual((kept["packedAgain"], kept["arrays"]), (0, first["arrays"]))
+        self.assertEqual(set(kept), {"bytes", "ms", "arrays", "packedAgain"})
+        # what the document holds reads back whole in a new session
+        st = S.state(runner.Context(doc=doc))
+        self.assertEqual([e["name"] for e in st["elements"]], ["Lid"])
+        np.testing.assert_allclose(st["scan"].V, S.state(ctx)["scan"].V, atol=1e-9)
+        # another document has its own record, and none before its first write
+        other = fakedoc.Doc("Other")
+        self.assertIsNone(D.last_write(other))
+        ctx.doc = other
+        ok, out = run("scan_info", {})
+        self.assertNotIn("kept", out)
+
+    def test_a_write_that_fails_keeps_what_the_file_there_was_packed_from(self):
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        D._KEPT.clear()
+        doc = fakedoc.Doc("Dense")
+        st = self.state()
+        D.write(doc, st)
+        before = dict(D._KEPT["Dense"]["packs"].kept)
+        o = D.find_state(doc)
+
+        class Refuses(type(o)):
+            def __setattr__(self, name, value):
+                if name == "State":
+                    raise OSError("no room")
+                super().__setattr__(name, value)
+
+        object.__setattr__(o, "__class__", Refuses)  # the property refuses the next file
+        st["deviation"]["values"] = st["deviation"]["values"] + 1.0
+        with self.assertRaises(OSError):
+            D.write(doc, st)
+        self.assertEqual(D._KEPT["Dense"]["packs"].kept, before)
+        self.assertEqual(D._KEPT["Dense"]["packs"].used, {})
+
+
+class BesideAgentLinksOwnKeeping(unittest.TestCase):
+    """Agent Link keeps every family's state per document too
+    (agentlink/docstates.py, since 16 Nov 2026). ScanRuler settles its own
+    (scanstate.settle) and says so; the two must not both set the state
+    aside, and a document reopened from a copy must get the state that
+    copy holds. Runs where Agent Link is importable."""
+
+    def setUp(self):
+        try:
+            from agentlink import docstates, hooks
+        except Exception:  # noqa: BLE001
+            self.skipTest("Agent Link is not on the path")
+        if not hasattr(hooks, "own_document_state"):
+            self.skipTest("an Agent Link from before it kept state per document")
+        self.docstates, self.hooks = docstates, hooks
+        self.fc = fakedoc.installed()
+        self.app = self.fc.__enter__()
+        self.addCleanup(self.fc.__exit__, None, None, None)
+        self.open = {}
+        self.app.listDocuments = lambda: dict(self.open)
+        was, own = docstates.open_documents, set(docstates.OWN)
+        docstates.open_documents = lambda: dict(self.open)
+        self.addCleanup(setattr, docstates, "open_documents", was)
+        self.addCleanup(lambda: (docstates.OWN.clear(), docstates.OWN.update(own)))
+        D._SIGS.clear()
+        D._KEPT.clear()
+
+        class Session:
+            """A session as Agent Link's is for this: doc and family_state
+            are properties that settle its book."""
+
+            def __init__(self, doc, out):
+                self._doc, self.out_dir = doc, out
+
+            doc = property(lambda s: s._doc, lambda s, d: (setattr(s, "_doc", d), docstates.settle(s, d))[0])
+            family_state = property(lambda s: docstates.settle(s, s._doc), lambda s, v: docstates.put(s, s._doc, v))
+
+            def snapshot(self, tool):
+                pass
+
+        self.Session = Session
+
+    def new(self, name):
+        d = self.open[name] = fakedoc.Doc(name)
+        return d
+
+    def session(self, doc):
+        s = self.Session(doc, tempfile.mkdtemp())
+        return s, runner.local(ctx=s)
+
+    def test_scanruler_tells_agent_link_it_settles_its_own(self):
+        import importlib.util
+
+        src = open(os.path.join(os.path.dirname(HERE), "scanrulerfc", "agentlink_families.py"), encoding="utf-8").read()
+        self.assertIn('_hook("state per document", _own_state)', src)
+        # the call itself, as the module makes it
+        self.docstates.OWN.clear()
+        own = getattr(self.hooks, "own_document_state")
+        own(S.KEY)
+        self.assertIn("scanruler", self.docstates.OWN)
+        self.assertIsNotNone(importlib.util.find_spec("scanrulerfc.agentlink_families"))
+
+    def both_ways(self, told):
+        if told:
+            self.hooks.own_document_state(S.KEY)
+        else:
+            self.docstates.OWN.clear()  # an Agent Link that goes by the book on the session
+        a, b = self.new("Worn"), self.new("Fresh")
+        s, run = self.session(a)
+        s.family_state["safetynet"] = {"checkpoints": ["cp1"]}  # another family's, kept by Agent Link
+        S.state(s)["scan"] = box_scan()
+        ok, out = run("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+        self.assertTrue(ok, out)
+        first = S.state(s)
+        s.doc = b
+        ok, out = run("scan_info", {})
+        self.assertIsNone(out["scan"])  # the new document has no scan
+        self.assertNotIn("safetynet", s.family_state)  # nor the other family's state
+        self.assertIsNone(D.find_state(b))  # and nothing written into it
+        s.doc = a
+        self.assertIs(S.state(s), first)  # the very state back, once
+        self.assertEqual(s.family_state["safetynet"], {"checkpoints": ["cp1"]})
+        # set aside by one of them only: Agent Link's parked dicts never hold ScanRuler's key
+        book = s.__dict__["_agentlink_document_states"]
+        self.assertTrue(all(S.KEY not in st for _d, st in book["parked"].values()))
+        s.doc = b
+        s.doc = a  # there and back with no ScanRuler call in between
+        self.assertIs(S.state(s), first)
+
+    def test_one_of_them_sets_the_state_aside_when_told(self):
+        self.both_ways(True)
+
+    def test_and_when_agent_link_goes_by_the_book_on_the_session(self):
+        self.both_ways(False)
+
+    def test_a_document_reopened_from_a_copy_gets_the_state_that_copy_holds(self):
+        # A checkpoint restored from its saved copy (Workshop's SafetyNet:
+        # close, open the copy under the same name, put the kept
+        # family_state back). The kept dict still holds ScanRuler's state
+        # as it was after the later calls; the copy holds the earlier one.
+        self.hooks.own_document_state(S.KEY)
+        a = self.new("Worn")
+        s, run = self.session(a)
+        S.state(s)["scan"] = box_scan()
+        ok, out = run("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+        self.assertTrue(ok, out)
+        # the copy: a document holding what a's file held at this moment
+        copy = fakedoc.Doc("Worn")
+        for o in a.Objects:
+            c = copy.addObject(o.TypeId, o.Name)
+            for k, v in o.__dict__.items():
+                if k not in ("Document", "TypeId", "Name", "ViewObject", "_files"):
+                    c.__dict__[k] = v
+            c._files.update(o._files)
+        state_file = D.find_state(a).State
+        kept_bytes = open(state_file, "rb").read()
+        keep = os.path.join(tempfile.mkdtemp(), "scanruler-state.zip")
+        with open(keep, "wb") as f:
+            f.write(kept_bytes)
+        D.find_state(copy).__dict__["State"] = keep
+        ok, out = run("element_rename", {"element": "Top", "name": "Later"})  # after the checkpoint
+        self.assertTrue(ok, out)
+        kept = s.family_state
+        self.open["Worn"] = copy  # closed, and the copy opened under its name
+        s.doc = copy
+        s.family_state = kept
+        ok, out = run("element_list", {})
+        self.assertTrue(ok, out)
+        self.assertEqual([e["name"] for e in out["elements"]], ["Top"])  # the copy's state, not the later one
+        self.assertEqual(open(D.find_state(copy).State, "rb").read(), kept_bytes)  # and nothing later written over it
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -682,7 +682,7 @@
     "section": "Mid",
     "brief": true
    },
-   "expect": "chain 0: 4 lines with world ends at the corners (0,0,10) (60,0,10) (60,40,10) (0,40,10); chain 1: one arc, radius 5.99–6.00, world centre [20, 20, 10]; sketch.add [30, 20]"
+   "expect": "chain 0: 4 lines with world ends at the corners (0,0,10) (60,0,10) (60,40,10) (0,40,10); chain 1: one arc, radius 5.99–6.00, world centre [20, 20, 10]; sketch.add [30, 20] Since run 2: each chain's scatter is what was measured on it — 0.0 on these exact cuts — with scatterFloor beside it (5 % of the point spacing: 0.0469 for the outline's 0.9375 mm spacing; run 2 gave that floor as the scatter); tolerance as before (0.6 of the spacing: 0.5625)."
   },
   {
    "tool": "section_cut",
@@ -1293,7 +1293,7 @@
   {
    "tool": "scan_snapshot_latest",
    "arguments": {},
-   "expect": "REFUSED not_found: no screenshot yet, ask the person to press the camera key — or the newest shot as a picture"
+   "expect": "REFUSED not_found: no screenshot yet, ask the person to press the camera key — or the newest shot as a picture (Refused is right here: no shot has been taken yet. Calls 139 to 143 take one and read it.)"
   },
   {
    "tool": "scan_snapshot_wait",
@@ -1301,6 +1301,175 @@
     "timeout": 30
    },
    "expect": "at once (under a second): came false, waited 0, and next naming job_start { tool: \"scan_snapshot_wait\", …, wait: false } — the window is not held"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "the WornScan summary (219,600 triangles on the Mac), elements and dimensions as they stand, and — new — kept { bytes, ms, arrays, packedAgain }: the last write of ScanRuler's state into the document. bytes a few MB (3.9 MB in run 2)"
+  },
+  {
+   "tool": "element_rename",
+   "arguments": {
+    "element": "Mirror",
+    "name": "MirrorPlane"
+   },
+   "expect": "element named MirrorPlane. ITS ms IS THE CHECK: in run 2 every such call took 1,200 to 1,600 ms on this scan (the whole state compressed again each time; 620 → 64 ms on a comparable state where it was tried off the Mac); expect well under 300 ms, most of it Agent Link's own (inside a batch the row's around says where)"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "kept.packedAgain 0 (a rename changes no array), kept.arrays as before, kept.ms a few tens at most; a kept.ms over 200 or packedAgain over 3 here is a finding"
+  },
+  {
+   "tool": "dimension_set_limit",
+   "arguments": {
+    "dimension": "Height",
+    "limit": {
+     "kind": "band",
+     "nominal": 20,
+     "plus": 0.2,
+     "minus": 0.2
+    }
+   },
+   "expect": "verdict.pass true; ms as the rename's, not 1,500"
+  },
+  {
+   "tool": "doc_new",
+   "arguments": {
+    "name": "ScanNoiseModel"
+   },
+   "expect": "a new empty document; the measure document stays open"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "scan: null and a note (no scan open HERE: before run 2's fix the other document's WornScan was still open in the new one); no kept"
+  },
+  {
+   "tool": "flat_edges",
+   "arguments": {},
+   "expect": "REFUSED invalid_state: nothing is on the 2D sheet (before the fix it listed the measure document's section)"
+  },
+  {
+   "tool": "part_primitive",
+   "arguments": {
+    "kind": "sphere",
+    "radius": 15,
+    "at": [
+     0,
+     0,
+     0
+    ],
+    "name": "Ball"
+   },
+   "expect": "volume 14137.17 (4/3 π 15³); box [30, 30, 30]"
+  },
+  {
+   "tool": "meshobj_from_shape",
+   "arguments": {
+    "body": "Ball",
+    "method": "standard",
+    "deflection": 0.05,
+    "angle": 15,
+    "name": "BallScan"
+   },
+   "expect": "a closed mesh, a few thousand facets, volume a little under 14137, box about [30, 30, 30]"
+  },
+  {
+   "tool": "scan_open",
+   "arguments": {
+    "object": "BallScan"
+   },
+   "expect": "ACCEPTED with no discard (this document has no scan: before the fix it was refused 'WornScan is open with 9 elements…'): opened { box.size about [30, 30, 30], centre about [0, 0, 0] }"
+  },
+  {
+   "tool": "scan_noise",
+   "arguments": {},
+   "expect": "either REFUSED invalid_input (BallScan is a CAD tessellation: half or more of its vertices sit between exactly coplanar triangles — what a UV-gridded sphere gives) or, if FreeCAD's mesher left fewer than half that way, a reading already (sigmaMm 0.05 to 0.4: the sag between the mesh's own vertices). Both are right; the next three calls make a surface it certainly reads"
+  },
+  {
+   "tool": "mesh_densify",
+   "arguments": {
+    "maxEdge": 1
+   },
+   "expect": "edit densify: 15,000 to 25,000 triangles, none with an edge over 1 mm; volume unchanged"
+  },
+  {
+   "tool": "mesh_smooth",
+   "arguments": {},
+   "expect": "edit smooth: report { settings { size about 2, limit 0.1 or 0.05, keepEdges true }, moved = every vertex, maxMove 0.01 to 0.06, atLimit 0 }; mesh.open 0; volume within 0.5 % of before (each point moved onto a quadric fitted round it: the facets' corners are no longer coplanar). A few seconds"
+  },
+  {
+   "tool": "mesh_use_edited",
+   "arguments": {},
+   "expect": "the smoothed mesh becomes the scan: triangles as mesh_densify answered"
+  },
+  {
+   "tool": "scan_noise",
+   "arguments": {},
+   "expect": "ACCEPTED (run 2 only ever saw this tool refuse): sigmaMm 0.015 to 0.04 (0.0238 to 0.0252 on three numpy-built spheres off the Mac — on a sphere this is its own curvature across two rings of neighbours, not a scanner's noise: the point is that it answers), p90 a little above it, spacingMm 0.5 to 0.7, sampled 4,000 to 5,000, plan { sigmaMm = the reading, source 'measured', from 'measured on this scan', finestMm three times it, warning: no scanner is set }, next naming scanner add"
+  },
+  {
+   "tool": "scan_qa",
+   "arguments": {},
+   "expect": "noise.median equals scan_noise's sigmaMm and no tessellation block (not a CAD tessellation any more); rims.count 0; thickness p95 about 29 to 30. May answer through a job (heavy)"
+  },
+  {
+   "tool": "doc_save",
+   "arguments": {
+    "path": "scan-noise-model"
+   },
+   "expect": "path …/scan-noise-model.FCStd; bytes well under 2 MB — the sphere, its meshes and this document's own ScanRuler state only (before the fix the measure document's 3.9 MB state was written into every other document's file)"
+  },
+  {
+   "tool": "doc_switch",
+   "arguments": {
+    "document": "ScanMeasureModel"
+   },
+   "expect": "back in the measure document (document: its internal name; if two open documents carry this label — a run started without a fresh FreeCAD — give the internal name doc_new answered at call 0)"
+  },
+  {
+   "tool": "scan_info",
+   "arguments": {},
+   "expect": "the WornScan again with its elements (MirrorPlane among them) and dimensions: each document kept its own state; kept present"
+  },
+  {
+   "tool": "workbench",
+   "arguments": {
+    "activate": "ScanRulerWorkbench"
+   },
+   "expect": "active ScanRulerWorkbench (its commands exist from now on)"
+  },
+  {
+   "tool": "cmd_run",
+   "arguments": {
+    "name": "ScanRuler_Snapshot"
+   },
+   "expect": "ran true: the camera key pressed as its button would be — one frame of FreeCAD's window kept as a shot and a small non-modal 'Screenshot' card opened beside the window (it may be left open, or closed by hand). NEW ON THIS PASS AND UNPROVEN: until now the key took no shot at all (nothing was wired to it). If scan_snapshot_list below is still empty, read the Report view and the ScanRuler panel's header for 'The screenshot could not be taken'. This answer, or the next call's, may carry notice: a new screenshot"
+  },
+  {
+   "tool": "scan_snapshot_list",
+   "arguments": {},
+   "expect": "shots: one — { index 0, id, at (now), workspace (the ScanRuler workspace in front), note null, width and height of the FreeCAD window in pixels, marks 0, pins [] }"
+  },
+  {
+   "tool": "scan_snapshot_latest",
+   "arguments": {},
+   "expect": "ACCEPTED (run 2 only ever saw this tool refuse): the picture of the FreeCAD window itself, and index 0, id, at, workspace, note null, width, height, marks 0, pins [], of 1, picture 'as taken' (no marks were drawn), file (a .png name)"
+  },
+  {
+   "tool": "scan_snapshot_latest",
+   "arguments": {
+    "original": true
+   },
+   "expect": "the same shot, picture 'as taken'"
+  },
+  {
+   "tool": "scan_snapshot_latest",
+   "arguments": {
+    "index": 3
+   },
+   "expect": "REFUSED not_found: There is 1 screenshot: index 0 to 0."
   }
  ],
  "notCovered": [
@@ -1311,8 +1480,9 @@
   "scan_noise's reading, scan_thread's match, a non-zero draft, a rotational pattern count, sheet / rims in scan_qa: a noise-free prismatic block has none of them — they need a real scan (the add-on's plain-Python tests cover them on synthetic noisy meshes)",
   "element_fit kinds sphere, cone, torus, circle, point and knownDiameter; element_construct's other methods; dimension types on spheres and loc-coaxiality: no such feature on the block (covered by tests/test_fits.py, test_measuring_core.py)",
   "fit_scan_export { what: \"stl\" | \"ini\" } and a non-zero printer error: the scan is the CAD itself, so every correction is zero",
-  "scan_snapshot_latest with a shot, scan_snapshot_wait as a job: only the person's camera key (Alt+Shift+S) makes a shot",
   "manual_plan export / import, pack_setup files and upstream entries, scanner export / import, fit_scan_setup keymap: plain file round trips, covered by the plain-Python tests",
-  "The worker-thread hand-over (docstate.on_gui_thread): proven only on stand-ins; live, run deviation_align as a job (job_start { tool: \"deviation_align\", arguments: { mode: \"auto\" }, wait: false }) and watch that FreeCAD stays up and the scan object's Placement has followed once job_status says done"
+  "The worker-thread hand-over (docstate.on_gui_thread): proven only on stand-ins; live, run deviation_align as a job (job_start { tool: \"deviation_align\", arguments: { mode: \"auto\" }, wait: false }) and watch that FreeCAD stays up and the scan object's Placement has followed once job_status says done",
+  "a screenshot with the person's marks, pins and note, and scan_snapshot_wait as a job: only the person draws on a shot (the mark-up view). The shot itself is taken at call 139 through Agent Link's cmd_run pressing the camera key; Alt+Shift+S pressed by hand is the same press (the shortcut is installed on this pass, unproven)",
+  "scan_noise on a real scan: calls 129 to 133 make a surface it reads (a meshed sphere, densified and smoothed) — its figure there is the sphere's curvature, not a scanner's noise; a real noisy scan is covered by the plain-Python tests on synthetic meshes"
  ]
 }

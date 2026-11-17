@@ -579,6 +579,38 @@
    "tool": "mesh_inspect",
    "arguments": {},
    "expect": "as at the start: working 'scan', triangles 12, volume 24000, open 0"
+  },
+  {
+   "tool": "mesh_wrap",
+   "arguments": {
+    "gap": 4
+   },
+   "expect": "a preview again, as call 56: wrap.shells 1, triangles about 25,500 (25,548 where it was tried), volume 24000, sharpCorners 8; status says mesh_apply_wrap makes it the edited copy"
+  },
+  {
+   "tool": "mesh_apply_wrap",
+   "arguments": {},
+   "expect": "ACCEPTED (run 2 only ever saw this tool refuse): edit { text 'apply the wrap', kind 'wrap', triangles as the wrap's }; status 'The wrap is the edited copy.'; mesh { working 'edited copy', vertices about 12,800, triangles as the wrap's, bounds [0, 0, 0] to [40, 30, 20], open 0, bad 0, volume 24000 (within 1), edits ['apply the wrap'] }"
+  },
+  {
+   "tool": "mesh_parts",
+   "arguments": {},
+   "expect": "wrap null (the preview is gone); edited { triangles as the wrap's, edits ['apply the wrap'] }; undo 'apply the wrap'; scan still the 12-triangle block"
+  },
+  {
+   "tool": "mesh_apply_wrap",
+   "arguments": {},
+   "expect": "refused (invalid_state): there is no wrap — mesh_wrap makes one"
+  },
+  {
+   "tool": "mesh_undo",
+   "arguments": {},
+   "expect": "undone 'apply the wrap'; mesh.working 'scan'; triangles 12; volume 24000"
+  },
+  {
+   "tool": "mesh_inspect",
+   "arguments": {},
+   "expect": "as at the start: working 'scan', triangles 12, volume 24000, open 0"
   }
  ],
  "notCovered": [

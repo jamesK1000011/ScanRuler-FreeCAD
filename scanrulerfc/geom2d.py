@@ -360,9 +360,9 @@ def _median(v):
     return float(s[len(s) >> 1])
 
 
-def view_chain(chain):
-    """(points, closed, spacing, scatter): a loop's closing duplicate dropped,
-    the median point spacing, and the noise read off second differences."""
+def _viewed(chain):
+    """(points, closed, spacing, the noise as measured): view_chain before
+    its floor."""
     C = np.asarray(chain, dtype=float)
     n0 = len(C)
     step = max(1, n0 // SAMPLE)
@@ -387,5 +387,26 @@ def view_chain(chain):
         b = pts[i] - pts[i - 1]
         ok = L >= 1e-9
         seconds = np.abs(a[ok, 0] * b[ok, 1] - a[ok, 1] * b[ok, 0]) / L[ok]
-    scatter = max(_median(seconds) * SCATTER_FROM_MEDIAN, SCATTER_FLOOR * spacing)
-    return pts.copy(), closed, spacing, scatter
+    return pts, closed, spacing, _median(seconds) * SCATTER_FROM_MEDIAN
+
+
+def view_chain(chain):
+    """(points, closed, spacing, scatter): a loop's closing duplicate dropped,
+    the median point spacing, and the noise read off second differences —
+    never taken as less than SCATTER_FLOOR of the spacing (viewChain's
+    rule: the fits that follow work with this figure, so an exact chain
+    still has a noise to weigh a circle against). chain_scatter gives the
+    measured figure and the floor apart."""
+    pts, closed, spacing, measured = _viewed(chain)
+    return pts.copy(), closed, spacing, max(measured, SCATTER_FLOOR * spacing)
+
+
+def chain_scatter(chain):
+    """(measured, floor): a chain's own noise as read off its second
+    differences — 0 on an exact straight or evenly stepped cut — and the
+    least the fits take it as, SCATTER_FLOOR of its point spacing. What
+    view_chain hands on as the chain's scatter is the larger of the two.
+    Found live (run 2): four exact straight lines 0.9375 mm between points
+    answered "scatter 0.0469" — the floor, told as if it had been measured."""
+    _pts, _closed, spacing, measured = _viewed(chain)
+    return measured, SCATTER_FLOOR * spacing

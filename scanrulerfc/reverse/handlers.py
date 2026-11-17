@@ -142,6 +142,7 @@ class DocStore:
         if c is None:
             return None
         D.restored_build(c)
+        D.current_build(c)  # the part an undo put back, built before it is read
         return D.builder_of(c)
 
     def part(self):
@@ -169,9 +170,9 @@ class DocStore:
         if c is None:
             return {"results": [], "bodies": [], "steps": {}, "parameters": []}
         D.restored_build(c)
+        D.current_build(c)  # the part an undo put back, built before it is read
         b = D.builder_of(c)
-        results = json.loads(c.Results) if c.Results else (getattr(b, "restored_results", None) or [])
-        return {"results": results, "bodies": b.briefs(), "steps": b.last_steps, "parameters": []}
+        return {"results": D.results_of(c), "bodies": b.briefs(), "steps": b.last_steps, "parameters": []}
 
 
 # ---- references ------------------------------------------------------------------------------------

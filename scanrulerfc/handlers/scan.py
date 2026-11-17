@@ -20,6 +20,18 @@ OUTLINE_TOLERANCE, OUTLINE_CELLS, OUTLINE_LOOPS = 0.2, 250_000, 4
 HEIGHT_CELLS, HEIGHT_SIDE, HEIGHT_CELLS_FINE, HEIGHT_SIDE_FINE, HEIGHT_LEVELS = 1600, 40, 25_600, 160, 12
 
 
+def _kept(session):
+    """What the last write of ScanRuler's state into the session's document
+    cost (docstate.last_write), or None: nothing written yet, or no
+    FreeCAD document to write into."""
+    try:
+        from .. import docstate
+
+        return docstate.last_write(getattr(session, "doc", None))
+    except Exception:  # noqa: BLE001 — a reading beside the answer, never a failure of it
+        return None
+
+
 def bind(session):
     """{tool name: fn(args)} for one session (Agent Link's, or the
     add-on's own runner's context)."""
@@ -614,7 +626,11 @@ def bind(session):
         st = S.state(session)
         if st["scan"] is None:
             return {"scan": None, "note": "No scan open: scan_open { path }."}
-        return {"scan": st["scan"].summary(), "elements": len(st["elements"]), "dimensions": len(st["dimensions"])}
+        out = {"scan": st["scan"].summary(), "elements": len(st["elements"]), "dimensions": len(st["dimensions"])}
+        kept = _kept(session)
+        if kept:
+            out["kept"] = kept
+        return out
 
     def scan_nearest(a):
         st = S.state(session)

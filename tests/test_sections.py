@@ -317,5 +317,75 @@ class Tools(unittest.TestCase):
         self.assertEqual(o["error"]["code"], "not_found")
 
 
+class Scatter(unittest.TestCase):
+    """Found live (run 2, measure model call 53): section_fit answered
+    "scatter 0.0469" for a chain of four exact straight lines, its points
+    0.9375 mm apart. The figure was not measured: it is the least the fits
+    take a chain's noise as, 5 % of the point spacing (viewChain's floor;
+    0.05 x 0.9375 = 0.046875). The fits still work with it; the answer
+    gives what was measured as scatter and the floor beside it."""
+
+    def straight(self):
+        # the live chain's kind: a 60 x 40 rectangle, a point every 0.9375 mm
+        n = lambda L: int(round(L / 0.9375))  # noqa: E731
+        side = lambda a, b, k: [np.array(a) + (np.array(b) - np.array(a)) * i / k for i in range(k)]  # noqa: E731
+        c = [(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)]
+        pts = sum((side(c[i], c[(i + 1) % 4], n(60 if i % 2 == 0 else 40)) for i in range(4)), [])
+        return np.array(pts + [pts[0]])
+
+    def test_an_exact_chain_measures_no_scatter_and_the_floor_is_told_apart(self):
+        from scanrulerfc import geom2d as G
+        from scanrulerfc.handlers import sections as H
+
+        chain = self.straight()
+        measured, floor = G.chain_scatter(chain)
+        self.assertLess(measured, 1e-9)
+        self.assertAlmostEqual(floor, 0.046875, places=6)
+        # what the fits work with is as it was (a port of viewChain: not changed)
+        _pts, closed, spacing, used = G.view_chain(chain)
+        self.assertTrue(closed)
+        self.assertAlmostEqual(spacing, 0.9375, places=6)
+        self.assertAlmostEqual(used, 0.046875, places=6)
+        self.assertEqual(H.scatter_out(chain), {"scatter": 0.0, "scatterFloor": 0.0469})
+
+    def test_a_noisy_chain_gives_its_own_scatter_alone(self):
+        from scanrulerfc import geom2d as G
+        from scanrulerfc.handlers import sections as H
+
+        rng = np.random.default_rng(3)
+        x = np.arange(0, 60, 0.5)
+        chain = np.c_[x, rng.normal(0, 0.2, len(x))]
+        measured, floor = G.chain_scatter(chain)
+        self.assertGreater(measured, floor)
+        self.assertAlmostEqual(measured, 0.2, delta=0.08)  # the noise put in
+        self.assertEqual(H.scatter_out(chain), {"scatter": round(measured, 4)})
+        self.assertAlmostEqual(G.view_chain(chain)[3], measured, places=12)
+
+    def test_section_fit_answers_it_on_a_dense_block(self):
+        # The tool itself, without FreeCAD: a densely meshed block cut at
+        # mid height is four straight sides.
+        import fakedoc
+        from scanrulerfc import runner
+        from scanrulerfc import scanstate as S
+
+        fc = fakedoc.installed()
+        fc.__enter__()
+        self.addCleanup(fc.__exit__, None, None, None)
+        V, F = box_mesh(60.0, 40.0, 20.0, n=40)
+        ctx = runner.Context(doc=fakedoc.Doc("Block"), out_dir=tempfile.mkdtemp())
+        run = runner.local(ctx=ctx)
+        S.state(ctx)["scan"] = S.Scan("block.stl", np.asarray(V, float), np.asarray(F, np.int64))
+        ok, out = run("section_cut", {"across": "XY", "name": "Mid"})
+        self.assertTrue(ok, out)
+        ok, out = run("section_fit", {"section": "Mid", "brief": True})
+        self.assertTrue(ok, out)
+        row = out["chains"][0]
+        self.assertEqual([p["kind"] for p in row["pieces"]], ["line"] * 4)
+        self.assertEqual(max(p["rms"] for p in row["pieces"]), 0.0)
+        self.assertEqual(row["scatter"], 0.0)  # was the floor: 5 % of the spacing
+        self.assertAlmostEqual(row["scatterFloor"], 0.05 * row["spacing"], delta=1e-4)
+        self.assertAlmostEqual(row["tolerance"], 0.6 * row["spacing"], delta=1e-4)  # the fit's tolerance is as it was
+
+
 if __name__ == "__main__":
     unittest.main()
