@@ -73,6 +73,10 @@ class Scan:
         # hook that moves it when the pose changes: None without FreeCAD.
         self.object = None
         self.on_pose = None
+        # True while that object's mesh holds these points one for one in
+        # this order, so the state in the document leaves them to it
+        # (docstate.attach_scan); otherwise the state keeps them itself.
+        self.in_object = False
 
     def set_pose(self, k, R, t):
         self.k, self.R, self.t = float(k), np.asarray(R, dtype=float), np.asarray(t, dtype=float)

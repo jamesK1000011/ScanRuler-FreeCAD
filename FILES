@@ -14,6 +14,7 @@ docs/hardening/scanruler-measure-model.json
 docs/hardening/scanruler-meshtools-model.json
 docs/hardening/scanruler-reverse-findings.md
 docs/hardening/scanruler-reverse-model.json
+docs/hardening/scanruler6-findings.md
 package.xml
 scanrulerfc/__init__.py
 scanrulerfc/agentlink/__init__.py
@@ -326,6 +327,7 @@ tests/test_decoupled.py
 tests/test_deviation.py
 tests/test_deviation_maths.py
 tests/test_dfm_wall.py
+tests/test_docstate_order.py
 tests/test_draft_scan.py
 tests/test_editor_view.py
 tests/test_files.py

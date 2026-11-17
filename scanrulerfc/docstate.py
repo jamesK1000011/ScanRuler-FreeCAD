@@ -24,9 +24,15 @@
 # encode / decode are pure (numpy, json, zipfile): any dict, list, tuple,
 # set, number, string and numpy array of the state goes through; a Scan by
 # its pose (its points in the scan object when there is one, else in the
-# arrays); the deviation reference's search structure is built again from
-# its points; caches are left out. Nothing is unpickled: arrays load with
-# allow_pickle=False.
+# arrays); a rigid motion (dev_rigid.Rigid: a best fit's transform) by its
+# rotation and translation, and back as a Rigid; the deviation reference's
+# search structure is built again from its points; caches are left out.
+# Nothing is unpickled: arrays load with allow_pickle=False.
+#
+# The scan's points are left to its mesh object only while that mesh holds
+# them one for one, in the scan's own order (Scan.in_object): the state
+# keeps the triangles as vertex numbers, and numbers into points in another
+# order are another surface. See _mesh_built and points_in_order.
 #
 # What a write costs follows what changed, not how large the state is: each
 # array is packed (compressed) on its own and its packed bytes are kept
@@ -162,6 +168,7 @@ class _Enc:
         return {"__scan__": out}
 
     def value(self, x, path):
+        from .dev_rigid import Rigid
         from .scanstate import Scan
 
         if x is None or isinstance(x, (bool, str)):
@@ -184,6 +191,13 @@ class _Enc:
             return self.array(x)
         if isinstance(x, Scan):
             return self.scan(x)
+        if isinstance(x, Rigid):
+            # A best fit's transform (deviation.align.transform and .total)
+            # was left out, and said in the Report View, on every write:
+            # a reopened document held an alignment without its motion,
+            # and the next deviation call failed on it (found live, run 4).
+            # Kept as its numbers, in full precision.
+            return {"__rigid__": {"r": self.value(np.asarray(x.r, dtype=float).reshape(3, 3).tolist(), path), "t": self.value(np.asarray(x.t, dtype=float).reshape(3).tolist(), path)}}
         if isinstance(x, dict):
             if all(isinstance(k, str) for k in x):
                 out = {}
@@ -240,6 +254,7 @@ def encode(st, scan_points=None, packs=None):
 def signature(st):
     """A cheap fingerprint of the state: moves when something in it changes
     (an array by identity, shape and a sum), so a write happens on change."""
+    from .dev_rigid import Rigid
     from .scanstate import Scan
 
     h = hashlib.sha1()
@@ -251,6 +266,8 @@ def signature(st):
                 h.update(repr(float(np.asarray(x, dtype=float).sum())).encode())
         elif isinstance(x, Scan):
             h.update(f"scan{id(x)}{x.version}{x.k}".encode())
+        elif isinstance(x, Rigid):
+            h.update(b"rigid" + np.asarray(x.r, dtype=float).tobytes() + np.asarray(x.t, dtype=float).tobytes())
         elif isinstance(x, dict):
             for k in sorted(x, key=repr):
                 if k in SKIP_KEYS:
@@ -270,8 +287,10 @@ def signature(st):
 
 def decode(data, scan_points=None):
     """The state back from encode's bytes. scan_points(record) gives a
-    scan's points as read and scaled (k·V0) from its document object, or
-    None (then the arrays' copy is used, or the scan is left out)."""
+    scan's points as read and scaled (k·V0) from its document object, in
+    the order the record's triangles (record["F"], the array) number them,
+    or None (then the arrays' copy is used, or the scan is left out)."""
+    from .dev_rigid import Rigid
     from .scanstate import Scan
 
     with zipfile.ZipFile(io.BytesIO(data)) as z:
@@ -290,7 +309,7 @@ def decode(data, scan_points=None):
         if "V0" in rec:
             V0 = arrays[rec["V0"]["__nd__"]]
         else:
-            kV0 = (scan_points or (lambda r: None))(rec)
+            kV0 = (scan_points or (lambda r: None))({**rec, "F": arrays[rec["F"]["__nd__"]]})
             if kV0 is None:
                 missing.append(rec["name"])
                 return None
@@ -316,6 +335,8 @@ def decode(data, scan_points=None):
             return set(value(v) for v in x["__set__"])
         if "__dict__" in x:
             return {value(k): value(v) for k, v in x["__dict__"]}
+        if "__rigid__" in x:
+            return Rigid(value(x["__rigid__"]["r"]), value(x["__rigid__"]["t"]))
         if "__scanref__" in x:
             return scans.get(x["__scanref__"])
         if "__scan__" in x:
@@ -368,6 +389,60 @@ def points_from_object(points, placement_rt_, box):
     R, t = placement_rt_
     unplaced = (P - t) @ R  # R orthonormal: R^T applied row-wise
     return P if off(P) <= off(unplaced) else unplaced
+
+
+def _area(P, F):
+    t = np.asarray(P, dtype=float)[np.asarray(F, dtype=np.int64)]
+    return float(np.linalg.norm(np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0]), axis=1).sum() / 2) if len(t) else 0.0
+
+
+# How far the area of the state's triangles on an object's points may lie
+# from the area of the object's own mesh for the two to be one surface.
+ORDER_AREA_TOLERANCE = 0.005
+
+
+def points_in_order(P, tris, F, count):
+    """A scan's points as its mesh object holds them (P, with the object's
+    own triangles tris) put in the order the state's triangles F number
+    them: (points, how) — how "same" (the object's order is the state's),
+    "mapped" (another order, read back through the triangles) — or
+    (None, why) when the object's mesh is not the scan the state holds.
+
+    The state keeps F and leaves the points to the object. A mesh built
+    from loose triangles (Mesh.addFacets of a list) numbers its points by
+    where they first come up in the triangles, merges equal ones and drops
+    triangles with no area: the same points in another order. F on those
+    is some other surface — a 10 mm cube read 1,800 mm² where it has 600,
+    a scan of some ten thousand triangles millions of mm² (scan_info's
+    area 9,049,056 mm² on a block tens of mm across, found live, run 4).
+    Where the triangles stand one for one, corner for corner, each of the
+    state's vertex numbers is the object's point at the same corner."""
+    P = np.asarray(P, dtype=float).reshape(-1, 3)
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3)
+    if tris is None:
+        return (P, "same") if len(P) == count else (None, "count")
+    T = np.asarray(tris, dtype=np.int64).reshape(-1, 3)
+    if len(P) == count and T.shape == F.shape and np.array_equal(T, F):
+        return P, "same"
+    if len(F) and (F.min() < 0 or F.max() >= count or (len(T) and (T.min() < 0 or T.max() >= len(P)))):
+        return None, "range"
+    if T.shape == F.shape and len(F):
+        to = np.full(count, -1, dtype=np.int64)
+        to[F.ravel()] = T.ravel()
+        if np.array_equal(to[F.ravel()], T.ravel()):  # one object point for each of the state's
+            if (to >= 0).all():
+                return P[to], "mapped"
+            used = to >= 0
+            if len(P) == count and np.array_equal(to[used], np.nonzero(used)[0]):
+                return P, "same"  # in order; the rest are on no triangle
+            return None, "unreferenced"
+    if len(P) == count and len(F) and len(T):
+        # Triangles dropped or turned on the way in: the same surface when
+        # the state's triangles cover what the object's own do.
+        own = _area(P, T)
+        if own > 0 and abs(_area(P, F) - own) <= ORDER_AREA_TOLERANCE * own:
+            return P, "same"
+    return None, "order"
 
 
 # ---- in a document (FreeCAD) ---------------------------------------------------------------------
@@ -564,17 +639,61 @@ def set_role(doc, role, obj):
     o.Roles = roles
 
 
-def _mesh_of(V, F):
+def _mesh_built(V, F):
+    """(a FreeCAD mesh of V and F, ordered): ordered True when the mesh
+    holds the points one for one in V's order, so they can be read back
+    from it under F.
+
+    By its points and triangles (FreeCAD 1.1 source: src/Mod/Mesh/App/
+    MeshPyImp.cpp, MeshPy::addFacets, the tuple form; Core/MeshKernel.cpp,
+    AddFacets(facets, points, checkManifolds): the points are appended as
+    given). That form takes Base.Vector points and tuples of three numbers
+    and nothing else: a point given as a list is passed over without a
+    word and a triangle given as a list is a TypeError. Lists were what it
+    was given, so every mesh fell to the loose triangles below — its points
+    in another order than V (points_in_order), and 660,000 tuples for a
+    scan of 220,000 triangles. The manifold check is off: it drops the
+    triangles round an edge three share, and a scan has such edges."""
     import Mesh
 
-    V = np.asarray(V, dtype=float)
-    F = np.asarray(F, dtype=np.int64)
+    V = np.asarray(V, dtype=float).reshape(-1, 3)
+    F = np.asarray(F, dtype=np.int64).reshape(-1, 3)
     try:
-        return Mesh.Mesh((V.tolist(), F.tolist()))  # from its topology: the points' order kept
-    except Exception:  # noqa: BLE001 — an older Mesh: facet by facet
-        m = Mesh.Mesh()
-        m.addFacets([[tuple(V[i]) for i in t] for t in F.tolist()])
-        return m
+        import FreeCAD
+
+        points = [FreeCAD.Vector(x, y, z) for x, y, z in V.tolist()]
+        faces = [tuple(t) for t in F.tolist()]
+        try:
+            m = Mesh.Mesh()
+            m.addFacets((points, faces), False)
+        except TypeError:  # a Mesh from before the check could be turned off
+            m = Mesh.Mesh((points, faces))
+        if int(m.CountPoints) == len(V):
+            # The points are in as given. With every triangle in too, the
+            # mesh reads back as V and F; with some dropped, see for itself.
+            return m, int(m.CountFacets) == len(F) or _ordered(m, V, F)
+    except Exception:  # noqa: BLE001 — a Mesh without that form: facet by facet
+        pass
+    m = Mesh.Mesh()
+    m.addFacets([[tuple(V[i]) for i in t] for t in F.tolist()])
+    return m, _ordered(m, V, F)
+
+
+def _ordered(m, V, F):
+    """Whether mesh m holds V one for one in order under F — read back
+    from it; only where the way it was built does not say."""
+    try:
+        from .scanstate import points_array
+
+        pts, tris = m.Topology
+        P, how = points_in_order(points_array(pts), tris, F, len(V))
+        return P is not None and how == "same" and len(P) == len(V) and bool(np.abs(P - V).max(initial=0.0) <= 1e-5 * max(1.0, float(np.abs(V).max(initial=0.0))))
+    except Exception:  # noqa: BLE001 — not known: the state keeps the points itself
+        return False
+
+
+def _mesh_of(V, F):
+    return _mesh_built(V, F)[0]
 
 
 def _placement(R, t):
@@ -593,28 +712,34 @@ def _read_placement(obj):
     return placement_rt(obj.Placement.toMatrix().A)
 
 
-def put_mesh(doc, name, label, role, V, F, R=None, t=None, old=None):
+def put_mesh(doc, name, label, role, V, F, R=None, t=None, old=None, said=None):
     """A Mesh::Feature for the scan or the reference: its mesh V, F, its
-    Placement (R, t). One it made before (old) is taken out first."""
+    Placement (R, t). One it made before (old) is taken out first. said
+    (a dict) is given ordered: whether the mesh holds V in V's order."""
     if old is not None and getattr(old, ROLE_PROPERTY, None) == role and old.Name.startswith((SCAN_OBJECT, REFERENCE_OBJECT)):
         doc.removeObject(old.Name)
     o = doc.addObject("Mesh::Feature", name)
     o.addProperty("App::PropertyString", ROLE_PROPERTY, "ScanRuler", "What ScanRuler reads this mesh as")
     setattr(o, ROLE_PROPERTY, role)
     o.Label = label
-    o.Mesh = _mesh_of(V, F)
+    o.Mesh, ordered = _mesh_built(V, F)
+    if said is not None:
+        said["ordered"] = ordered
     if R is not None:
         o.Placement = _placement(R, t)
     set_role(doc, role, o)
     return o
 
 
-def attach_scan(doc, scan, obj, owned=True, push_now=True):
+def attach_scan(doc, scan, obj, owned=True, push_now=True, ordered=True):
     """The scan read from (or put in) obj: its pose pushed to obj's
     Placement on each change, and a move made on obj in FreeCAD pulled
     back (pull_pose). A mesh of the document's own that was opened as the
-    scan (owned False) is only shown and hidden through it."""
+    scan (owned False) is only shown and hidden through it. ordered: obj's
+    mesh holds the scan's points in the scan's order (Scan.in_object), so
+    the state leaves them to it; otherwise the state keeps them itself."""
     scan.object = obj.Name
+    scan.in_object = bool(ordered)
     set_role(doc, "scan", obj)
     if not owned:
         scan.on_pose = None
@@ -635,7 +760,9 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
             # call read that as a move made by the person and took the
             # alignment off (found live, run 2).
             if getattr(s, "meshed_k", s.k) != s.k:  # scaled: the mesh holds k·V0
-                o.Mesh = _mesh_of(s.k * s.V0, s.F)
+                s.in_object = False  # till the new mesh is in and known to be in order
+                o.Mesh, ordered = _mesh_built(s.k * s.V0, s.F)
+                s.in_object = ordered
                 s.meshed_k = s.k
                 rebuilt = True
             o.Placement = _placement(s.R, s.t)
@@ -668,8 +795,9 @@ def attach_scan(doc, scan, obj, owned=True, push_now=True):
 def put_scan(doc, scan):
     """The scan as a Mesh::Feature in doc (replacing the one put before)."""
     old = role_object(doc, "scan")
-    o = put_mesh(doc, SCAN_OBJECT, scan.name, "scan", scan.k * scan.V0, scan.F, old=old)
-    attach_scan(doc, scan, o)
+    said = {}
+    o = put_mesh(doc, SCAN_OBJECT, scan.name, "scan", scan.k * scan.V0, scan.F, old=old, said=said)
+    attach_scan(doc, scan, o, ordered=said.get("ordered", False))
     return o
 
 
@@ -769,7 +897,8 @@ def write(doc, st):
     (Packs), so the cost follows what changed."""
     t0 = time.perf_counter()
     o = state_object(doc)
-    scan_points = lambda s: s is st.get("scan") and getattr(s, "on_pose", None) is not None and doc.getObject(getattr(s, "object", "") or "") is not None  # noqa: E731
+    scan_points = lambda s: (s is st.get("scan") and getattr(s, "on_pose", None) is not None and getattr(s, "in_object", False)  # noqa: E731
+                             and doc.getObject(getattr(s, "object", "") or "") is not None)
     rec = _kept_for(doc)
     data, dropped = encode(st, scan_points, rec["packs"])
     folder = tempfile.mkdtemp(prefix="scanruler-state-")
@@ -818,24 +947,36 @@ def read(doc):
     if not path or not os.path.isfile(path):
         return None
 
+    read_as = {}
+
     def scan_points(rec):
         obj = doc.getObject(rec.get("object") or "")
         if obj is None or not hasattr(obj, "Mesh"):
             return None
-        pts = obj.Mesh.Topology[0]
+        pts, tris = obj.Mesh.Topology
         from .scanstate import points_array
 
         P = points_from_object(points_array(pts), _read_placement(obj), rec.get("box"))
-        return P if len(P) == rec.get("count") else None
+        P, how = points_in_order(P, tris, rec["F"], rec.get("count"))
+        read_as[rec.get("object")] = how
+        return P
 
     st, notes = decode(_file_bytes(path), scan_points)
     scan = st.get("scan")
     obj = doc.getObject(getattr(scan, "object", None) or "") if scan is not None else None
     if obj is not None:
         owned = getattr(obj, ROLE_PROPERTY, None) == "scan" and obj.Name.startswith(SCAN_OBJECT)
-        attach_scan(doc, scan, obj, owned, push_now=False)
+        how = read_as.get(scan.object)
+        # Read from the object in its order: left to it. Read through the
+        # triangles, or from the state's own copy: kept in the state.
+        attach_scan(doc, scan, obj, owned, push_now=False, ordered=how == "same")
+        if how == "mapped":
+            _report(f"the points of {scan.name} stand in another order in its mesh object than its triangles number them: read back through the triangles, and kept with the state from the next call on.")
     if notes["missing"]:
-        _report(f"the scan's mesh ({', '.join(notes['missing'])}) is no longer in the document: open the scan again.")
+        if any(why in ("order", "unreferenced", "range", "count") for why in read_as.values()):
+            _report(f"the scan's mesh ({', '.join(notes['missing'])}) in the document is not the mesh its triangles were kept for (its points changed, or stand in an order that cannot be read back): open the scan again.")
+        else:
+            _report(f"the scan's mesh ({', '.join(notes['missing'])}) is no longer in the document: open the scan again.")
     if notes["dropped"]:
         _report("not kept in the document: " + ", ".join(notes["dropped"]))
     return st
