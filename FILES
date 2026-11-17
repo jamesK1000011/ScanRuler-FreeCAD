@@ -311,6 +311,8 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 scanrulerfc/workbench.py
 scanrulerfc/workspaces.py
+scripts/ste_check.py
+scripts/ste_originals.json
 tests/fakedoc.py
 tests/meshes.py
 tests/meshkit.py
@@ -416,6 +418,7 @@ tests/test_segment_sparse.py
 tests/test_shared.py
 tests/test_snapshot.py
 tests/test_split_view.py
+tests/test_ste_lint.py
 tests/test_theme.py
 tests/test_thickness.py
 tests/test_thickness_maths.py
