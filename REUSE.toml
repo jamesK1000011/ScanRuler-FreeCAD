@@ -25,7 +25,7 @@ SPDX-License-Identifier = "OFL-1.1"
 # Files that cannot carry a comment, or are read whole: the file list, the
 # Addon Manager metadata, the tool and key-map data, the test fixtures.
 [[annotations]]
-path = ["FILES", "package.xml", ".gitignore", "scanrulerfc/data/**", "tests/reverse_fixtures/**"]
+path = ["FILES", "package.xml", ".gitignore", "scanrulerfc/data/**", "tests/reverse_fixtures/**", "scripts/ste_originals.json"]
 SPDX-FileCopyrightText = "ScanRuler for FreeCAD contributors; ported from ScanRuler by Stefan Hermann (CNC Kitchen), github.com/CNCKitchen/ScanRuler"
 SPDX-License-Identifier = "AGPL-3.0-only"
 
