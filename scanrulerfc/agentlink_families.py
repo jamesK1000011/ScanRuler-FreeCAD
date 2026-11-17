@@ -226,3 +226,26 @@ def _reverse_health():
 
 
 _hook("reverse health", _reverse_health)
+
+
+def _own_state():
+    # ScanRuler's state is settled per document by ScanRuler itself
+    # (scanstate.settle: written into the document it belongs to on
+    # leaving, set aside, read back from the document on arriving). An
+    # Agent Link that keeps every family's state per document
+    # (agentlink/docstates.py) is told so, and carries the "scanruler" key
+    # along untouched instead of setting it aside too. It would do the
+    # same unasked on finding scanstate's book on the session
+    # (_scanruler_documents); saying it leaves nothing to a naming
+    # convention. An Agent Link from before has no such call and no such
+    # keeping: nothing to say.
+    from agentlink import hooks
+
+    from .scanstate import KEY
+
+    own = getattr(hooks, "own_document_state", None)
+    if own is not None:
+        own(KEY)
+
+
+_hook("state per document", _own_state)

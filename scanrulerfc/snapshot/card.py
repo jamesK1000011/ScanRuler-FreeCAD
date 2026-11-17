@@ -347,13 +347,16 @@ def open_card(store=STORE, shot_id=None, parent=None):
     return card
 
 
-def install(window=None, store=STORE, workspace=lambda: None):
-    """Alt+Shift+S on the main window takes a shot."""
+def install(window=None, store=STORE, workspace=lambda: None, press=None):
+    """Alt+Shift+S on the main window takes a shot — or, given press, does
+    what the camera key does (dock.install_shortcut: the shot with the
+    workspace in front, the panel's header told when it fails). The
+    shortcut, for its caller to keep."""
     _QtCore, QtGui, QtW = _qt()
     if window is None:
         import FreeCADGui
         window = FreeCADGui.getMainWindow()
     QShortcut = getattr(QtGui, "QShortcut", None) or QtW.QShortcut
     sc = QShortcut(QtGui.QKeySequence(SHORTCUT), window)
-    sc.activated.connect(lambda: take_shot(store, workspace(), window))
+    sc.activated.connect(press if press is not None else (lambda: take_shot(store, workspace(), window)))
     return sc

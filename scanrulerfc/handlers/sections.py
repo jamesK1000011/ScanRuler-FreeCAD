@@ -19,7 +19,7 @@ from .. import scanstate as S
 from .. import section_core as SC
 from ..chainsegment import arcs_of_chain, place_segments, profile_curves, segment_chain
 from ..errors import ToolError
-from ..geom2d import FitError
+from ..geom2d import FitError, chain_scatter
 from . import _bind
 
 
@@ -328,6 +328,19 @@ def chosen_chains(sec, a):
     return [(i, allc[i]) for i in kept], ({"leftOut": left} if left else {})
 
 
+def scatter_out(chain):
+    """A chain's scatter for an answer: the noise measured on it (0 on an
+    exact cut) and, where that is under the least the fits take it as (5 %
+    of the point spacing), that floor beside it as scatterFloor. The one
+    figure given before was the larger of the two, so an exact straight
+    side read "scatter 0.0469"."""
+    measured, floor = chain_scatter(chain)
+    out = {"scatter": r4(measured)}
+    if measured < floor:
+        out["scatterFloor"] = r4(floor)
+    return out
+
+
 def segmented(chain, a):
     if a.get("arcs"):
         return arcs_of_chain(chain, a["arcs"], a.get("tolerance"))
@@ -448,7 +461,7 @@ def bind(session):
             try:
                 cut = segmented(chain, a)
                 pieces = pieces_out(cut, sec["frame"])
-                out.append({"index": idx, "closed": bool(cut["closed"]), "points": int(len(cut["points"])), "scatter": r4(cut["scatter"]), "spacing": r4(cut["spacing"]), "tolerance": r4(cut["tolerance"]), "pieces": [brief(p) for p in pieces] if a.get("brief") else pieces})
+                out.append({"index": idx, "closed": bool(cut["closed"]), "points": int(len(cut["points"])), **scatter_out(chain), "spacing": r4(cut["spacing"]), "tolerance": r4(cut["tolerance"]), "pieces": [brief(p) for p in pieces] if a.get("brief") else pieces})
             except FitError as e:
                 out.append({"index": idx, "points": int(len(chain)), "error": str(e)})
         allc = flat_chains(sec)
@@ -522,7 +535,7 @@ def bind(session):
                     g1, _, e1 = ids[i]
                     g2, s2, _ = ids[(i + 1) % len(ids)]
                     sk.addConstraint(Sketcher.Constraint("Coincident", g1, e1, g2, s2))
-            fitted.append({"index": idx, "closed": bool(closed), "lines": sum(1 for c in curves if c["kind"] == "line" and not c.get("bridge")), "arcs": sum(1 for c in curves if c["kind"] == "arc"), "circles": sum(1 for c in curves if c["kind"] == "circle"), "bridges": sum(1 for c in curves if c.get("bridge")), "tolerance": r4(cut["tolerance"]), "scatter": r4(cut["scatter"])})
+            fitted.append({"index": idx, "closed": bool(closed), "lines": sum(1 for c in curves if c["kind"] == "line" and not c.get("bridge")), "arcs": sum(1 for c in curves if c["kind"] == "arc"), "circles": sum(1 for c in curves if c["kind"] == "circle"), "bridges": sum(1 for c in curves if c.get("bridge")), "tolerance": r4(cut["tolerance"]), **scatter_out(chain)})
         doc.recompute()
         wires = []
         try:

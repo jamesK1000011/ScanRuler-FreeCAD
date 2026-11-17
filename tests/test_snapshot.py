@@ -218,6 +218,93 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(sorted(H.HANDLERS), ["scan_snapshot_latest", "scan_snapshot_list", "scan_snapshot_wait"])
 
 
+class TheCameraKey(unittest.TestCase):
+    """Found on the second hardening pass, by reading: nothing took a shot.
+    The camera key (ScanRuler_Snapshot) reached the panel's handle, which
+    only noted it as a group to open, and Alt+Shift+S was never installed —
+    so the store stayed empty and scan_snapshot_latest could only ever be
+    refused. The key takes the shot now; the shortcut presses the key."""
+
+    def test_the_key_takes_a_shot_with_the_workspace_in_front(self):
+        from scanrulerfc import dock as DK
+
+        taken = []
+        self.assertIsNone(DK.snapshot_key("deviation", take=lambda workspace=None: taken.append(workspace)))
+        self.assertEqual(taken, ["deviation"])
+
+        def no_window(workspace=None):
+            raise RuntimeError("no main window")
+
+        why = DK.snapshot_key("mesh", take=no_window)
+        self.assertIn("could not be taken", why)
+        self.assertIn("no main window", why)
+
+    def test_the_panel_hands_the_key_to_it_and_notes_nothing_to_open(self):
+        import types
+        import unittest.mock
+
+        from scanrulerfc import dock as DK
+
+        st = ShotStore(save=False)
+        panel = types.SimpleNamespace(current="thickness", ui={"thickness": {"open": "limits"}}, error="an old error", refreshed=[])
+        panel.refresh = lambda force=False: panel.refreshed.append(force)
+        with unittest.mock.patch.object(DK, "snapshot_key", lambda ws: st.add(shot(workspace=ws)) and None):
+            self.assertTrue(DK.Dock.handle(panel, "snapshot"))
+        self.assertEqual([s.workspace for s in st.shots], ["thickness"])
+        self.assertEqual(panel.ui, {"thickness": {"open": "limits"}})  # before: "open" became "snapshot"
+        self.assertEqual((panel.error, panel.refreshed), (None, [True]))
+        # and the tools then have it
+        self.assertEqual(H.scan_snapshot_latest({"shots": st}, {})["workspace"], "thickness")
+
+    def test_the_command_takes_the_shot_itself_when_no_panel_has_opened(self):
+        import unittest.mock
+
+        from scanrulerfc import commands as CM
+        from scanrulerfc import dock as DK
+
+        taken, handed = [], []
+        cmd = CM.SnapshotCommand()
+        with unittest.mock.patch.object(DK, "snapshot_key", lambda ws: taken.append(ws)):
+            with unittest.mock.patch.dict(CM._hooks, {"ui": CM._no_ui}):
+                self.assertTrue(cmd.Activated())
+            self.assertEqual(taken, [CM.current_workspace()])
+            with unittest.mock.patch.dict(CM._hooks, {"ui": lambda key, *a: handed.append(key) or True}):
+                self.assertTrue(cmd.Activated())
+        self.assertEqual((handed, len(taken)), (["snapshot"], 1))  # with a panel, the panel's handle takes it
+
+    def test_the_shortcut_is_set_once_and_presses_the_newest_panels_key(self):
+        import unittest.mock
+
+        from scanrulerfc import dock as DK
+
+        made, pressed = [], []
+
+        def install(press=None):
+            made.append(press)
+            return "the shortcut"
+
+        with unittest.mock.patch.dict(DK._shortcut, {"key": None, "press": None}):
+            self.assertTrue(DK.install_shortcut(lambda: pressed.append("first"), install=install))
+            self.assertTrue(DK.install_shortcut(lambda: pressed.append("second"), install=install))
+            self.assertEqual(len(made), 1)  # one shortcut a window: two would be ambiguous to Qt and neither would fire
+            made[0]()
+            self.assertEqual(pressed, ["second"])
+
+    def test_a_window_without_the_shortcut_still_has_the_key(self):
+        import unittest.mock
+
+        from scanrulerfc import dock as DK
+
+        said = []
+
+        def refuse(press=None):
+            raise RuntimeError("no Qt here")
+
+        with unittest.mock.patch.dict(DK._shortcut, {"key": None, "press": None}), unittest.mock.patch.object(DK.C, "_say", lambda m, warn=False: said.append(m)):
+            self.assertFalse(DK.install_shortcut(lambda: None, install=refuse))
+        self.assertIn("the camera key takes the shot", said[0])
+
+
 def _qt():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     for name in ("PySide6", "PySide2", "PySide"):
@@ -257,6 +344,21 @@ class TestQt(unittest.TestCase):
         self.assertTrue(img.loadFromData(png))
         self.assertNotEqual(img.pixelColor(10, 50).name(), "#ffffff")
         self.assertEqual(MK.composite(s, original=True), (s.png, False))
+
+    def test_a_press_keeps_a_shot_of_the_window_and_the_shortcut_calls_the_press(self):
+        from scanrulerfc.snapshot import card as C
+
+        st = ShotStore(save=False)
+        win = QT.QtWidgets.QMainWindow()
+        win.resize(320, 200)
+        s = C.take_shot(st, "Mesh Tools", win, show=False)
+        self.assertIs(st.latest(), s)
+        self.assertEqual((s.workspace, s.width > 0, s.png[:4]), ("Mesh Tools", True, b"\x89PNG"))
+        pressed = []
+        sc = C.install(win, st, press=lambda: pressed.append(1))
+        self.assertEqual(sc.key().toString(), C.SHORTCUT)
+        sc.activated.emit()
+        self.assertEqual(pressed, [1])
 
     def test_card_builds(self):
         from scanrulerfc.snapshot import card as C

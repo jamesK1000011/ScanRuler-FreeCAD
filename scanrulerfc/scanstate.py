@@ -215,6 +215,25 @@ def _report(text):
 # A document closed and another opened under the same name is another
 # document (FreeCAD keeps one Python object per open document: identity
 # tells them apart), so nothing of the old one is handed to it.
+#
+# Agent Link keeps every family's state per document as well since
+# 16 Nov 2026 (agentlink/docstates.py: session.family_state is one dict per
+# document, set aside on leaving and brought back on return). The two do
+# not meet: a key whose add-on settles itself is carried along by Agent
+# Link untouched — it is told so (agentlink_families: hooks.
+# own_document_state("scanruler")) and would also see the book below on
+# the session — so settle() here still finds, on arriving in another
+# document, the state of the document it left, writes it there and sets
+# it aside itself. Agent Link's settling runs first (it hangs on reading
+# session.family_state and session.doc, which settle() does on its first
+# two lines), so the dict this function works on is already the new
+# document's. Where a host puts a kept dict back after reopening a
+# document from a copy (session.family_state = kept), the state in it
+# belongs to a document object that is closed: it is let go here and read
+# again from the reopened document, which holds the state as it was when
+# that copy was written — so a checkpoint restored from its copy takes
+# ScanRuler's state back with the document, and a later state is never
+# written over it.
 _BOOK = "_scanruler_documents"
 
 
