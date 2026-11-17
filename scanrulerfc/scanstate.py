@@ -152,7 +152,7 @@ def fresh():
 _TICKS = itertools.count(1)
 
 
-def touched(session, tool, write=True):
+def touched(session, tool, write=True, args=None, answer=None):
     """After a call went through (the add-on's runner, or Agent Link's
     family layer): the session's version moves and last_tool names the
     tool, so the dock refreshes and turns to that tool's workspace. Every
@@ -169,27 +169,49 @@ def touched(session, tool, write=True):
 
     The write is of this state into the document it was made in: both are
     taken here, so a write that lands later (handed to the GUI thread)
-    still goes to that document when the session has moved to another."""
+    still goes to that document when the session has moved to another.
+
+    With a window, the call's results are then drawn in the 3D view
+    (scene_coin.after_call: the elements, dimensions, sections, markers,
+    the colour map and its legend, Mesh Tools' edited copy), on the GUI
+    thread after the write, so the scan object it draws round is in place.
+    args, answer: the call's arguments and answer, for what only that call
+    shows (the nearest point, an outline, a cut plane). Without a window
+    nothing is drawn and nothing is computed for it."""
     if tool.startswith("scan_snapshot_") or getattr(session, "family_state", None) is None:
         return  # a session that keeps no state (a catalog-only caller): nothing to show
     st = state(session)
     st["version"] = next(_TICKS)
     st["last_tool"] = tool
-    if not write:
-        return
     try:
         from . import docstate
     except ImportError:
         return
     doc = getattr(session, "doc", None)
+    drawn = _window_up()
 
     def to_document():
-        try:
-            docstate.mark_doc(doc, st, session)  # FreeCAD's Save carries it from here
-        except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
-            _report(f"the state could not be written into the document: {e}")
+        if write:
+            try:
+                docstate.mark_doc(doc, st, session)  # FreeCAD's Save carries it from here
+            except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
+                _report(f"the state could not be written into the document: {e}")
+        if drawn:
+            from . import scene_coin
 
-    docstate.on_gui_thread(to_document)
+            scene_coin.after_call(session, tool, args, answer)
+
+    if write or drawn:
+        docstate.on_gui_thread(to_document)
+
+
+def _window_up():
+    """FreeCAD with its window (the 3D view the results are drawn in)."""
+    try:
+        import FreeCAD
+    except ImportError:
+        return False
+    return bool(getattr(FreeCAD, "GuiUp", False))
 
 
 def _report(text):

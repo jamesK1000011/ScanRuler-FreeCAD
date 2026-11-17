@@ -445,11 +445,18 @@ def covered(V, F, R_, chunk=2_000_000):
         e2u, e2v = tu[tri, 2] - a_u, tv[tri, 2] - a_v
         den = e1u * e2v - e1v * e2u
         pu, pv = cc - a_u, rr - a_v
-        with np.errstate(divide="ignore", invalid="ignore"):
-            s = (pu * e2v - pv * e2u) / den
-            t = (e1u * pv - e1v * pu) / den
+        # A triangle seen edge-on (den 0) covers no cell: it is left out
+        # before the division, so no infinity or NaN is made. Divided by 0
+        # and masked afterwards, s + t and h were inf - inf and inf * 0, and
+        # numpy wrote "invalid value encountered in add / multiply" to the
+        # Report view on every outline of a scan with a wall square to the
+        # view (window review round 3, scan_outline on a block).
+        flat = np.abs(den) > 1e-12
+        safe = np.where(flat, den, 1.0)
+        s = np.where(flat, (pu * e2v - pv * e2u) / safe, -1.0)
+        t = np.where(flat, (e1u * pv - e1v * pu) / safe, -1.0)
         eps = 1e-9
-        ok = (np.abs(den) > 1e-12) & (s >= -eps) & (t >= -eps) & (s + t <= 1 + eps)
+        ok = flat & (s >= -eps) & (t >= -eps) & (s + t <= 1 + eps)
         h = td[tri, 0] + s * (td[tri, 1] - td[tri, 0]) + t * (td[tri, 2] - td[tri, 0])
         ok &= (h >= -1e-6) & (h <= far + 1e-6)
         mask[(rr * cols + cc)[ok]] = True

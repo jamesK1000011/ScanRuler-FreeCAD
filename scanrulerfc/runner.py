@@ -201,7 +201,7 @@ def local(doc_fn=None, table=None, ctx=None):
             else:
                 doc.abortTransaction()
         if ok:
-            S.touched(c, tool)
+            S.touched(c, tool, args=args, answer=out)
         return ok, out
 
     return run
