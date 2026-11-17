@@ -622,7 +622,11 @@ def handlers(session=None, store=None):
     def feature_clear(a):
         if not a.get("confirm"):
             _invalid("This takes every feature and parameter away (one undo step): give confirm: true.")
-        return commit("clear", None, lambda p: D.empty_part())
+        out = commit("clear", None, lambda p: D.empty_part())
+        left = shown_after_clear(getattr(getattr(st, "session", None), "doc", None))
+        if left is not None and isinstance(out, dict):
+            out = {**out, "documentShows": left}
+        return out
 
     def feature_list(a):
         part = st.part()
@@ -882,6 +886,33 @@ def handlers(session=None, store=None):
         "reverse_body_describe": body_describe, "reverse_body_names": body_names, "reverse_body_check": body_check, "reverse_body_set": body_set,
         "reverse_body_clearance": body_clearance, "reverse_import_step": import_step,
     }
+
+
+def shown_after_clear(doc):
+    """What the document still shows after reverse_feature_clear: the
+    labels of its shown objects with a shape (at most 8), the Reverse
+    engineer's own left out — so a solid left in view can be told apart
+    from a body the clear missed (window pass 3, 10-061: a grey cube stayed
+    in view; the model's own part_primitive Gauge, call 37, is not the
+    Reverse engineer's). None without a document."""
+    if doc is None:
+        return None
+    try:
+        rows = []
+        for o in doc.Objects:
+            if not getattr(o, "Visibility", False) or getattr(getattr(o, "Shape", None), "isNull", lambda: True)():
+                continue
+            proxy = getattr(o, "Proxy", None)
+            if getattr(o, "Label", "") == D.LABEL:
+                continue
+            if proxy is not None and type(proxy).__module__.endswith("reverse.doc"):
+                # A body the clear left: named as one, so the answer says so.
+                rows.append(f"{o.Label} (a Reverse engineer body: not cleared)")
+                continue
+            rows.append(f"{o.Label} ({getattr(o, 'TypeId', '?')})")
+        return rows[:8]
+    except Exception:  # noqa: BLE001 — a fact only
+        return None
 
 
 SWATCHES = {"red": "#d64541", "orange": "#e8590c", "yellow": "#c99a0a", "green": "#2e7d46", "teal": "#0f9b9b", "blue": "#2f73c4", "purple": "#7c52b3"}

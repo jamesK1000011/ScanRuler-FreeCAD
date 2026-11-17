@@ -9,6 +9,19 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Window pass 3. Every ScanRuler tool's caption says what it did with its
+  key values (the 2D sheet, print fit, scan noise, repeat, wear, Mesh
+  Tools, the Reverse engineer, the report); flat_profile's caption was its
+  help text. Agent Link's own tools keep their words. A flat_ call draws
+  the 2D sheet in the 3D view: an image as a texture with its edges, or a
+  section's sheet on its plane, with the fitted elements, dimensions with
+  their values, notes and the zero point; the camera turns square onto the
+  sheet and frames it (it stayed zoomed into a corner after a comb). With
+  an image on the sheet the scan is put away and the panel's header names
+  the image. Mesh Tools' edited copy and previews are drawn a hair toward
+  the eye (they striped against the solid the scan came from).
+  reverse_feature_clear says what the document still shows. view3d gains
+  flat (sheet, counts, corners, texture, framed) and inFront.
 - Window review round 7 of the 3D-view overlay. The legend card is laid
   out in the view's device pixels from the words it holds (it ran past the
   view's right edge while its words were drawn at a fixed pixel size): it

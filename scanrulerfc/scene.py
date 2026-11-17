@@ -8,8 +8,8 @@
 # constructed elements, the dimensions with their values, the sections, the
 # marked points, the nearest point, hot spots, an outline, a cut plane, the
 # colour map of the call (deviation, wall thickness, draft, height, wear,
-# segments) with its legend, and Mesh Tools' edited copy in place of the
-# scan. ScanRuler keeps these in its state, not as FreeCAD objects (the
+# segments) with its legend, Mesh Tools' edited copy in place of the
+# scan, and after a flat_ call the 2D sheet (flat_plan). ScanRuler keeps these in its state, not as FreeCAD objects (the
 # document is not filled with a fit's every try; element_to_document makes
 # objects of them on request), so the window draws them as an overlay of
 # the 3D view: scene_coin.py builds the Coin nodes from what plan() gives.
@@ -596,6 +596,244 @@ def transient(session, st, scan, tool, args, body):
     return out
 
 
+# ---- the 2D sheet (the flat workspace) ------------------------------------------------------------
+# Window review pass 3 (02-012 to 02-088): no flat_ call drew anything; the
+# 3D view stayed on the mesh as the last 3D call left it. The sheet is
+# drawn here as ScanRuler's 2D workspace shows it (src/ui/FlatPanel.tsx and
+# the flat canvas): the image (or, for a section, the section's own cut on
+# the part), the edges found on it, the fitted elements in the sheet's
+# colours, the dimensions with their values, the notes and the alignment's
+# zero point. A section's sheet lies on the section's plane; an image's on
+# the world's XY plane, its bottom-left corner at the origin, in the
+# sheet's units (mm once calibrated, else pixels). Everything is drawn on
+# top of the model (an image of a part may lie where a model is), and the
+# camera is turned square onto the sheet and framed on it (flat_frame).
+
+FLAT_COLOURS = ("#e4572e", "#2e86ab", "#a23b72", "#f18f01", "#3b8132", "#6a4c93")  # handlers/flat.py COLORS
+FLAT_EDGES = (0.07, 0.71, 0.65)        # the edges found, as flat_render draws them
+FLAT_SHEET = (0.55, 0.57, 0.60)        # the sheet's border
+FLAT_ARC_STEPS = 64
+XY_FRAME = {"origin": [0.0, 0.0, 0.0], "basisU": [1.0, 0.0, 0.0], "basisV": [0.0, 1.0, 0.0], "normal": [0.0, 0.0, 1.0]}
+
+
+def flat_frame(st):
+    """The sheet in front and where it lies: {"kind": "section" | "image",
+    "frame": {origin, basisU, basisV, normal}, "unit": (x, y) chain units to
+    the sheet's, "units": "mm" | "px", "section": the section or None,
+    "image": the image record or None}, or None when nothing is on the
+    sheet. Read only (no handler's setdefault): drawing changes no state."""
+    f = st.get("flatState") if isinstance(st, dict) else None
+    if not isinstance(f, dict) or not isinstance(f.get("subject"), dict):
+        return None
+    subj = f["subject"]
+    if subj.get("kind") == "section":
+        ss = st.get("sectionState") or {}
+        sec = next((x for x in ss.get("sections", []) if x.get("id") == subj.get("id")), None)
+        if sec is None or not isinstance(sec.get("frame"), dict):
+            return None
+        return {"kind": "section", "frame": sec["frame"], "unit": (1.0, 1.0), "units": "mm", "section": sec, "image": None}
+    img = f.get("image")
+    if subj.get("kind") == "image" and isinstance(img, dict) and img.get("width"):
+        p = f.get("pxPerMm")
+        unit = (1.0 / float(p["x"]), 1.0 / float(p["y"])) if isinstance(p, dict) and p.get("x") and p.get("y") else (1.0, 1.0)
+        return {"kind": "image", "frame": XY_FRAME, "unit": unit, "units": "mm" if unit != (1.0, 1.0) or isinstance(p, dict) else "px", "section": None, "image": img}
+    return None
+
+
+def _flat_colour(i):
+    return rgb01(FLAT_COLOURS[i % len(FLAT_COLOURS)])
+
+
+def flat_element_shape(fit, lift, size):
+    """A 2D element's fit as 3D lines and points on the sheet, or None."""
+    if not isinstance(fit, dict):
+        return None
+    k = fit.get("kind")
+    out = {"lines": [], "points": [], "face": None}
+    if k == "point" and fit.get("at") is not None:
+        x, y = (float(v) for v in fit["at"][:2])
+        d = 0.02 * size
+        out["lines"] = [np.array([lift((x - d, y)), lift((x + d, y))]), np.array([lift((x, y - d)), lift((x, y + d))])]
+        out["points"] = [lift((x, y))]
+        out["at"] = lift((x + d, y + d))
+        return out
+    if fit.get("center") is None:
+        return None
+    c = np.asarray(fit["center"], dtype=float)[:2]
+    if k == "line":
+        d = np.asarray(fit.get("dir", [1, 0]), dtype=float)[:2]
+        h = float(fit.get("length", 0.0)) / 2
+        out["lines"] = [np.array([lift(c - d * h), lift(c + d * h)])]
+        out["at"] = lift(c + d * h)
+        return out
+    if k in ("circle", "arc") and fit.get("radius") is not None:
+        r = float(fit["radius"])
+        a0, sw = (0.0, 2 * math.pi) if k == "circle" else (float(fit.get("start", 0.0)), float(fit.get("sweep", 2 * math.pi)))
+        t = a0 + np.linspace(0.0, sw, FLAT_ARC_STEPS + 1)
+        out["lines"] = [np.array([lift((c[0] + r * math.cos(a), c[1] + r * math.sin(a))) for a in t])]
+        out["points"] = [lift(c)]
+        mid = a0 + sw / 2 if k == "arc" else math.pi / 4
+        out["at"] = lift((c[0] + r * math.cos(mid), c[1] + r * math.sin(mid)))
+        return out
+    return None
+
+
+def _flat_dimension(f, d, lift, units):
+    """A 2D dimension as its segment and value on the sheet, or None."""
+    from . import flat_core as FC
+
+    els = [next((e for e in f.get("elements", []) if e.get("id") == i), None) for i in d.get("refs", [])]
+    if not els or any(e is None or not e.get("fit") for e in els):
+        return {"lines": [], "points": [], "text": f"{d.get('name') or 'Dimension'} (invalid)", "at": None}
+    try:
+        v = FC.evaluate_dimension(d.get("type"), [e["fit"] for e in els], units)
+    except Exception:  # noqa: BLE001 — a dimension that cannot be read is left out
+        return None
+    text = f"{d.get('name') or v.get('label') or 'Dimension'} {v.get('value') if not v.get('invalid') else '(invalid)'}"
+    seg = v.get("segment")
+    if seg is not None and len(seg) == 2:
+        a, b = (np.asarray(x, dtype=float)[:2] for x in seg)
+        return {"lines": [np.array([lift(a), lift(b)])], "points": [], "text": text, "at": lift((a + b) / 2)}
+    cs = [FC.ref_point(e["fit"]) if FC.ref_point(e["fit"]) is not None else np.asarray(e["fit"].get("center", [0, 0]), dtype=float)[:2] for e in els]
+    return {"lines": [], "points": [], "text": text, "at": lift(np.mean(cs, axis=0))}
+
+
+def flat_plan(st, tool, args=None, body=None, memo=None):
+    """What the view shows of the 2D sheet: {"kind", "units", "frame",
+    "box" (two 3D corners), "corners" (the sheet's four, 3D), "image"
+    (the image record, for its texture) or None, "items" [shapes as
+    plan()'s, drawn on top], "counts"}, or None with nothing on the sheet."""
+    sh = flat_frame(st)
+    if sh is None:
+        return None
+    memo = memo if memo is not None else {}
+    f = st["flatState"]
+    fr = sh["frame"]
+    o, u, v = (np.asarray(fr[k], dtype=float) for k in ("origin", "basisU", "basisV"))
+
+    def lift(p):
+        return o + float(p[0]) * u + float(p[1]) * v
+
+    ux, uy = sh["unit"]
+    chains = []
+    if sh["kind"] == "image":
+        for c in _seq(f.get("chains")):
+            c = np.asarray(c, dtype=float)
+            if len(c) >= 2:
+                chains.append(c * np.array([ux, uy]))
+        img = sh["image"]
+        lo, hi = np.zeros(2), np.array([float(img["width"]) * ux, float(img["height"]) * uy])
+    else:
+        from .section_core import chains_of, project_cut
+
+        sec = sh["section"]
+        try:
+            flat = project_cut(sec["points"], sec["frame"])
+            chains = [np.asarray(c, dtype=float) for c in chains_of(flat, sec["offsets"]) if len(c) >= 2]
+        except Exception:  # noqa: BLE001 — a section without its cut: its elements alone
+            chains = []
+        pts = np.vstack(chains) if chains else np.zeros((1, 2))
+        pad = 0.05 * max(float(np.ptp(pts[:, 0])), float(np.ptp(pts[:, 1])), 1.0)
+        lo, hi = pts.min(0) - pad, pts.max(0) + pad
+    size = float(max(hi - lo)) or 1.0
+    corners = np.array([lift(p) for p in ((lo[0], lo[1]), (hi[0], lo[1]), (hi[0], hi[1]), (lo[0], hi[1]))])
+    items = []
+    seen = memo.get("flat") or {}
+    now = {}
+    named = _named(body)
+    note = body.get("note") if isinstance(body, dict) and isinstance(body.get("note"), dict) else None
+    fresh = bool(memo.get("flatPrimed")) and memo.get("flatSubject") == repr(f.get("subject"))
+
+    def is_new(key, val, name=None):
+        now[key] = val
+        return (fresh and seen.get(key) != val) or (name is not None and name in named)
+
+    items.append({"kind": "sheet", "lines": [np.vstack([corners, corners[:1]])], "points": [], "face": None, "colour": FLAT_SHEET,
+                  "text": None, "new": False})
+    if sh["kind"] == "image" and chains:
+        items.append({"kind": "edges", "lines": [np.array([lift(p) for p in c]) for c in chains], "points": [], "face": None,
+                      "colour": FLAT_EDGES, "text": None, "new": False})
+    shown = [e for e in f.get("elements", []) if e.get("visible", True) and e.get("fit")]
+    for i, e in enumerate(shown):
+        s = flat_element_shape(e["fit"], lift, size)
+        if s is None:
+            continue
+        new = is_new(("e", e.get("id")), (e.get("name"), repr(e.get("fit"))), e.get("name"))
+        s.update(kind="flatElement", colour=NEW if new else _flat_colour(i), text=e.get("name"), name=e.get("name"), new=new)
+        items.append(s)
+    for d in f.get("dimensions", []):
+        if not d.get("visible", True):
+            continue
+        s = _flat_dimension(f, d, lift, sh["units"])
+        if s is None:
+            continue
+        new = is_new(("d", d.get("id")), (s["text"],), d.get("name"))
+        s.update(kind="flatDimension", colour=NEW if new else DIMENSION, name=d.get("name"), face=None, new=new)
+        items.append(s)
+    for n in f.get("notes", []):
+        if not n.get("visible", True) or n.get("at") is None:
+            continue
+        at = lift(n["at"])
+        new = is_new(("n", n.get("id")), (n.get("text"), tuple(n["at"]))) or (note is not None and note.get("id") == n.get("id"))
+        items.append({"kind": "flatNote", "lines": [], "points": [at], "face": None, "colour": NEW if new else MARKED,
+                      "text": n.get("text"), "at": at, "name": f"note {n.get('id')}", "new": new})
+    al = f.get("alignment")
+    if isinstance(al, dict) and al.get("origin") is not None:
+        a0 = np.asarray(al["origin"], dtype=float)[:2]
+        dx = np.array([math.cos(float(al.get("angle", 0.0))), math.sin(float(al.get("angle", 0.0)))])
+        dy = np.array([-dx[1], dx[0]])
+        L = 0.15 * size
+        new = is_new(("a",), (tuple(a0), float(al.get("angle", 0.0))))
+        items.append({"kind": "flatOrigin", "lines": [np.array([lift(a0), lift(a0 + dx * L)]), np.array([lift(a0), lift(a0 + dy * L * 0.6)])],
+                      "points": [lift(a0)], "face": None, "colour": NEW if new else DIMENSION, "text": "origin", "at": lift(a0 + dx * L), "name": "origin", "new": new})
+    memo["flat"] = now
+    memo["flatPrimed"] = True
+    memo["flatSubject"] = repr(f.get("subject"))
+    return {"kind": sh["kind"], "units": sh["units"], "frame": {k: np.asarray(fr[k], dtype=float) for k in ("origin", "basisU", "basisV")},
+            "box": (corners.min(0), corners.max(0)), "corners": corners, "image": sh["image"], "unit": sh["unit"], "items": items,
+            "counts": {"elements": len(shown), "dimensions": sum(1 for d in f.get("dimensions", []) if d.get("visible", True)),
+                       "notes": sum(1 for n in f.get("notes", []) if n.get("visible", True)), "chains": len(chains),
+                       "aligned": isinstance(al, dict)}}
+
+
+def camera_rotation(u, v):
+    """The camera's orientation that looks square onto the plane of u, v
+    (u to the right, v up, the eye on the side of u x v), as a quaternion
+    (x, y, z, w): Coin's camera looks down its own -Z with +Y up."""
+    u = _unit(u)
+    v = np.asarray(v, dtype=float)
+    if u is None:
+        u = np.array([1.0, 0.0, 0.0])
+    v = _unit(v - u * float(np.dot(v, u)))
+    if v is None:
+        v = _unit(np.cross([0.0, 0.0, 1.0], u)) if abs(u[2]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    n = np.cross(u, v)
+    R = np.column_stack([u, v, n])  # the camera's axes in the world
+    t = float(np.trace(R))
+    if t > 0:
+        s = math.sqrt(t + 1.0) * 2
+        w, x, y, z = 0.25 * s, (R[2, 1] - R[1, 2]) / s, (R[0, 2] - R[2, 0]) / s, (R[1, 0] - R[0, 1]) / s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+        w, x, y, z = (R[2, 1] - R[1, 2]) / s, 0.25 * s, (R[0, 1] + R[1, 0]) / s, (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+        w, x, y, z = (R[0, 2] - R[2, 0]) / s, (R[0, 1] + R[1, 0]) / s, 0.25 * s, (R[1, 2] + R[2, 1]) / s
+    else:
+        s = math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+        w, x, y, z = (R[1, 0] - R[0, 1]) / s, (R[0, 2] + R[2, 0]) / s, (R[1, 2] + R[2, 1]) / s, 0.25 * s
+    q = np.array([x, y, z, w])
+    return tuple(float(c) for c in q / np.linalg.norm(q))
+
+
+def rotate_by(q, p):
+    """p turned by the quaternion q (x, y, z, w)."""
+    x, y, z, w = q
+    qv = np.array([x, y, z])
+    p = np.asarray(p, dtype=float)
+    return p + 2 * np.cross(qv, np.cross(qv, p) + w * p)
+
+
 # ---- the whole scene ------------------------------------------------------------------------------
 
 
@@ -615,6 +853,8 @@ def plan(session, tool, args=None, body=None, memo=None):
                     shown mesh, or None
         elements, dimensions, sections, items
                     [{"lines", "points", "face", "colour", "text", "at"}]
+        flat        after a flat_ call, the 2D sheet (flat_plan): drawn on
+                    top, the camera turned square onto it and framed on it
 
     memo: a dict kept between calls for one session (what was drawn last):
     elements, dimensions and sections new or changed since are drawn in
@@ -624,7 +864,22 @@ def plan(session, tool, args=None, body=None, memo=None):
     st = S.state(session) if not isinstance(session, dict) else session
     scan = st.get("scan")
     tool = str(tool or "")
-    out = {"scan": None, "mesh": None, "previews": [], "map": None, "elements": [], "dimensions": [], "sections": [], "items": []}
+    out = {"scan": None, "mesh": None, "previews": [], "map": None, "elements": [], "dimensions": [], "sections": [], "items": [], "flat": None}
+    # A flat_ call shows the 2D sheet (the flat workspace): an image's sheet
+    # alone, with the scan and its 3D results put away until the next 3D
+    # call; a section's sheet on the section's plane of the part, without
+    # the 3D elements and dimensions (they are the 3D Measure's).
+    flat = None
+    if tool.startswith("flat_"):
+        try:
+            flat = flat_plan(st, tool, args, body, memo)
+        except Exception:  # noqa: BLE001 — a sheet that cannot be read is not drawn; the call has answered
+            flat = None
+    out["flat"] = flat
+    if flat is not None and (scan is None or flat["kind"] == "image"):
+        out["scan"] = {"hide": True} if scan is not None else None
+        memo["map"] = None
+        return out
     if scan is None:
         memo.clear()
         return out
@@ -653,7 +908,7 @@ def plan(session, tool, args=None, body=None, memo=None):
     named = set() if moves_all else _named(body)
     seen = memo.get("elements") or {}
     now = {}
-    for e in st.get("elements", []):
+    for e in (st.get("elements", []) if flat is None else []):
         if not e.get("visible", True) or not e.get("fit"):
             continue
         sh = element_shape(e["fit"], e.get("assumed"))
@@ -664,11 +919,12 @@ def plan(session, tool, args=None, body=None, memo=None):
         changed = (marking and seen.get(e.get("id")) != key) or e.get("name") in named
         sh.update(colour=NEW if changed else ELEMENT, text=e.get("name"), name=e.get("name"), new=changed)
         out["elements"].append(sh)
-    memo["elements"] = now
+    if flat is None:
+        memo["elements"] = now
 
     seen_d = memo.get("dimensions") or {}
     now_d = {}
-    for d in st.get("dimensions", []):
+    for d in (st.get("dimensions", []) if flat is None else []):
         if not d.get("visible", True):
             continue
         sh = dimension_shape(st, d)
@@ -679,7 +935,8 @@ def plan(session, tool, args=None, body=None, memo=None):
         changed = (marking and seen_d.get(d.get("id")) != key) or d.get("name") in named
         sh.update(colour=NEW if changed else DIMENSION, name=d.get("name"), new=changed)
         out["dimensions"].append(sh)
-    memo["dimensions"] = now_d
+    if flat is None:
+        memo["dimensions"] = now_d
 
     ss = st.get("sectionState") or {}
     seen_s = memo.get("sections") or {}
