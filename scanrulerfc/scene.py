@@ -796,6 +796,76 @@ def flat_plan(st, tool, args=None, body=None, memo=None):
                        "aligned": isinstance(al, dict)}}
 
 
+# Labels on the sheet kept apart (window pass 3, 01-012 to 01-070: "Mid"
+# over "Sparse", "Bore centre" under "Bore to left 20.000 mm", the note
+# over the Diagonal's value). A label is drawn in screen space from its
+# point (SoText2 / SoTextLabel: left end of the baseline), so its box on
+# the sheet is its words' size times the sheet's millimetres per pixel.
+LABEL_CHAR_W = 0.62    # a character's advance, a share of the font size (bold sans; a little wide on purpose)
+LABEL_LINE_H = 1.25    # a line's height, a share of the font size
+LABEL_GAP = 0.15       # the space kept between two labels, a share of the font size
+LABEL_STEPS = ((0, 0), (0, 1), (0, -1), (0, 2), (0, -2), (-0.5, 1), (0.5, -1), (0, 3), (0, -3), (-1, 0), (1, 0), (0, 4), (0, -4))
+
+
+def sheet_per_px(box, view):
+    """The sheet's units per device pixel once flat_frame's camera frames
+    box (two 3D corners, padded as scene_coin.frame_sheet pads them) in a
+    view (width, height) device px: Coin's viewBoundingBox makes the
+    view's height the box's diagonal (its bounding sphere), its width when
+    the view stands taller than wide. None without a view."""
+    if not view or not view[0] or not view[1]:
+        return None
+    lo, hi = (np.asarray(x, dtype=float) for x in box)
+    pad = 0.04 * float(np.linalg.norm(hi - lo)) or 1.0
+    diag = float(np.linalg.norm((hi + pad) - (lo - pad)))
+    w, h = float(view[0]), float(view[1])
+    return diag / (w if w < h else h)
+
+
+def label_box(text, uv, per_px, font_px, margin_px):
+    """(x0, y0, x1, y1) on the sheet of a label whose baseline starts at uv."""
+    lines = str(text).split("\n")
+    w = (max(len(t) for t in lines) * LABEL_CHAR_W * font_px + 2 * margin_px) * per_px
+    h = (len(lines) * LABEL_LINE_H * font_px + 2 * margin_px) * per_px
+    x, y = float(uv[0]) - margin_px * per_px, float(uv[1]) - (0.25 * font_px + margin_px) * per_px
+    return (x, y, x + w, y + h)
+
+
+def spread_labels(shapes, frame, per_px, font_px, margin_px=0.0):
+    """Each shape's label ("text" at "at", a 3D point) moved, when it would
+    cover one placed before it, to the nearest free place up or down the
+    sheet (whole label heights) or beside it: in the order given, so put
+    the ones that must not move first. frame: {"origin", "basisU",
+    "basisV"}. Changes the shapes' "at" in place. Returns {"count",
+    "moved", "overlapping" (still covering another), "perPx"}."""
+    o, u, v = (np.asarray(frame[k], dtype=float) for k in ("origin", "basisU", "basisV"))
+    placed, moved, over = [], 0, 0
+    gap = LABEL_GAP * font_px * per_px
+    todo = [sh for sh in shapes if sh.get("text") and sh.get("at") is not None]
+    for sh in todo:
+        at = np.asarray(sh["at"], dtype=float)
+        uv = np.array([float(np.dot(at - o, u)), float(np.dot(at - o, v))])
+        x0, y0, x1, y1 = label_box(sh["text"], uv, per_px, font_px, margin_px)
+        w, h = x1 - x0, y1 - y0
+        best = None
+        for sx, sy in LABEL_STEPS:
+            b = (x0 + sx * w, y0 + sy * (h + gap), x1 + sx * w, y1 + sy * (h + gap))
+            if not any(b[0] < q[2] + gap and q[0] < b[2] + gap and b[1] < q[3] + gap and q[1] < b[3] + gap for q in placed):
+                best = (sx, sy, b)
+                break
+        if best is None:
+            over += 1
+            placed.append((x0, y0, x1, y1))
+            continue
+        sx, sy, b = best
+        placed.append(b)
+        if sx or sy:
+            moved += 1
+            sh["at"] = at + (sx * w) * u + (sy * (h + gap)) * v
+            sh["labelMoved"] = [round(sx * w, 3), round(sy * (h + gap), 3)]
+    return {"count": len(todo), "moved": moved, "overlapping": over, "perPx": round(float(per_px), 5)}
+
+
 def camera_rotation(u, v):
     """The camera's orientation that looks square onto the plane of u, v
     (u to the right, v up, the eye on the side of u x v), as a quaternion

@@ -157,6 +157,7 @@ class Builder:
         self.label_node = None      # the type the labels were drawn with
         self.offsets = []           # the meshes drawn a hair toward the eye
         self.texture = None         # the sheet image's texture: [w, h] drawn, or why not
+        self.labels = None          # the sheet's labels kept apart: scene.spread_labels' account
 
     def legend_font(self):
         """The legend's SoFont size, device pixels."""
@@ -339,6 +340,25 @@ class Builder:
             self.texture = f"{type(e).__name__}: {e}"
             return None
 
+    def spread(self, plan):
+        """The labels on the 2D sheet kept apart (scene.spread_labels), in
+        the order: what this call made, then the sheet's own items, then
+        the 3D groups drawn over it (a section's name stays where it was
+        last). self.labels: what was done, for the facts. Never raises."""
+        try:
+            flat = plan["flat"]
+            per = SC.sheet_per_px(flat["box"], self.view)
+            if per is None:
+                self.labels = {"why": "no view size"}
+                return
+            shapes = [sh for g in ("items",) for sh in _seq(flat.get(g))]
+            shapes += [sh for g in ("sections", "elements", "dimensions", "items") for sh in _seq(plan.get(g))]
+            shapes.sort(key=lambda sh: 0 if sh.get("new") else 1)  # stable: the rest keep their order
+            font = self.font_size(True)
+            self.labels = SC.spread_labels(shapes, flat["frame"], per, font, LABEL_FRAME * font)
+        except Exception as e:  # noqa: BLE001 — the labels stay where they were
+            self.labels = {"error": f"{type(e).__name__}: {e}{_where(e)}"}
+
     def sheet(self, flat):
         """The 2D sheet: its image (an image's sheet), then its border,
         edges, elements, dimensions, notes and zero point, all on top of
@@ -385,6 +405,7 @@ class Builder:
             drawn += 1
         flat = plan.get("flat")
         if flat is not None:
+            self.spread(plan)
             root.addChild(self.sheet(flat))
             drawn += 1
         lift = 0.0
@@ -578,7 +599,7 @@ def facts(plan, builder, height=None, framed=None):
     if fl is not None:
         out["flat"] = dict(fl["counts"], sheet=fl["kind"], units=fl["units"],
                            corners=[[round(float(c), 3) for c in p] for p in fl["corners"]],
-                           texture=builder.texture if fl["kind"] == "image" else None,
+                           texture=builder.texture if fl["kind"] == "image" else None, labels=builder.labels,
                            new=[x.get("name") for x in fl["items"] if x.get("new")], framed=framed,
                            scanHidden=bool(plan.get("scan") and plan["scan"].get("hide")))
     secs = _seq(plan.get("sections"))

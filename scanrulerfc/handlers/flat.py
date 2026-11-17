@@ -144,6 +144,33 @@ def report_input(session):
     return r
 
 
+def sheet_source(session):
+    """What is on the 2D sheet, for every flat_ answer ("sheet"): {"kind":
+    "image" | "section" | None, "name", "units", "scale" (the report's scale
+    line, "Scale: " left off)}. Window pass 3 (01-059, 01-074): an image
+    that was not opened left the section on the sheet, and nothing in the
+    later answers said so. Never raises."""
+    try:
+        f = fl_state(session)
+        subj = f["subject"]
+        if subj is None:
+            return {"kind": None, "name": None, "units": None, "scale": None}
+        if subj["kind"] == "section":
+            sec = find_section(session, subj["id"])
+            return {"kind": "section", "name": sec["name"], "units": "mm", "scale": FC.scale_line({"section": True})[len("Scale: "):]}
+        p = f["pxPerMm"]
+        r = {"calSource": f["calSource"], "pxPerMm": p}
+        name = f["image"]["fileName"] if f["image"] else subj.get("name")
+        return {"kind": "image", "name": name, "units": "mm" if p else "px", "scale": FC.scale_line(r)[len("Scale: "):]}
+    except Exception as e:  # noqa: BLE001 — the answer stands without it
+        return {"kind": None, "name": None, "units": None, "scale": None, "error": f"{type(e).__name__}: {e}"}
+
+
+def source_words(src):
+    """'image flat-test.png' / 'section Mid' / 'nothing'."""
+    return f"{src['kind']} {src['name']}" if src and src.get("kind") else "nothing"
+
+
 def describe_flat(session):
     f = fl_state(session)
     units, _u, chains, sec = sheet(session) if f["subject"] else (None, None, [], None)
@@ -190,13 +217,17 @@ def bind(session):
     def flat_open_image(a):
         path = a.get("path")
         if not path or not os.path.isfile(path):
-            raise ToolError("not_found", f"path {path!r}: no such file — give the image's path on this computer.")
+            # Window pass 3 (01-059 to 01-074): this refusal left the section
+            # on the sheet and the calls after it measured the plate. Say so.
+            raise ToolError("not_found", f"path {path!r}: no such file — give the image's path on this computer. "
+                                         f"The sheet still shows {source_words(sheet_source(session))}: the flat_ calls after this one read that.")
         with open(path, "rb") as fh:
             data = fh.read()
         try:
             gray, w, h, decoder = read_image(path, data)
         except ValueError as e:
             raise ToolError("invalid_input", f"{os.path.basename(path)}: {e}")
+        was = sheet_source(session)
         f = fl_state(session)
         ppm = FC.image_pixels_per_mm(data)
         S.state(session)["flatSubject"] = {"kind": "image", "name": os.path.basename(path)}
@@ -208,7 +239,7 @@ def bind(session):
         f.update({"image": {"name": os.path.basename(path), "fileName": os.path.basename(path), "width": w, "height": h, "gray": gray[::-1].copy(), "decoder": decoder},
                   "pxPerMm": ppm, "calSource": "metadata" if ppm else "none"})
         detect(f, f["sensitivity"])
-        return {"flat": describe_flat(session)}
+        return {"flat": describe_flat(session), "replaced": source_words(was)}
 
     def flat_calibrate(a):
         f = fl_state(session)
@@ -745,7 +776,7 @@ def bind(session):
         return out
 
 
-    return {
+    tools = {
         "flat_objects": flat_objects,
         "flat_profile": flat_profile,
         "flat_open_image": flat_open_image,
@@ -763,6 +794,22 @@ def bind(session):
         "flat_report": flat_report,
         "flat_export": flat_export,
     }
+    return {n: with_sheet(session, fn) for n, fn in tools.items()}
+
+
+def with_sheet(session, fn):
+    """fn(args) whose answer names what is on the sheet ("sheet",
+    sheet_source): every flat_ answer says which sheet it read or changed."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(a=None, *more):
+        out = fn(a if a is not None else {}, *more)
+        if isinstance(out, dict) and "sheet" not in out:
+            out["sheet"] = sheet_source(session)
+        return out
+
+    return run
 
 
 def scale_fit(fit, k):

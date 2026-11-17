@@ -128,6 +128,18 @@ LONG_CHECK = 28
 SPACING, MARGIN, GROUP_MARGINS = 4, 4, (4, 4, 4, 4)
 # The dynamic property that marks a section card (a QFrame) for the sheet.
 CARD = "card"
+# Window pass 3 (01-012 to 02-096): the Create Element keys were squashed
+# to a few pixels high and unreadable, and the Measure Against keys were
+# cut. The scroll area gives its page the height the page's layout
+# reckons for its width (heightForWidth) — reckoned before reflow put the
+# keys in fewer columns, so more rows than it counted. A key keeps its own
+# height and the width of its words (no less than KEY_MIN_W), and the
+# page's minimum height is set again from its layout after every reflow
+# (fit_height), so no layout can squash a key below its words.
+KEY_MIN_W = 64
+# What the last page laid out reported (fit_height): the panel's facts in a
+# call's answer (dock.after_call) and a live check in FreeCAD's console.
+LAST_LAYOUT = {}
 
 
 PAGE = "ScanRulerPage"
@@ -207,6 +219,51 @@ def reflow(width, grids, rows, down, across, fields=()):
                 row.setDirection(want)
                 r += 1
     return g, r
+
+
+def key_size(b):
+    """A key that keeps its words: its minimum width the words' (at least
+    KEY_MIN_W), its height its own and fixed (no layout squashes it)."""
+    from PySide import QtWidgets
+
+    hint = b.sizeHint()
+    b.setMinimumWidth(max(KEY_MIN_W, int(hint.width())))
+    b.setMinimumHeight(int(hint.height()))
+    p = b.sizePolicy()
+    b.setSizePolicy(p.horizontalPolicy(), QtWidgets.QSizePolicy.Fixed)
+    return b
+
+
+def squashed(buttons):
+    """How many of the keys are drawn lower or narrower than their words
+    need (height under the size hint's, width under the minimum)."""
+    n = 0
+    for b in buttons:
+        try:
+            if b.isVisible() and (b.height() < b.sizeHint().height() or b.width() < b.minimumWidth()):
+                n += 1
+        except Exception:  # noqa: BLE001 — a key gone meanwhile
+            continue
+    return n
+
+
+def fit_height(root, width=None):
+    """The page's minimum height set to what its layout needs at its width
+    now (after reflow), so the scroll area cannot give it less. Returns
+    the layout's account (also LAST_LAYOUT)."""
+    lay = root.layout()
+    w = int(width if width is not None else root.width())
+    lay.activate()
+    need = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else -1
+    need = max(int(need), int(lay.totalMinimumSize().height()))
+    if root.minimumHeight() != need:
+        root.setMinimumHeight(need)
+    keys = [b for grid in getattr(root, "_grids", []) for b in grid[1]]
+    out = {"width": w, "minHeight": need, "height": int(root.height()), "keys": len(keys), "squashed": squashed(keys),
+           "columns": [grid[3] for grid in getattr(root, "_grids", [])]}
+    LAST_LAYOUT.clear()
+    LAST_LAYOUT.update(out)
+    return out
 
 
 def section_object_name(section_id):
@@ -342,6 +399,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
                     b.setChecked(o["value"] == fd["value"])
                     b.setToolTip(o["tip"])
                     b.clicked.connect(lambda _=False, sid=s["id"], fid=fd["id"], v=o["value"]: emit(sid, fid, v))
+                    key_size(b)
                     group.addButton(b)
                     tl.addWidget(b)
             row.addWidget(w)
@@ -366,6 +424,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 b.setProperty("primary", True)
             if on_key:
                 b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
+            key_size(b)
             grid.addWidget(b, i // per, i % per)
             made.append(b)
         grids.append([grid, made, per, per])
@@ -402,6 +461,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             b.setEnabled(sl["button"]["enabled"])
             if on_key:
                 b.clicked.connect(lambda _=False, kid=sl["button"]["id"]: on_key(s["id"], kid))
+            key_size(b)
             row.addWidget(b)
             box.addLayout(row)
         for r in s["rows"]:
@@ -426,8 +486,17 @@ def widget(model, on_key=None, on_field=None, parent=None):
         def eventFilter(self, obj, ev):  # noqa: N802 (Qt)
             if ev.type() == QtCore.QEvent.Resize:
                 reflow(obj.width(), grids, rows, down, across, fields)
+                # On the next turn, once the grids hold their new rows.
+                QtCore.QTimer.singleShot(0, lambda o=obj: _fit_later(o))
             return False
 
+    def _fit_later(o):
+        try:
+            fit_height(o)
+        except RuntimeError:  # the page went meanwhile (a refresh)
+            pass
+
+    root._grids = grids
     root._reflow = Reflow(root)  # kept with its page
     root.installEventFilter(root._reflow)
     return root
