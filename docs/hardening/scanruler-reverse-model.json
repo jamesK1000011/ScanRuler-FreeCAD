@@ -44,13 +44,10 @@
   "where": "The argument shapes, ids, refusals and parameter answers were run in plain Python on the add-on's stand-in kernel on this pass; the volumes are worked out by hand. No geometry ran: the kernel is FreeCAD's Part."
  },
  "conventions": {
-  "placeholders": {
-   "<UPRIGHT_EDGES>": "a list of four whole numbers: the index of each edge in the reverse_body_describe { body: 'Block' } answer just before whose kind is 'line', length 20 and mid [0 or 40, 0 or 30, 10] (the block's corners; NOT the bore's seam, whose mid is at y 15)",
-   "<MOVED_PEG>": "the id of the 1000 mm³ body in the answer of the moveBody call (7 if a move keeps the body's id, 8 if the move makes it its own)"
-  },
   "session": "A fresh document: the ids above depend on it. Run the chunks in order.",
   "health": "Every changing reverse_ call carries health; it is red when a feature failed (the add-on's own reading, new on this pass). Expected green throughout.",
-  "tolerances": "Volumes within 0.05 mm³ (exact geometry)."
+  "tolerances": "Volumes within 0.05 mm³ (exact geometry).",
+  "references": "No placeholders: call 20 takes the four upright edges from call 19's answer ({ $from: 19, $at: \"edges.0\" } … edges 1, 4, 7) and call 36 the moved body's id from call 35's ({ $from: 35, $at: \"added.0.bodies.0\" }); n is the call's index in this whole list (agentlink/chain.py). Each reaches one call back, so a batch answered in parts keeps each pair together."
  },
  "calls": [
   {
@@ -306,7 +303,7 @@
    "arguments": {
     "body": "Block"
    },
-   "expect": "faces 7: six planes and one cylinder (radius 5, dir [0, 0, ±1], origin 4); edges: the 12 lines of the box, two circles of radius 5 and the cylinder's seam (a line of length 20 at x 25 or 15, y 15). Note the indices of the four upright edges at the block's corners for the next call"
+   "expect": "faces 7: six planes and one cylinder (radius 5, dir [0, 0, ±1], origin 4); edges: the 12 lines of the box, two circles of radius 5 and the cylinder's seam (a line of length 20 at x 25 or 15, y 15). The next call takes the four upright corner edges from this answer by reference: edges 0, 1, 4 and 7 (mid [0, 0, 10], [40, 0, 10], [0, 30, 10], [40, 30, 10] in the live answer of 16 Nov; the seam is edge 14, mid [25, 15, 10]). If OCCT numbers them otherwise, call 20 rounds the wrong edges: its volume tells"
   },
   {
    "tool": "reverse_feature_add",
@@ -315,11 +312,28 @@
      "kind": "fillet",
      "name": "Round",
      "body": "Block",
-     "edges": "<UPRIGHT_EDGES>",
+     "edges": [
+      {
+       "$from": 19,
+       "$at": "edges.0"
+      },
+      {
+       "$from": 19,
+       "$at": "edges.1"
+      },
+      {
+       "$from": 19,
+       "$at": "edges.4"
+      },
+      {
+       "$from": 19,
+       "$at": "edges.7"
+      }
+     ],
      "radius": 3
     }
    },
-   "expect": "added [{ id 5, name 'Round', status 'ok' }]; Block: volume 22274.69 (22429.20 - (4 - pi) x 3² x 20 = 154.51), faces 11, closed true"
+   "expect": "added [{ id 5, name 'Round', status 'ok' }]; Block: volume 22274.69 (22429.20 - (4 - pi) x 3² x 20 = 154.51), faces 11, closed true. edges: the four edge records of call 19's answer by reference ({ $from: 19, $at: \"edges.N\" }): each is a fingerprint (kind, mid, dir, length, faces, origin) with its index beside it, which reverse_feature_add takes as a fingerprint (handlers.py _picks)"
   },
   {
    "tool": "reverse_feature_add",
@@ -530,15 +544,18 @@
      "copy": false
     }
    },
-   "expect": "added [{ id 8, name 'Seat dowel', kind 'moveBody', status 'ok' }]; bodies: Block 22274.69 and a 1000 mm³ body with box [35,0,0] to [45,10,10] (note its id for the next call)"
+   "expect": "added [{ id 8, name 'Seat dowel', kind 'moveBody', status 'ok' }]; bodies: Block 22274.69 and a 1000 mm³ body with box [35,0,0] to [45,10,10] (the next call takes its id by reference: added.0.bodies.0, 7 when the move keeps the body's id, as on 16 Nov)"
   },
   {
    "tool": "reverse_body_clearance",
    "arguments": {
     "a": 2,
-    "b": "<MOVED_PEG>"
+    "b": {
+     "$from": 35,
+     "$at": "added.0.bodies.0"
+    }
    },
-   "expect": "gap 0; overlap 480.69 (the 5 x 10 x 10 the peg shares with the block, 500, less the rounded corner (1 - pi/4) x 3² x 10 = 19.31)"
+   "expect": "gap 0; overlap 480.69 (the 5 x 10 x 10 the peg shares with the block, 500, less the rounded corner (1 - pi/4) x 3² x 10 = 19.31). b: the moved body's id from call 35's answer by reference (added.0.bodies.0)"
   },
   {
    "tool": "part_primitive",
@@ -704,9 +721,10 @@
   {
    "tool": "doc_save",
    "arguments": {
-    "path": "scan-reverse-model"
+    "path": "scan-reverse-model",
+    "overwrite": true
    },
-   "expect": "path …/scan-reverse-model.FCStd"
+   "expect": "path …/scan-reverse-model.FCStd; overwrite: true replaces this model's own file from an earlier run (without it a second run is refused: 'another FreeCAD document already there')"
   },
   {
    "tool": "doc_close",

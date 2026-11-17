@@ -56,12 +56,10 @@
   "where": "Every answer but flat_render's and the comb's was produced by running the handlers in plain Python on this pass (the section on a plate made with the add-on's own mesh boolean and an 64-sided hole; the image through the add-on's own PNG reader, not Qt's). Nothing ran in FreeCAD."
  },
  "conventions": {
-  "placeholders": {
-   "<BORE>": "the chain number of the bore in the flat_edges answer after section 'Mid': the chain whose length is about 31.4 (chains[1].chain when the outline is the longest; 1 where it was tried). Chain numbers are not the list's order."
-  },
   "session": "Run in a fresh session (or after scan_open replaced the scan): the first flat_edges expects an empty sheet. Run the chunks in order in the same document.",
-  "image": "Before the call flat_open_image { path: \"flat-test.png\" }, write the PNG into the session's folder (session_state gives outDir; ~/AgentLink by default) with the script in notes.makePng: `python3 mkpng.py <outDir>/flat-test.png`. Plain Python 3, no packages.",
-  "jobs": "flat_open_image, flat_calibrate and flat_detect_edges are declared heavy: outside a batch a call past 45 s answers with a job id. This image takes a fraction of a second."
+  "image": "Call 48 opens ~/AgentLink/hardening/refs/flat-test.png, a fixture put there once before the first run (not by the model): python3 mkpng.py ~/AgentLink/hardening/refs/flat-test.png with the script in notes.makePng (plain Python 3, no packages; the same bytes every time). The repository holds the script, not the PNG (a raster image in the repository needs a reviewed hash in .github/privacy/images.txt).",
+  "jobs": "flat_open_image, flat_calibrate and flat_detect_edges are declared heavy: outside a batch a call past 45 s answers with a job id. This image takes a fraction of a second.",
+  "references": "No placeholders: calls 30, 32 and 44 take the bore's chain number from call 12's flat_edges answer ({ $from: 12, $at: \"chains.1.chain\" }; chain numbers are not the list's order, the list is longest first). The longest reaches 32 calls back: run the model as one batch part (it ran as one, 70 calls, on 16 Nov); if a part boundary falls between 12 and 44, start the part at 12 again (batch { file, from: 12 })."
  },
  "notes": {
   "makePng": "# Plain Python: a 400 x 300 px, 8-bit grey PNG at 10 px/mm (pHYs 10000 px/m): a white 40 x 30 mm sheet with a black\n# disc (centre [12, 15] mm, radius 8) and a black rectangle (x 25..35, y 10..16 mm). Sheet origin bottom-left, y up.\nimport struct, zlib, sys, os\ndef chunk(t, d): return struct.pack(\">I\", len(d)) + t + d + struct.pack(\">I\", zlib.crc32(t + d) & 0xFFFFFFFF)\ndef make(path, W=400, H=300, ppmm=10, phys=True):\n    rows = bytearray()\n    for r in range(H):                      # rows top first\n        y = (H - r - 0.5) / ppmm\n        rows.append(0)                      # filter 0\n        for c in range(W):\n            x = (c + 0.5) / ppmm\n            dark = (x - 12) ** 2 + (y - 15) ** 2 <= 64 or (25 <= x <= 35 and 10 <= y <= 16)\n            rows.append(0 if dark else 255)\n    png = b\"\\x89PNG\\r\\n\\x1a\\n\" + chunk(b\"IHDR\", struct.pack(\">IIBBBBB\", W, H, 8, 0, 0, 0, 0))\n    if phys: png += chunk(b\"pHYs\", struct.pack(\">IIB\", ppmm * 1000, ppmm * 1000, 1))\n    png += chunk(b\"IDAT\", zlib.compress(bytes(rows), 9)) + chunk(b\"IEND\", b\"\")\n    open(path, \"wb\").write(png)\nif __name__ == \"__main__\":\n    make(os.path.expanduser(sys.argv[1]), phys=(len(sys.argv) < 3))\n"
@@ -182,7 +180,7 @@
   {
    "tool": "flat_edges",
    "arguments": {},
-   "expect": "units 'mm'; total 2; one closed chain of length 140.0 with bounds [-20, -15] to [20, 15] (the 40 x 30 outline; the sheet's zero is the plate's centre) and one closed chain of length 31.40 to 31.42 with bounds about [-5, -5] to [5, 5] (the bore: 2 pi x 5 = 31.416); each with a few hundred points now"
+   "expect": "units 'mm'; total 2; one closed chain of length 140.0 with bounds [-20, -15] to [20, 15] (the 40 x 30 outline; the sheet's zero is the plate's centre) and one closed chain of length 31.40 to 31.42 with bounds about [-5, -5] to [5, 5] (the bore: 2 pi x 5 = 31.416); each with a few hundred points now. Calls 30, 32 and 44 take the bore's chain number from this answer by reference: chains.1.chain (the list is longest first, so the outline is chains.0 and the bore chains.1; chain 1 on 16 Nov)"
   },
   {
    "tool": "flat_objects",
@@ -407,7 +405,10 @@
    "tool": "flat_curvature",
    "arguments": {
     "chains": [
-     "<BORE>"
+     {
+      "$from": 12,
+      "$at": "chains.1.chain"
+     }
     ]
    },
    "expect": "items[0]: closed true; one stretch, kind arc, radius 4.98 to 5.00, convex false (a bore is a hollow); scatter under 0.001"
@@ -421,7 +422,10 @@
    "tool": "flat_profile",
    "arguments": {
     "chains": [
-     "<BORE>"
+     {
+      "$from": 12,
+      "$at": "chains.1.chain"
+     }
     ],
     "about": "Bore"
    },
@@ -529,7 +533,10 @@
    "tool": "flat_curvature",
    "arguments": {
     "chains": [
-     "<BORE>"
+     {
+      "$from": 12,
+      "$at": "chains.1.chain"
+     }
     ],
     "comb": true,
     "name": "Bore comb"
@@ -565,9 +572,9 @@
   {
    "tool": "flat_open_image",
    "arguments": {
-    "path": "flat-test.png"
+    "path": "~/AgentLink/hardening/refs/flat-test.png"
    },
-   "expect": "flat.image { fileName 'flat-test.png', width 400, height 300, decoder 'QImage' (or 'png (zlib)' without Qt) }; units 'mm'; calibration { source 'metadata', pxPerMm { x 10, y 10 } }; edges.chains 6 (the disc, the rectangle and four 2 mm specks at the disc's diagonals — a hard-edged synthetic image; the count may differ by a few under QImage); elements [] (the section's elements are gone)"
+   "expect": "the image from the hardening refs folder (written once by notes.makePng, see conventions.image): flat.image { fileName 'flat-test.png', width 400, height 300, decoder 'QImage' (or 'png (zlib)' without Qt) }; units 'mm'; calibration { source 'metadata', pxPerMm { x 10, y 10 } }; edges.chains 6 (the disc, the rectangle and four 2 mm specks at the disc's diagonals — a hard-edged synthetic image; the count may differ by a few under QImage); elements [] (the section's elements are gone)"
   },
   {
    "tool": "flat_edges",

@@ -128,13 +128,13 @@
   "simulated": "Every number above was also read by running the add-on's own handlers in plain Python on a mesh of the same part built with numpy (boundary-vertex triangulation, then the add-on's densify). FreeCAD's mesher will place vertices differently: counts and areas marked 'about' move by a few per cent, the dimensions do not. The FreeCAD-only steps (meshing, scan_open { object }, the shadow, section_to_sketch, element_to_document, deviation_open_reference { body }, pack_write, manual_check, manual_render) were not run anywhere."
  },
  "conventions": {
-  "chunks": "Run in order, in chunks of 20; the comments in the patch notes mark seven natural chunks but any cut works — calls name elements, sections and bodies by the names they were given, never by an earlier answer's id (one exception: <BODY>).",
-  "<JOB>": "Only when a heavy read (scan_qa, scan_segment, scan_heightmap, section_fit, deviation_align, deviation_measure, deviation_set_target, deviation_hotspots, deviation_volume, deviation_export, thickness_measure, manual_check, manual_render) answers with status running instead of its result: the answer's job field fills <JOB> in job_status { job: \"<JOB>\", wait: 25 }. Inside a batch heavy reads run inline and no job id comes.",
+  "chunks": "Run in order, in chunks of 20; the comments in the patch notes mark seven natural chunks but any cut works — calls name elements, sections and bodies by the names they were given, never by an earlier answer's id (one exception: call 59 takes call 58's body by reference, one call back).",
   "frame": "All coordinates are the CAD frame of the block until the align_ calls of chunk 6; each of those says the box it should leave.",
   "builderCalls": "doc_new, part_primitive, part_boolean, part_transform, meshobj_from_shape, mesh_densify, mesh_use_edited and pd_pad belong to other families (arguments read from their schemas, not hardened here): if one answers differently, any way of getting a body Block, a body Worn and a mesh object labelled WornScan serves.",
-  "<BODY>": "section_to_sketch's answer field body (call 58) fills <BODY> in the pd_pad after it (call 59): a new Body takes FreeCAD's next free label (Body002 on the Mac), never a fixed one. The one call here that needs an earlier answer; to avoid it, make the Body first with pd_body_new { name } and give it to section_to_sketch as body.",
   "refusals": "A call whose expect starts REFUSED is meant to be refused: check the code and that the message says what to do next.",
-  "files": "Relative paths go in the session's output folder."
+  "files": "Relative paths go in the session's output folder.",
+  "references": "section_to_sketch's answer field body (call 58) is call 59's body: { $from: 58, $at: \"body\" } (a new Body takes FreeCAD's next free label, Body002 on the Mac, never a fixed one).",
+  "jobs": "In one batch every heavy read (scan_qa, scan_segment, scan_heightmap, section_fit, deviation_align, deviation_measure, deviation_set_target, deviation_hotspots, deviation_volume, deviation_export, thickness_measure, manual_check, manual_render) runs inline and answers its result; no job id comes. Only when one is sent on its own and answers status running does job_status { job: <its job field>, wait: 25 } give the result."
  },
  "calls": [
   {
@@ -726,16 +726,19 @@
     "section": "Mid",
     "name": "MidProfile"
    },
-   "expect": "a new Body (body: its label, FreeCAD's next free one — \"Body002\" on the Mac — which fills <BODY>) with sketch MidProfile: fitted chain 0 { lines 4 }, chain 1 { circles 1 }; wires: 2, both closed; frame.origin [0, 0, 10], normal [0, 0, 1]; next is the pd_pad call with both labels; health ok (an under-constrained sketch is expected, not an error)"
+   "expect": "a new Body (body: its label, FreeCAD's next free one — \"Body002\" on the Mac — which call 59 takes by reference) with sketch MidProfile: fitted chain 0 { lines 4 }, chain 1 { circles 1 }; wires: 2, both closed; frame.origin [0, 0, 10], normal [0, 0, 1]; next is the pd_pad call with both labels; health ok (an under-constrained sketch is expected, not an error)"
   },
   {
    "tool": "pd_pad",
    "arguments": {
-    "body": "<BODY>",
+    "body": {
+     "$from": 58,
+     "$at": "body"
+    },
     "sketch": "MidProfile",
     "length": 5
    },
-   "expect": "a pad: volume about 11434 (5 × (2400 − π·6²)); proves the sketch is a usable profile. <BODY> is the body label section_to_sketch answered"
+   "expect": "a pad: volume about 11434 (5 × (2400 − π·6²)); proves the sketch is a usable profile. body: the label call 58 answered, by reference ({ $from: 58, $at: \"body\" }; Body002 on 16 Nov)"
   },
   {
    "tool": "element_to_document",
@@ -850,7 +853,7 @@
     "maxThickness": 25,
     "maxPoints": 20000
    },
-   "expect": "a job or its answer: stats.min 10.0 (the pocket's wall to the x 60 face), max under 25, mean 18–20; sampled { points: 20000 }; thinSpots.count 0 (limit 1 mm). About 20 s in plain Python off the Mac; if a job id comes back, job_status { job: \"<JOB>\" } gives it."
+   "expect": "a job or its answer: stats.min 10.0 (the pocket's wall to the x 60 face), max under 25, mean 18–20; sampled { points: 20000 }; thinSpots.count 0 (limit 1 mm). About 20 s in plain Python off the Mac; inside a batch it runs inline and answers itself (conventions.jobs)."
   },
   {
    "tool": "thickness_settings",
@@ -1417,9 +1420,10 @@
   {
    "tool": "doc_save",
    "arguments": {
-    "path": "scan-noise-model"
+    "path": "scan-noise-model",
+    "overwrite": true
    },
-   "expect": "path …/scan-noise-model.FCStd; bytes well under 2 MB — the sphere, its meshes and this document's own ScanRuler state only (before the fix the measure document's 3.9 MB state was written into every other document's file)"
+   "expect": "path …/scan-noise-model.FCStd; bytes well under 2 MB — the sphere, its meshes and this document's own ScanRuler state only (before the fix the measure document's 3.9 MB state was written into every other document's file); overwrite: true replaces this model's own file from an earlier run (without it a second run is refused: 'another FreeCAD document already there')"
   },
   {
    "tool": "doc_switch",
