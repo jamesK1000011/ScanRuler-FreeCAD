@@ -205,6 +205,25 @@ def follow_width(w):
     return w
 
 
+CREDIT_ROW = 1  # the credit's row in the dock's layout: under the header, over the pages
+
+
+def credit_label(label):
+    """The credit label made for its row: wrapped and following the panel's
+    width (as follow_width does), with no background of its own (it read as a box
+    floating over the window, r9sr-1), its name "ScanRulerCredit", and
+    never shorter than its wrapped text (vertical policy Minimum: the
+    layout gives it its height for the width). The label."""
+    label.setObjectName("ScanRulerCredit")
+    label.setWordWrap(True)
+    label.setStyleSheet("background: transparent;")
+    from PySide import QtWidgets
+
+    # follow_width's Ignored across, and Minimum down
+    label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Minimum)
+    return label
+
+
 class Dock:
     """The dock's widget tree; `widget` is what goes in a QDockWidget or a tab."""
 
@@ -235,6 +254,12 @@ class Dock:
         self.head.setWordWrap(True)
         follow_width(self.head)
         lay.addWidget(self.head)
+        # Stefan Hermann's credit (CNC Kitchen) on its own row at the panel's
+        # top, under the header, whole (window pass 7, r9sr-1: as the
+        # panel's last row it sat level with the document tab bar at the
+        # window's foot and read as laid over its first tab).
+        self.credit = credit_label(QtWidgets.QLabel(W.CREDIT))
+        lay.addWidget(self.credit)
         # "Unsaved changes" on a line of its own (header_html), so a narrow
         # panel never breaks it in two.
         self.stack = QtWidgets.QStackedWidget()
@@ -254,10 +279,6 @@ class Dock:
             self.stack.addWidget(holder)
         follow_width(self.stack)
         lay.addWidget(self.stack, 1)
-        foot = QtWidgets.QLabel(W.CREDIT)
-        foot.setWordWrap(True)
-        follow_width(foot)
-        lay.addWidget(foot)
         self.widget.setToolTip(W.WORKBENCH_TIP)
         self.timer = QtCore.QTimer(self.widget)
         self.timer.setInterval(REFRESH_MS)
