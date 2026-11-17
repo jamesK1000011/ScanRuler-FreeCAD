@@ -245,6 +245,9 @@ class Dock:
             # Up and down only: the page follows the panel's width and its
             # grids and rows reflow (pages/kit.reflow).
             holder.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            # A page taller than the panel scrolls; its keys never squash
+            # (its minimum height is its layout's, pages/kit.settle).
+            holder.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
             holder.setMinimumWidth(0)
             follow_width(holder)
             self.slots[wid] = holder
@@ -322,10 +325,25 @@ class Dock:
         page = PAGES[self.current]
         self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key, on_field=self.field))
         self.stack.setCurrentWidget(self.slots[self.current])
+        self.settle()
         box = reverse.box_key() if self.current == "reverse" else None
         if box_to_show(getattr(self, "_box_shown", None), box):
             self._bring_into_view(self.slots[self.current], reverse.EDITOR_SECTION)
         self._box_shown = box
+
+    def settle(self):
+        """The page just drawn laid out at once at its scroll area's width
+        (pages/kit.settle): a window picture taken in the same call shows
+        it laid out, and the account (squashed, overlapping) is read from
+        it. None for a page not drawn by kit.widget."""
+        from .pages import kit
+
+        holder = self.slots.get(self.current)
+        page = holder.widget() if holder is not None else None
+        if page is None or kit._own(page, "_reflow_now") is None:
+            return None
+        width = holder.viewport().width()
+        return kit.settle(page, width if width > 0 else None)
 
     def _bring_into_view(self, holder, section_id):
         """A section of the page scrolled into view, once the page is laid
@@ -557,9 +575,15 @@ def after_call(d=None, later=None):
         out = {"shown": True, "version": d._seen[0] if d._seen else None, "workspace": d.current}
         from .pages import kit
 
-        if kit.LAST_LAYOUT:
-            # The page laid out last (before this refresh): keys squashed
-            # below their words, its minimum height (pages/kit.fit_height).
+        settle = getattr(type(d), "settle", None)
+        laid = settle(d) if settle is not None else None
+        if laid:
+            # The page this refresh drew, laid out now and read from its
+            # geometry (pages/kit.settle): keys under their words, texts
+            # cut, overlapping siblings, its minimum height.
+            out["layout"] = laid
+        elif kit.LAST_LAYOUT:
+            # The page laid out last (pages/kit.fit_height).
             out["layout"] = dict(kit.LAST_LAYOUT)
         if not getattr(d, "_again", False):
             d._again = True

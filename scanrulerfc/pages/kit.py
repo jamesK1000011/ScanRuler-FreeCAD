@@ -247,10 +247,198 @@ def squashed(buttons):
     return n
 
 
+# --- the page's account, from its real geometry (round 9) ----------------------
+# Window round 8 (r8sr-1/2, a 332 px dock at device pixel ratio 2): the
+# Create Element keys lay over each other (rows 11 px apart, keys 22 px
+# high) and the Scanner Profiles box covered its help text, while the
+# account read squashed 0. A key kept its own height (its minimum), so it
+# was never lower than its words: its card was. The card's height came
+# from the page's height for its width, reckoned with the grid in four
+# columns and the field row across — before reflow put them in two
+# columns and stacked the row. Qt re-reckons a card only on a later turn
+# of its loop (a grid's change marks the layouts above it "not active",
+# not their cached heights), and the page was drawn again on every call.
+# Now settle() reflows, drops every cached height, sets the page's
+# minimum height from the fresh account and lays the cards out at once;
+# the account then reads the geometry: a key or box under its size hint,
+# a wrapped text cut short, and siblings that overlap.
+
+
+def grid_rows(n, cols):
+    """How many rows n keys take in cols columns."""
+    cols = max(1, int(cols or 1))
+    return (int(n) + cols - 1) // cols if n else 0
+
+
+def grid_height(n, cols, key_h, spacing=SPACING):
+    """The height a key grid needs: its rows of keys key_h high, spacing
+    between them."""
+    rows = grid_rows(n, cols)
+    return rows * int(key_h) + max(0, rows - 1) * int(spacing) if rows else 0
+
+
+def overlap(a, b):
+    """Whether two rectangles (x, y, w, h) in one parent's coordinates
+    share any area (touching edges do not)."""
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    return min(ax + aw, bx + bw) > max(ax, bx) and min(ay + ah, by + bh) > max(ay, by)
+
+
+def overlapping(items):
+    """The pairs of items that overlap: items are (name, parent, rect),
+    rect (x, y, w, h) in its parent's coordinates; only siblings (the same
+    parent) are compared — a card holds its keys. A pair is (name, name)."""
+    by_parent = {}
+    for name, parent, rect in items:
+        if rect[2] > 0 and rect[3] > 0:
+            by_parent.setdefault(id(parent), []).append((name, rect))
+    out = []
+    for group in by_parent.values():
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                if overlap(group[i][1], group[j][1]):
+                    out.append((group[i][0], group[j][0]))
+    return out
+
+
+def short_of(size, need):
+    """Whether a widget size (w, h) is under what it needs (w, h); a need of
+    None or under 0 on an axis is not checked."""
+    return any(n is not None and n >= 0 and s < n for s, n in zip(size, need))
+
+
+def _own(obj, name, default=None):
+    """An attribute set on this very object (a page's own lists), not one a
+    stand-in makes up on reading."""
+    try:
+        return vars(obj).get(name, default)
+    except TypeError:
+        return getattr(obj, name, default)
+
+
+def _rect(w):
+    g = w.geometry()
+    return (int(g.x()), int(g.y()), int(g.width()), int(g.height()))
+
+
+def _shown(w, root):
+    try:
+        return bool(w.isVisibleTo(root)) if w is not root else True
+    except Exception:  # noqa: BLE001 — a stand-in, or a widget gone
+        try:
+            return bool(w.isVisible())
+        except Exception:  # noqa: BLE001
+            return False
+
+
+def _name(w):
+    for get in ("text", "accessibleName", "objectName"):
+        try:
+            t = getattr(w, get)()
+            if isinstance(t, str) and t:
+                return t[:24]
+        except Exception:  # noqa: BLE001
+            continue
+    return type(w).__name__
+
+
+def measure(root):
+    """The page's account from its geometry as laid out now (settle runs
+    the layout first): keys (and boxes) under their size hint, wrapped
+    texts cut, and overlapping siblings. Duck-typed: no Qt import."""
+    keys = [b for grid in _own(root, "_grids", []) for b in grid[1]]
+    laid = list(_own(root, "_laid", ()))
+    seen, items, low, cut = set(), [], 0, 0
+    for w, kind in laid:
+        if id(w) in seen or not _shown(w, root):
+            continue
+        seen.add(id(w))
+        try:
+            r = _rect(w)
+            items.append((_name(w), w.parentWidget(), r))
+            if kind in ("key", "field"):
+                h = w.sizeHint()
+                if short_of((r[2], r[3]), (int(h.width()) if kind == "key" else -1, int(h.height()))):
+                    low += 1
+            elif kind == "text" and w.wordWrap() and r[2] > 0:
+                if r[3] < int(w.heightForWidth(r[2])):
+                    cut += 1
+        except Exception:  # noqa: BLE001 — a widget gone meanwhile
+            continue
+    if not laid:  # a page drawn before round 9's register: the keys alone
+        low = squashed(keys)
+    pairs = overlapping(items)
+    return {"keys": len(keys), "squashed": low, "clipped": cut, "overlapping": len(pairs),
+            "overlaps": [list(p) for p in pairs[:3]]}
+
+
+def settle(root, width=None):
+    """Lay the page out now for width (its own by default), not on later
+    turns of Qt's loop: keys sized from their size hints (as polished in
+    the page), grids and rows reflowed, every cached height dropped, the
+    page's minimum height set from the fresh account (the scroll area
+    scrolls rather than squash), the page and its cards laid out, then the
+    account read from the geometry (measure). Returns it (also LAST_LAYOUT)."""
+    if _own(root, "_settling", False):
+        return dict(LAST_LAYOUT)
+    root._settling = True
+    try:
+        w = int(width if width else root.width())
+        for grid in _own(root, "_grids", []):
+            for b in grid[1]:
+                key_size(b)
+        for b, kind in _own(root, "_laid", ()):
+            if kind == "key" and not any(b is k for g in _own(root, "_grids", []) for k in g[1]):
+                key_size(b)
+        f = _own(root, "_reflow_now", None)
+        if f is not None:
+            f(w)
+        lay = root.layout()
+        cards = list(_own(root, "_cards", ()))
+        # Every cached height dropped: the rows' and grids' layouts, each
+        # card's (its own top layout) and the page's items (activate
+        # clears them; a card's updateGeometry its item's cache).
+        for sub in _own(root, "_layouts", ()):
+            sub.invalidate()
+        for card in cards:
+            cl = card.layout()
+            if cl is not None:
+                cl.invalidate()
+            card.updateGeometry()
+        lay.invalidate()
+        lay.activate()
+        need = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else -1
+        need = max(int(need), int(lay.totalMinimumSize().height()))
+        if root.minimumHeight() != need:
+            root.setMinimumHeight(need)
+        if int(root.height()) < need or (width and int(root.width()) != w):
+            root.resize(w, max(int(root.height()), need))
+        # Laid out at the page's size now, then each card inside (a parent
+        # card before the cards it holds).
+        lay.invalidate()
+        lay.activate()
+        for card in cards:
+            cl = card.layout()
+            if cl is not None:
+                cl.activate()
+        out = {"width": w, "minHeight": need, "height": int(root.height()),
+               "columns": [grid[3] for grid in _own(root, "_grids", [])]}
+        out.update(measure(root))
+        LAST_LAYOUT.clear()
+        LAST_LAYOUT.update(out)
+        return out
+    finally:
+        root._settling = False
+
+
 def fit_height(root, width=None):
     """The page's minimum height set to what its layout needs at its width
     now (after reflow), so the scroll area cannot give it less. Returns
-    the layout's account (also LAST_LAYOUT)."""
+    the layout's account (also LAST_LAYOUT). A page drawn by widget() is
+    settled instead (settle: laid out at once, read from its geometry)."""
+    if _own(root, "_reflow_now") is not None:
+        return settle(root, width)
     lay = root.layout()
     w = int(width if width is not None else root.width())
     lay.activate()
@@ -293,6 +481,13 @@ def widget(model, on_key=None, on_field=None, parent=None):
     root.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
     root.setMinimumWidth(0)
     grids, rows, fields = [], [], []
+    # What settle and measure read: each laid-out widget with its kind
+    # (key, field, text, card), the cards' and the rows' layouts.
+    laid, layouts, cards = [], [], []
+
+    def put(w, kind):
+        laid.append((w, kind))
+        return w
 
     def info_button(title, paras):
         dot = QtWidgets.QToolButton()
@@ -321,6 +516,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 row.addWidget(label(str(s["count"])))
             else:
                 row.addWidget(info_button(s["info"], s["info_text"]))
+        layouts.append(row)
         box.addLayout(row)
 
     def emit(sid, fid, v):
@@ -330,7 +526,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
     def label(text):
         lab = QtWidgets.QLabel(text)
         lab.setWordWrap(True)
-        return lab
+        return put(lab, "text")
 
     def field(s, fd, box):
         row = QtWidgets.QHBoxLayout()
@@ -348,8 +544,11 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 lab.mousePressEvent = lambda _e, w=w: w.isEnabled() and w.toggle()
                 row.addWidget(lab, 1)
         else:
-            row.addWidget(label(fd["label"]), 1)
-            fields.append(row)
+            if fd["label"]:
+                row.addWidget(label(fd["label"]), 1)
+                fields.append(row)
+            # No label (Scanner Profiles' box): the box has the whole row,
+            # and no empty row stacks above it in a narrow panel.
             if k == "select":
                 w = QtWidgets.QComboBox()
                 w.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
@@ -400,16 +599,22 @@ def widget(model, on_key=None, on_field=None, parent=None):
                     b.setToolTip(o["tip"])
                     b.clicked.connect(lambda _=False, sid=s["id"], fid=fd["id"], v=o["value"]: emit(sid, fid, v))
                     key_size(b)
+                    put(b, "key")
                     group.addButton(b)
                     tl.addWidget(b)
-            row.addWidget(w)
+                layouts.append(tl)
+            row.addWidget(w, 0 if fd["label"] else 1)
+        put(w, "field")
         w.setEnabled(fd["enabled"])
         if fd.get("info"):
             row.addWidget(info_button(fd["info"], fd["info_text"]))
+        layouts.append(row)
         box.addLayout(row)
 
     def keys(s, box):
         grid = QtWidgets.QGridLayout()
+        # The spacing columns_for counts (a style's own can be wider).
+        grid.setSpacing(SPACING)
         per = s.get("grid") or 1
         made = []
         for i, k in enumerate(s["keys"]):
@@ -425,9 +630,11 @@ def widget(model, on_key=None, on_field=None, parent=None):
             if on_key:
                 b.clicked.connect(lambda _=False, sid=s["id"], kid=k["id"]: on_key(sid, kid))
             key_size(b)
+            put(b, "key")
             grid.addWidget(b, i // per, i % per)
             made.append(b)
         grids.append([grid, made, per, per])
+        layouts.append(grid)
         box.addLayout(grid)
 
     def section_w(s, box):
@@ -444,6 +651,8 @@ def widget(model, on_key=None, on_field=None, parent=None):
             group.setProperty(CARD, True)  # the card rule in the page's sheet (theme.sheet)
             group.setAccessibleName(group_title(s))
             box.addWidget(group)
+            put(group, "card")
+            cards.append(group)
             box = QtWidgets.QVBoxLayout(group)
             box.setSpacing(SPACING)
             box.setContentsMargins(*GROUP_MARGINS)
@@ -462,7 +671,9 @@ def widget(model, on_key=None, on_field=None, parent=None):
             if on_key:
                 b.clicked.connect(lambda _=False, kid=sl["button"]["id"]: on_key(s["id"], kid))
             key_size(b)
+            put(b, "key")
             row.addWidget(b)
+            layouts.append(row)
             box.addLayout(row)
         for r in s["rows"]:
             reading = r.get("reading") or r.get("value") or ""
@@ -471,9 +682,12 @@ def widget(model, on_key=None, on_field=None, parent=None):
             field(s, fd, box)
         keys(s, box)
         if s.get("hint"):
+            # Its own row under the keys and boxes, wrapped, never lower
+            # than its lines (settle counts it in the page's height).
             h = QtWidgets.QLabel(s["hint"])
             h.setWordWrap(True)
-            box.addWidget(h)
+            h.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+            box.addWidget(put(h, "text"))
         for c in s.get("children", []):
             section_w(c, box)
 
@@ -484,19 +698,23 @@ def widget(model, on_key=None, on_field=None, parent=None):
 
     class Reflow(QtCore.QObject):
         def eventFilter(self, obj, ev):  # noqa: N802 (Qt)
-            if ev.type() == QtCore.QEvent.Resize:
-                reflow(obj.width(), grids, rows, down, across, fields)
-                # On the next turn, once the grids hold their new rows.
-                QtCore.QTimer.singleShot(0, lambda o=obj: _fit_later(o))
+            if ev.type() == QtCore.QEvent.Resize and not _own(obj, "_settling", False):
+                # At once (settle), not on a later turn: the window picture
+                # of the same call shows it laid out. Once more on the next
+                # turn for what the theme's polish changes after.
+                _settle_now(obj)
+                QtCore.QTimer.singleShot(0, lambda o=obj: _settle_now(o))
             return False
 
-    def _fit_later(o):
+    def _settle_now(o):
         try:
-            fit_height(o)
+            settle(o)
         except RuntimeError:  # the page went meanwhile (a refresh)
             pass
 
     root._grids = grids
+    root._laid, root._layouts, root._cards = laid, layouts, cards
+    root._reflow_now = lambda w: reflow(w, grids, rows, down, across, fields)
     root._reflow = Reflow(root)  # kept with its page
     root.installEventFilter(root._reflow)
     return root
