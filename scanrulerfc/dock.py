@@ -555,6 +555,12 @@ def after_call(d=None, later=None):
             return {"shown": False}
         d.refresh()
         out = {"shown": True, "version": d._seen[0] if d._seen else None, "workspace": d.current}
+        from .pages import kit
+
+        if kit.LAST_LAYOUT:
+            # The page laid out last (before this refresh): keys squashed
+            # below their words, its minimum height (pages/kit.fit_height).
+            out["layout"] = dict(kit.LAST_LAYOUT)
         if not getattr(d, "_again", False):
             d._again = True
 

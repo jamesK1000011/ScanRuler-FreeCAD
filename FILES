@@ -426,6 +426,7 @@ tests/test_upstream_011.py
 tests/test_volume_maths.py
 tests/test_wear.py
 tests/test_window_pass3.py
+tests/test_window_pass5.py
 tests/test_window_r6.py
 tests/test_window_r7.py
 tests/test_wiring.py

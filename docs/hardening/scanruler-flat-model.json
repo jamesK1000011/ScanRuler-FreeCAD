@@ -57,7 +57,7 @@
  },
  "conventions": {
   "session": "Run in a fresh session (or after scan_open replaced the scan): the first flat_edges expects an empty sheet. Run the chunks in order in the same document.",
-  "image": "Call 48 opens ~/AgentLink/hardening/refs/flat-test.png, a fixture put there once before the first run (not by the model): python3 mkpng.py ~/AgentLink/hardening/refs/flat-test.png with the script in notes.makePng (plain Python 3, no packages; the same bytes every time). The repository holds the script, not the PNG (a raster image in the repository needs a reviewed hash in .github/privacy/images.txt).",
+  "image": "Call 48 opens ~/AgentLink/hardening/refs/flat-test.png, a fixture put there once before the first run (not by the model): python3 mkpng.py ~/AgentLink/hardening/refs/flat-test.png with the script in notes.makePng (plain Python 3, no packages; the same bytes every time). The repository holds the script, not the PNG (a raster image in the repository needs a reviewed hash in .github/privacy/images.txt). Every flat_ answer names its sheet (\"sheet\": kind, name, scale) and its caption says \"on flat-test.png\" or \"on section Mid\". If call 48 is refused (not_found), the fixture is missing: stop and put it there; calls 49 to 63 would run on the section Mid (window pass 3: flat_objects and flat_profile refused, the Disc fitted to the plate's outline, the report on the 3D scan).",
   "jobs": "flat_open_image, flat_calibrate and flat_detect_edges are declared heavy: outside a batch a call past 45 s answers with a job id. This image takes a fraction of a second.",
   "references": "No placeholders: calls 30, 32 and 44 take the bore's chain number from call 12's flat_edges answer ({ $from: 12, $at: \"chains.1.chain\" }; chain numbers are not the list's order, the list is longest first). The longest reaches 32 calls back: run the model as one batch part (it ran as one, 70 calls, on 16 Nov); if a part boundary falls between 12 and 44, start the part at 12 again (batch { file, from: 12 })."
  },
@@ -567,21 +567,21 @@
    "arguments": {
     "path": "no-such-image.png"
    },
-   "expect": "refused (not_found): no such file"
+   "expect": "refused (not_found): no such file; the message says the sheet still shows section Mid"
   },
   {
    "tool": "flat_open_image",
    "arguments": {
     "path": "~/AgentLink/hardening/refs/flat-test.png"
    },
-   "expect": "the image from the hardening refs folder (written once by notes.makePng, see conventions.image): flat.image { fileName 'flat-test.png', width 400, height 300, decoder 'QImage' (or 'png (zlib)' without Qt) }; units 'mm'; calibration { source 'metadata', pxPerMm { x 10, y 10 } }; edges.chains 6 (the disc, the rectangle and four 2 mm specks at the disc's diagonals — a hard-edged synthetic image; the count may differ by a few under QImage); elements [] (the section's elements are gone)"
+   "expect": "the image from the hardening refs folder (written once by notes.makePng, see conventions.image): flat.image { fileName 'flat-test.png', width 400, height 300, decoder 'QImage' (or 'png (zlib)' without Qt) }; units 'mm'; calibration { source 'metadata', pxPerMm { x 10, y 10 } }; sheet { kind 'image', name 'flat-test.png', scale 'UNCALIBRATED — nominal 254 dpi from file metadata' }; replaced 'section Mid'; edges.chains 6 (the disc, the rectangle and four 2 mm specks at the disc's diagonals — a hard-edged synthetic image; the count may differ by a few under QImage); elements [] (the section's elements are gone)"
   },
   {
    "tool": "flat_edges",
    "arguments": {
     "limit": 2
    },
-   "expect": "total about 6; the two longest: length about 50.3 with bounds [4, 7] to [20, 23] (the disc: 2 pi x 8 = 50.27) and about 31.4 with bounds [25, 10] to [35, 16] (the rectangle's perimeter 32, its corners cut short)"
+   "expect": "sheet.kind 'image' (if it says section, call 48 was refused: see conventions.image); total about 6; the two longest: length about 50.3 with bounds [4, 7] to [20, 23] (the disc: 2 pi x 8 = 50.27) and about 31.4 with bounds [25, 10] to [35, 16] (the rectangle's perimeter 32, its corners cut short)"
   },
   {
    "tool": "flat_objects",

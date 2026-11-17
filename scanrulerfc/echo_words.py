@@ -462,6 +462,20 @@ def _cap(t):
 
 
 def _flat(name, a, b):
+    """The 2D sheet's tools, with the sheet they read named in the head
+    ("Edge chains on flat-test.png: 6 chains, …"): window pass 3, 01-059
+    and 01-074 read the section where an image was meant, and the words
+    did not tell. The answer's "sheet" (handlers/flat.sheet_source)."""
+    said = _flat_words(name, a, b)
+    src = b.get("sheet") if isinstance(b.get("sheet"), dict) else None
+    if not said or not src or not src.get("name") or name == "flat_open_image":
+        return said
+    on = f" on {src['name']}" if src.get("kind") == "image" else f" on section {src['name']}"
+    head, sep, tail = said.partition(": ")
+    return f"{head}{on}{sep}{tail}"
+
+
+def _flat_words(name, a, b):
     """The 2D sheet's tools (ScanRuler's flat workspace)."""
     fl = b.get("flat") if isinstance(b.get("flat"), dict) else (b if "subject" in b and "elements" in b else None)
     el = b.get("element") if isinstance(b.get("element"), dict) else None
@@ -471,7 +485,8 @@ def _flat(name, a, b):
         cal = (fl or {}).get("calibration") or {}
         ppm = cal.get("pxPerMm") or {}
         return _join(f"Opened the image {im.get('fileName') or a.get('path') or ''}".strip(), f"{im.get('width')} × {im.get('height')} px" if im.get("width") else None,
-                     f"{_n(ppm.get('x'), 4)} px/mm from the file" if ppm.get("x") else "uncalibrated (pixels)", _count(_d(fl, "edges", "chains"), "edge chain"))
+                     f"{_n(ppm.get('x'), 4)} px/mm from the file" if ppm.get("x") else "uncalibrated (pixels)", _count(_d(fl, "edges", "chains"), "edge chain"),
+                     f"in place of {b['replaced']}" if b.get("replaced") and b["replaced"] != "nothing" else None)
     if name == "flat_calibrate":
         c = b.get("calibration") or {}
         return _join("Calibrated the image", f"{_n(_d(c, 'pxPerMm', 'x'), 4)} px/mm ({_n(c.get('dpi'), 1)} dpi)" if _d(c, "pxPerMm", "x") else None,
