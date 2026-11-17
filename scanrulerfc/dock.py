@@ -528,6 +528,47 @@ def live():
     return _dock.get("live")
 
 
+def after_call(d=None, later=None):
+    """The panel drawn again now that a call's change is in (scanstate.
+    touched, on the GUI thread, after the state is written): at once, and
+    once more on the next turn of Qt's loop for what the host settles after
+    the call returns (Agent Link closes its undo step and recomputes
+    after the answer; the Reverse engineer's lists are read off the
+    document). Window review round 6: the panel was one call behind in
+    7023, 7029, 7031, 7037, 7042, 8013 and 8055 — it waited for its 100 ms
+    timer, and the window picture was taken before that. d: the Dock
+    (the live one by default); later(fn): runs fn on the next turn (Qt's
+    singleShot 0 by default). Returns the panel's facts for the answer, or
+    None without a panel. Never raises."""
+    d = d if d is not None else _dock.get("live")
+    if d is None:
+        return None
+    try:
+        if not d.widget.isVisible():
+            return {"shown": False}
+        d.refresh()
+        out = {"shown": True, "version": d._seen[0] if d._seen else None, "workspace": d.current}
+        if not getattr(d, "_again", False):
+            d._again = True
+
+            def again():
+                d._again = False
+                try:
+                    d.refresh()
+                except RuntimeError:  # the widget went meanwhile
+                    pass
+
+            if later is None:
+                from PySide import QtCore
+
+                QtCore.QTimer.singleShot(0, again)
+            else:
+                later(again)
+        return out
+    except Exception as e:  # noqa: BLE001 — the panel only: the call has answered
+        return {"shown": None, "error": f"{type(e).__name__}: {e}"}
+
+
 def _hosted_tab():
     """Whether Agent Link's panel has the ScanRuler tab (an older Agent
     Link); else the page is ScanRuler's own dock."""

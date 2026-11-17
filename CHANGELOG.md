@@ -9,6 +9,21 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Window review round 6 of the 3D-view overlay. Colours went to Coin as
+  0..255, so Coin's 32-bit packing swapped them: what a call made showed
+  blue and the rest orange; they are 0..1 now (new #e8590c, element
+  #1877c0, CNC Kitchen blue), segment colours too. Labels scale with the
+  view and the screen's pixel ratio (12 to 22 px, 2 more for the new one)
+  and are plain ASCII. The legend has its title (what is mapped and its
+  unit), every tick's value and its figures on a light card at the right
+  edge, at a readable size. fit_scan_* keep the ScanRuler workbench (the
+  Workshop's "fit" key no longer wins). Sections move and scale with the
+  part (align_*, scan_scale, a move in FreeCAD), as ScanRuler's own do;
+  align answers say how many moved. The panel is drawn again right after
+  each call and once more on the next turn of Qt's loop. With a window, the
+  answer carries view3d: the colours, label size, legend words, where the
+  first section stands and the panel's version.
+
 - Results drawn in FreeCAD's 3D view (window review round 3: the panel
   listed them, the view showed only the grey scan). After each ScanRuler
   call, with a window only, one overlay node in each 3D view of the

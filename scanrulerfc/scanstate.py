@@ -189,6 +189,7 @@ def touched(session, tool, write=True, args=None, answer=None):
         return
     doc = getattr(session, "doc", None)
     drawn = _window_up()
+    seen = {}
 
     def to_document():
         if write:
@@ -197,12 +198,41 @@ def touched(session, tool, write=True, args=None, answer=None):
             except Exception as e:  # noqa: BLE001 — the call went through; only the copy in the document did not
                 _report(f"the state could not be written into the document: {e}")
         if drawn:
-            from . import scene_coin
-
-            scene_coin.after_call(session, tool, args, answer)
+            seen.update(window_after(session, tool, args, answer))
 
     if write or drawn:
-        docstate.on_gui_thread(to_document)
+        ran = docstate.on_gui_thread(to_document)
+        # What the window shows, as facts in the answer (window review
+        # round 6: colours, label size and the legend's words could only
+        # be told from a picture). Only when drawn here and now, on the
+        # thread that hands the answer back: a write queued from a job's
+        # worker never touches an answer that may be on its way out.
+        if ran is True and seen and isinstance(answer, dict) and "view3d" not in answer:
+            answer["view3d"] = seen
+
+
+def window_after(session, tool, args, answer):
+    """The call's results drawn in the 3D view, then the panel drawn again
+    (the change is in by now). Returns the facts of both, {} for none.
+    Never raises."""
+    out = {}
+    try:
+        from . import scene_coin
+
+        got = scene_coin.after_call(session, tool, args, answer)
+        if isinstance(got, dict) and got.get("facts"):
+            out.update(got["facts"])
+    except Exception as e:  # noqa: BLE001 — the view only: the call has answered
+        _report(f"the results of {tool} could not be drawn: {e}")
+    try:
+        from . import dock
+
+        panel = dock.after_call()
+        if panel is not None:
+            out["panel"] = panel
+    except Exception as e:  # noqa: BLE001 — the panel only
+        _report(f"the panel could not be drawn again after {tool}: {e}")
+    return out
 
 
 def _window_up():

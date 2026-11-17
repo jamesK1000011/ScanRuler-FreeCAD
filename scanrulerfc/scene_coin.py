@@ -30,6 +30,7 @@
 
 import numpy as np
 
+from . import legend as L
 from . import scene as SC
 
 NODE_NAME = "ScanRulerScene"
@@ -38,7 +39,50 @@ NEW_LINE_PX = 3.5
 POINT_PX = 6.0
 FACE_TRANSPARENCY = 0.8
 GHOST_TRANSPARENCY = 0.6
-FONT_SIZE = 13.0
+# The labels' size in the view's own (logical) pixels: a share of the 3D
+# view's height, within LABEL_PX_MIN..LABEL_PX_MAX, and LABEL_NEW_PX more
+# for what this call made. Coin's SoFont size is in the framebuffer's
+# device pixels, so it is this times the screen's device pixel ratio
+# (2 on a Retina Mac). Window review round 6: a fixed 13 came out about
+# 6 px in a 1400 px window picture, too small to read.
+LABEL_PX_SHARE = 1.0 / 52.0
+LABEL_PX_MIN, LABEL_PX_MAX = 12.0, 22.0
+LABEL_NEW_PX = 2.0
+LEGEND_PX = 13.0
+FONT_SIZE = 13.0  # the label size when the view's size is not known (stand-ins, an older FreeCAD)
+
+
+def label_px(view_height=None, dpr=1.0):
+    """The labels' size in logical pixels for a 3D view view_height device
+    pixels tall on a screen of device pixel ratio dpr."""
+    try:
+        h = float(view_height) / max(1.0, float(dpr or 1.0))
+    except (TypeError, ValueError):
+        return FONT_SIZE
+    if not h > 0:
+        return FONT_SIZE
+    return float(min(LABEL_PX_MAX, max(LABEL_PX_MIN, round(h * LABEL_PX_SHARE))))
+
+
+def text_scale(gui, views):
+    """(label px, device pixel ratio, view height in device px) for the
+    views a scene goes into: the ratio from FreeCAD's main window (Qt),
+    the height from the first view's render size (View3DInventor.getSize)."""
+    dpr = 1.0
+    try:
+        mw = gui.getMainWindow()
+        got = mw.devicePixelRatioF() if hasattr(mw, "devicePixelRatioF") else mw.devicePixelRatio()
+        dpr = float(got) if float(got) > 0 else 1.0
+    except Exception:  # noqa: BLE001 — a stand-in or no main window: 1
+        dpr = 1.0
+    height = None
+    for v in views:
+        try:
+            height = int(v.getSize()[1])
+            break
+        except Exception:  # noqa: BLE001 — a view without getSize
+            continue
+    return (label_px(height, dpr) if height else FONT_SIZE), dpr, height
 
 
 def _where(e):
@@ -61,8 +105,14 @@ def _seq(x):
 class Builder:
     """Coin nodes for one plan, from a coin module (pivy's or a stand-in)."""
 
-    def __init__(self, coin):
+    def __init__(self, coin, label_px=FONT_SIZE, dpr=1.0):
         self.coin = coin
+        self.label_px = float(label_px)
+        self.dpr = float(dpr or 1.0)
+
+    def font_size(self, new=False):
+        """A label's SoFont size, device pixels."""
+        return (self.label_px + (LABEL_NEW_PX if new else 0.0)) * self.dpr
 
     def _colour(self, rgb):
         c = self.coin.SoBaseColor()
@@ -157,10 +207,10 @@ class Builder:
             tr.translation.setValue(*[float(x) + (lift if i == 2 else 0.0) for i, x in enumerate(np.asarray(at, dtype=float))])
             t.addChild(tr)
             font = coin.SoFont()
-            font.size.setValue(FONT_SIZE)
+            font.size.setValue(self.font_size(bool(sh.get("new"))))
             t.addChild(font)
             words = coin.SoText2()
-            words.string.setValue(str(text))
+            words.string.setValue(L.coin_text(text))
             t.addChild(words)
             over.addChild(t)
         sep = coin.SoSeparator()
@@ -198,9 +248,7 @@ class Builder:
                 root.addChild(self.shape(sh, lift))
                 drawn += 1
         if layer is not None and layer.get("legend") is not None and drawn:
-            from . import legend as L
-
-            root.addChild(L.coin_nodes(layer["legend"], coin=coin))
+            root.addChild(L.coin_nodes(layer["legend"], coin=coin, font_size=LEGEND_PX * self.dpr))
         return root if drawn else None
 
 
@@ -292,10 +340,13 @@ class Window:
         hide = bool(plan.get("scan") and plan["scan"].get("hide"))
         scan_was = self.scan_drawn(doc, not hide)
         self.clear(doc.Name)
-        node = Builder(self.coin).build(plan, SC.size_of(scan))
+        views = self.views(doc)
+        px, dpr, height = text_scale(self.gui, views)
+        builder = Builder(self.coin, px, dpr)
+        node = builder.build(plan, SC.size_of(scan))
         put = []
         if node is not None:
-            for v in self.views(doc):
+            for v in views:
                 try:
                     sg = v.getSceneGraph()
                     sg.addChild(node)
@@ -308,7 +359,36 @@ class Window:
                 "legend": bool(layer and layer.get("legend")), "editedCopy": plan.get("mesh") is not None, "scan": scan_was,
                 "elements": len(plan["elements"]), "dimensions": len(plan["dimensions"]), "sections": len(plan["sections"]),
                 "items": [i["kind"] for i in plan["items"]],
-                "new": [x.get("name") for g in ("elements", "dimensions", "sections") for x in plan[g] if x.get("new")]}
+                "new": [x.get("name") for g in ("elements", "dimensions", "sections") for x in plan[g] if x.get("new")],
+                "facts": facts(plan, builder, height)}
+
+
+def facts(plan, builder, height=None):
+    """What the window shows that a picture alone would otherwise have to
+    tell, as plain data for the call's answer (window review round 6):
+    the colours of what this call made and of the rest (hex), the label
+    size (logical px, and the SoFont size in device px with the ratio), the
+    legend's title and its low, middle and high values, and where the
+    sections stand (the first one's first point, mm), so a move after an
+    alignment shows."""
+    out = {"colours": {"new": SC.hex_of(SC.NEW), "element": SC.hex_of(SC.ELEMENT), "dimension": SC.hex_of(SC.DIMENSION),
+                       "section": SC.hex_of(SC.SECTION)},
+           "labelPx": builder.label_px, "newLabelPx": builder.label_px + LABEL_NEW_PX, "fontSize": builder.font_size(), "dpr": builder.dpr}
+    if height:
+        out["viewHeight"] = height
+    drawn = {g: [{"name": x.get("name"), "colour": SC.hex_of(x.get("colour") or SC.ELEMENT)} for x in _seq(plan.get(g))][:6]
+             for g in ("elements", "dimensions", "sections") if _seq(plan.get(g))}
+    if drawn:
+        out["drawn"] = drawn
+    layer = plan.get("map")
+    if layer is not None and layer.get("legend") is not None:
+        out["legend"] = dict(L.text_rows(layer["legend"]), fontSize=LEGEND_PX * builder.dpr)
+    secs = _seq(plan.get("sections"))
+    if secs:
+        first = [np.asarray(x, dtype=float) for x in _seq(secs[0].get("lines")) if len(x)]
+        if first:
+            out["sectionAt"] = {"name": secs[0].get("name"), "point": [round(float(c), 3) for c in first[0][0]]}
+    return out
 
 
 _WINDOW = []

@@ -587,8 +587,49 @@ def _move_params(src, rig):
     src["params"] = p
 
 
+def _move_sections(st, point, direction, length=None):
+    """The sections cut on the scan carried with it: each one's frame (its
+    origin a point, its axes directions), its 3D points and their normals.
+    ScanRuler's own sections move with the part (src/commands/core/
+    align.ts: "the elements, dimensions and sections move with the part");
+    here they were left where they were cut, so after align_datum,
+    align_auto, align_symmetry and scan_scale the section curves stood
+    off the moved scan (window review round 6, sr-a 4011, 4017, 4018,
+    4019). length(x): a length along the part (scan_scale's factor), for
+    the section's offset. Returns how many moved."""
+    ss = st.get("sectionState")
+    if not isinstance(ss, dict) or ss.get("scan") is not st.get("scan"):
+        return 0
+    n = 0
+    for sec in ss.get("sections") or []:
+        fr = sec.get("frame")
+        if isinstance(fr, dict):
+            moved = dict(fr)
+            if fr.get("origin") is not None:
+                moved["origin"] = point(np.asarray(fr["origin"], dtype=float)[None])[0]
+            for k in ("normal", "basisU", "basisV"):
+                if fr.get(k) is not None:
+                    moved[k] = direction(np.asarray(fr[k], dtype=float)[None])[0]
+            sec["frame"] = moved
+        P = sec.get("points")
+        if P is not None:
+            P = np.asarray(P, dtype=float)
+            if P.ndim == 2 and P.shape[1] == 3 and len(P):
+                sec["points"] = point(P)
+        N = sec.get("normals")
+        if N is not None:
+            N = np.asarray(N, dtype=float)
+            if N.ndim == 2 and N.shape[1] == 3 and len(N):
+                sec["normals"] = direction(N)
+        if length is not None and isinstance(sec.get("offset"), (int, float)) and not isinstance(sec.get("offset"), bool):
+            sec["offset"] = length(sec["offset"])
+        n += 1
+    return n
+
+
 def transform_all(st, rig):
-    """Carry the scan and everything measured on it through a rigid motion."""
+    """Carry the scan and everything measured on it through a rigid motion.
+    Returns how many sections moved with it."""
     scan = st["scan"]
     R, t = A.compose(rig, (scan.R, scan.t))
     scan.set_pose(scan.k, R, t)
@@ -601,6 +642,8 @@ def transform_all(st, rig):
             e["source"]["points"] = A.apply(rig, e["source"]["points"]).tolist()
         if e["source"].get("guide"):
             e["source"]["guide"] = _move_guide(e["source"]["guide"], rig)
+    R = np.asarray(rig[0], dtype=float)
+    return _move_sections(st, lambda X: A.apply(rig, X), lambda X: X @ R.T)
 
 
 def _move_guide(g, rig):
@@ -633,6 +676,7 @@ def scale_all(st, s):
                 g["radius"] = {k: v * s for k, v in g["radius"].items() if v is not None}
             if g.get("within"):
                 g["within"] = {k: [x * s for x in v] for k, v in g["within"].items()}
+    return _move_sections(st, lambda X: X * s, lambda X: X, lambda x: x * s)
 
 
 def applied(scan):
@@ -707,7 +751,7 @@ def align_datum(st, a):
     except A.AlignmentError as e:
         raise Refusal("invalid_input", str(e))
     before = np.asarray(org["center"], dtype=float) if org is not None else None
-    transform_all(st, rig)
+    moved = transform_all(st, rig)
     out = {"applied": A.rigid_json(rig)}
     total = applied(scan)
     if not first:
@@ -724,6 +768,8 @@ def align_datum(st, a):
     if parallel:
         out["parallelFace"] = parallel
     out["elements"] = len(st["elements"])
+    if moved:
+        out["sections"] = moved
     return out
 
 
@@ -732,20 +778,22 @@ def align_clear(st):
     total = applied(scan)
     if total is None:
         raise Refusal("invalid_state", "The part is in scan coordinates already: there is no alignment to clear (align_datum, align_auto and align_symmetry set one).")
-    transform_all(st, A.inverse(total))
+    moved = transform_all(st, A.inverse(total))
     scan.set_pose(scan.k, np.eye(3), np.zeros(3))
-    return {"appliedAlignment": None, "elements": len(st["elements"])}
+    return {"appliedAlignment": None, "elements": len(st["elements"]), **({"sections": moved} if moved else {})}
 
 
 def apply_rigid(st, rig, extra=None):
     """An alignment found by a search (auto, symmetry), applied."""
     first = applied(st["scan"]) is None
-    transform_all(st, rig)
+    moved = transform_all(st, rig)
     out = {"applied": A.rigid_json(rig)}
     if not first:
         out["appliedAlignment"] = A.rigid_json(applied(st["scan"]))
     out.update(extra or {})
     out["elements"] = len(st["elements"])
+    if moved:
+        out["sections"] = moved
     return out
 
 
@@ -822,7 +870,9 @@ def scan_scale(st, a):
     if a.get("dryRun"):
         out.update(dryRun=True, size={"before": round(before, 3), "after": round(before * k, 3)})
         return out
-    scale_all(st, k)
+    moved = scale_all(st, k)
+    if moved:
+        out["sections"] = moved
     prev = st.get("scaled")
     st["scaled"] = {"factor": (prev["factor"] if prev else 1.0) * k, "references": [{"label": r["label"], "measured": r["measured"], "true": r["true"]} for r in (comb["references"] if comb else [])]}
     out.update(size={"before": round(before, 3), "after": round(2 * model_size(scan), 3)}, scan=scan.summary())

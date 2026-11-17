@@ -45,9 +45,17 @@ FAMILIES = [f for f in (_family(n) for n in NAMES) if f is not None]
 
 # --- the live echo in the window (design 7.1), from the workbench's tables --
 WB = "ScanRulerWorkbench"
-# The workbench to bring up for a tool, by prefix. wear_, catalog_, pack_,
-# fit_scan_ and manual_ switch nothing.
-WORKBENCHES = {p: WB for p in ("scan_", "element_", "dimension_", "align_", "section_", "deviation_", "thickness_", "flat_", "mesh_", "report_get", "export_csv")}
+# The workbench to bring up for a tool, by prefix. wear_, catalog_, pack_
+# and manual_ switch nothing.
+#
+# fit_scan_ is ScanRuler's own: Agent Link takes the longest declared key
+# that its name starts with (echo._longest, no "_" boundary), and the
+# Workshop add-on declares "fit" (its fit tool) for the Make bench, so
+# fit_scan_setup / _features / _measure / _export brought Make up with
+# "No setups yet" (window review round 6, sr-a 4007-4010). The longer key
+# here wins over "fit".
+WORKBENCHES = {p: WB for p in ("scan_", "element_", "dimension_", "align_", "section_", "deviation_", "thickness_", "flat_", "mesh_", "report_get", "export_csv",
+                               "fit_scan_")}
 WORKBENCHES.update(_R.ECHO["WORKBENCHES"])
 # The snapshot tools only read the person's shots: no bench comes up for
 # them, though they start scan_ (an empty bench switches nothing).
