@@ -752,6 +752,128 @@ class WhatAWriteCosts(unittest.TestCase):
         self.assertEqual(D._KEPT["Dense"]["packs"].used, {})
 
 
+class WhatAScaleLeaves(unittest.TestCase):
+    """Found live (run 3): after scan_scale a save of the document took
+    2.7 s where it had taken 0.5 s. What ScanRuler itself leaves after a
+    scale or an alignment was looked for here: the wall-thickness reading
+    kept the scan's points as they stood when it was taken, to tell
+    whether the scan has moved since, and that marker was written into the
+    state as an array — every vertex a second time, the unscaled ones
+    beside the scaled scan. It is written as what it says now, and the
+    scan tools that move the scan answer what their own write cost."""
+
+    def setUp(self):
+        self.fc = fakedoc.installed()
+        self.fc.__enter__()
+        self.addCleanup(self.fc.__exit__, None, None, None)
+        D._SIGS.clear()
+        D._KEPT.clear()
+        self.doc = fakedoc.Doc("Scaled")
+        self.ctx = runner.Context(doc=self.doc, out_dir=tempfile.mkdtemp())
+        self.run = runner.local(ctx=self.ctx)
+        S.state(self.ctx)["scan"] = box_scan()
+        ok, out = self.run("element_fit", {"kind": "plane", "at": {"point": [0, 0, 10]}, "name": "Top"})
+        self.assertTrue(ok, out)
+        ok, out = self.run("thickness_measure", {"maxThickness": 50})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["thickness"]["status"], "ready")
+        self.points = len(S.state(self.ctx)["scan"].V)
+
+    def packed_sizes(self, tool, args):
+        """The sizes (numbers held) of the arrays compressed for the state
+        write that follows one call."""
+        import unittest.mock
+
+        sizes = []
+        real = D.pack_array
+
+        def pack(a):
+            sizes.append(int(np.asarray(a).size))
+            return real(a)
+
+        with unittest.mock.patch.object(D, "pack_array", pack):
+            ok, out = self.run(tool, args)
+        self.assertTrue(ok, out)
+        return sizes, out
+
+    def state_arrays(self):
+        import io
+        import zipfile
+
+        with zipfile.ZipFile(io.BytesIO(D._file_bytes(D.find_state(self.doc).State))) as z:
+            return [D.unpack_array(z.read(n)) for n in z.namelist() if n.startswith(D.ARRAYS)]
+
+    def test_the_state_holds_no_second_copy_of_the_scans_points(self):
+        # the scan's points are in its mesh object; nothing in the state is a copy of them
+        self.assertFalse([a.shape for a in self.state_arrays() if a.ndim == 2 and a.shape == (self.points, 3) and a.dtype.kind == "f"])
+        before = D.last_write(self.doc)["bytes"]
+        sizes, out = self.packed_sizes("scan_scale", {"factor": 2})
+        # a scale packs the pose and the fits again, never an array the size of the scan
+        self.assertTrue(all(n < self.points for n in sizes), sizes)
+        self.assertFalse([a.shape for a in self.state_arrays() if a.ndim == 2 and a.shape == (self.points, 3) and a.dtype.kind == "f"])
+        self.assertLess(abs(D.last_write(self.doc)["bytes"] - before), 2000)
+        sizes, out = self.packed_sizes("align_datum", {"primary": {"element": "Top"}, "origin": {"point": [20, 15, 10]}})
+        self.assertTrue(all(n < self.points for n in sizes), sizes)
+
+    def test_a_thickness_reading_is_kept_through_save_and_reopen(self):
+        # Before: the marker came back as a copy, never the scan's own
+        # array, so every reopened document had lost its reading.
+        again = runner.Context(doc=self.doc)
+        t = S.state(again)["thickness"]
+        self.assertIs(t["V"], S.state(again)["scan"].V)
+        np.testing.assert_allclose(t["values"], S.state(self.ctx)["thickness"]["values"])
+        ok, out = runner.local(ctx=again)("thickness_settings", {})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["thickness"]["status"], "ready")
+
+    def test_a_reading_taken_before_a_move_is_not_revived(self):
+        ok, out = self.run("scan_scale", {"factor": 2})  # no thickness call since: the reading is of the unscaled part
+        self.assertTrue(ok, out)
+        again = runner.Context(doc=self.doc)
+        st = S.state(again)
+        self.assertIsNot(st["thickness"]["V"], st["scan"].V)
+        ok, out = runner.local(ctx=again)("thickness_settings", {})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["thickness"]["status"], "none")
+        # and in the session that scaled it, the same
+        ok, out = self.run("thickness_settings", {})
+        self.assertEqual(out["thickness"]["status"], "none")
+
+    def test_the_codec_alone(self):
+        sc = box_scan()
+        st = {"scan": sc, "thickness": {"scan": sc, "V": sc.V, "values": np.ones(len(sc.V))}}
+        data, dropped = D.encode(st)
+        self.assertEqual(dropped, [])
+        got, _notes = D.decode(data)
+        self.assertIs(got["thickness"]["V"], got["scan"].V)
+        sc.set_pose(2.0, sc.R, sc.t)  # moved since: the marker is the old array
+        got, _notes = D.decode(D.encode(st)[0])
+        self.assertIsNot(got["thickness"]["V"], got["scan"].V)
+        self.assertEqual(len(got["thickness"]["V"]), 0)
+        # a "V" that is plain data (no scan beside it) is an array like any other
+        ref = {"deviation": {"reference": {"V": np.arange(12.0).reshape(4, 3), "F": np.array([[0, 1, 2]])}}}
+        got, _notes = D.decode(D.encode(ref)[0])
+        np.testing.assert_allclose(got["deviation"]["reference"]["V"], ref["deviation"]["reference"]["V"])
+
+    def test_a_scale_and_an_alignment_answer_what_their_own_write_cost(self):
+        ok, out = self.run("scan_scale", {"factor": 2, "dryRun": True})
+        self.assertTrue(ok, out)
+        self.assertNotIn("timing", out)  # nothing moved, nothing written
+        ok, out = self.run("scan_scale", {"factor": 2})
+        self.assertTrue(ok, out)
+        self.assertEqual(set(out["timing"]), {"ms", "object", "mesh"})
+        self.assertEqual(out["timing"]["mesh"], "rebuilt")  # a scale writes every vertex of the mesh object again
+        self.assertGreaterEqual(out["timing"]["ms"], out["timing"]["object"])
+        ok, out = self.run("align_datum", {"primary": {"element": "Top"}, "origin": {"point": [20, 15, 10]}})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["timing"]["mesh"], "kept")  # an alignment is the object's Placement only
+        ok, out = self.run("align_clear", {})
+        self.assertTrue(ok, out)
+        self.assertEqual(out["timing"]["mesh"], "kept")
+        ok, out = self.run("align_clear", {})  # refused: no timing on a refusal
+        self.assertFalse(ok)
+
+
 class BesideAgentLinksOwnKeeping(unittest.TestCase):
     """Agent Link keeps every family's state per document too
     (agentlink/docstates.py, since 16 Nov 2026). ScanRuler settles its own

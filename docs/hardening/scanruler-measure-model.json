@@ -701,7 +701,7 @@
     "section": "Half",
     "brief": true
    },
-   "expect": "lines only: one chain of 4 (x 0–14, z 0–20) and one of 8 (x 26–60 with the pocket's 1 mm step at x 40–50, z 19–20)"
+   "expect": "lines only: one chain of 4 (x 0–14, z 0–20) and one of 8 (x 26–60 with the pocket's 1 mm step at x 40–50, z 19–20). Run 3 (live): both chains read spacing 0.0, tolerance 0.0 and scatterFloor 0.0 on 303 and 464 points — the plane passes rows of mesh vertices within rounding and each was cut several times over. Since then: spacing about 0.3 to 1 (the mesh's edge length along the cut), tolerance 0.6 × spacing, scatter 0.0 with scatterFloor 0.05 × spacing beside it. The points tell which of the two fixes acted: about a quarter as many in each chain (near 75 and 115) when the plane was within a billionth of the part's size of the vertices and is now cut once through each; still 303 and 464 when it is further off than that (then only the spacing is read differently) — give me points, spacing, tolerance and scatterFloor of both chains"
   },
   {
    "tool": "section_remove",
@@ -1126,14 +1126,14 @@
    "arguments": {
     "factor": 2
    },
-   "expect": "size.after 149.67; scan.box.size [120, 80, 40] The alignment stays: the box is the aligned one doubled."
+   "expect": "size.after 149.67; scan.box.size [120, 80, 40] The alignment stays: the box is the aligned one doubled. New since run 3: timing { ms, object, mesh \"rebuilt\" } — give me all three (run 3: the call took 4.4 s with nothing to say where; object is the part spent writing the scan's mesh object)."
   },
   {
    "tool": "scan_scale",
    "arguments": {
     "factor": 0.5
    },
-   "expect": "back to box.size [60, 40, 20] — in the aligned frame it had before call 100 (live in run 2 it came back in scan coordinates, min [0, 0, 0]: the alignment had been lost, fixed since)"
+   "expect": "back to box.size [60, 40, 20] — in the aligned frame it had before call 100 (live in run 2 it came back in scan coordinates, min [0, 0, 0]: the alignment had been lost, fixed since). timing again; and if this row carries around, its inside.afterChange (run 3: 2,811 ms — a document copy made after the change, as long as a doc_save took just then)."
   },
   {
    "tool": "align_clear",

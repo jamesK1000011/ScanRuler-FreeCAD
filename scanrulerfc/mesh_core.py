@@ -45,7 +45,7 @@ def default_tolerance(diag):
     return round125(diag * 2.5e-4)
 
 
-def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
+def lightest_within(triangles, cap, tolerance, attempt, bisections=4, expired=None):
     """The lightest decimation that still lies within tolerance.
 
     attempt(target) decimates the mesh towards `target` triangles and
@@ -62,10 +62,17 @@ def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
     no lighter mesh holds (the mesh as it is has `triangles`, at most the
     cap); capped is True when the mesh had to come down to the cap and
     that does not hold the tolerance (best is then that attempt, the cap
-    being the harder rule); tries counts the decimations."""
+    being the harder rule); tries counts the decimations. expired(), when
+    given, ends the search early (the time allowed is up): what was found
+    so far is kept.
+
+    A mesh with more triangles than the cap is reduction_search's to
+    settle: it also says whether the cap was met at all and where the
+    tolerance starts to hold."""
     tries = 0
     best = None
     top = int(triangles)
+    late = expired or (lambda: False)
     if triangles > cap:
         best = attempt(int(cap))
         tries += 1
@@ -74,7 +81,7 @@ def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
         top = int(best["triangles"])
     good, bad = top, None
     target = good // 4
-    while target >= 4:
+    while target >= 4 and not late():
         got = attempt(target)
         tries += 1
         if got is None or got["worst"] > tolerance or got["triangles"] >= good:
@@ -86,7 +93,7 @@ def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
         bad = 3  # down to four triangles and still within: nothing lighter to look for
     for _ in range(bisections):
         target = int(round(math.sqrt(max(bad, 1) * good)))
-        if target <= bad or target >= good:
+        if target <= bad or target >= good or late():
             break
         got = attempt(target)
         tries += 1
@@ -95,6 +102,173 @@ def lightest_within(triangles, cap, tolerance, attempt, bisections=4):
         else:
             best, good = got, int(got["triangles"])
     return best, False, tries
+
+
+REDUCE_CLIMB = 8
+REDUCE_NEAR = 1.03
+
+
+def reduction_search(triangles, cap, tolerance, attempt, bisections=4, climb=REDUCE_CLIMB, seconds=None, clock=None):
+    """mesh_reduce's whole search: the cap and the tolerance, and which of
+    the two gave way when both cannot be had.
+
+    attempt(target) as lightest_within's; its "triangles" is the count the
+    decimator really left, which can be above the count asked: FreeCAD's
+    (src/Mod/Mesh/App/Core/Simplify.h, simplify_mesh) gives up after a
+    hundred rounds, and a collapse that would turn a triangle over or join
+    a rim vertex to an inner one is never made, so a mesh can have a count
+    it will not go under.
+
+    - A mesh at or under the cap: the lightest that holds the tolerance
+      (lightest_within), or nothing lighter.
+    - Over the cap, the try at the cap comes first. Met and within
+      tolerance: both hold, and the search goes on down from there.
+    - Met but not within tolerance: the cap wins (it is the harder rule)
+      and that try is kept; then the smallest count that does hold is
+      looked for between the cap and the mesh as it is, so the reply can
+      say what maxTriangles would hold the tolerance.
+    - Not met (the decimator stopped above the cap): the cap cannot win,
+      so the tolerance does. That try is kept when it holds; else the
+      lightest that holds, found the same way; else the mesh as it is.
+
+    The climb between a count that does not hold (lo) and one that does
+    (hi; the mesh as it is always does) halves the ratio each try, `climb`
+    tries at most, and stops once hi is within 3 % of lo. `seconds` is the
+    time allowed for the whole search (the try at the cap is always made);
+    `clock` a monotonic clock.
+
+    Returns { best (the attempt to keep; None: the mesh as it is),
+    won ("both", "cap", "tolerance"), capMet, atCap (the try at the cap,
+    when the mesh had more than the cap), holds (the lightest try found
+    above the cap that holds, or None), notHolding (the largest count
+    tried or reached that does not hold; None when no climb was made),
+    tries, ended ("done" or "time") }."""
+    import time
+
+    clock = clock or time.monotonic
+    started = clock()
+    out = {"best": None, "won": "both", "capMet": True, "atCap": None, "holds": None, "notHolding": None, "tries": 0, "ended": "done"}
+
+    def expired():
+        # Asked before each further try: a search cut short says so.
+        if seconds is not None and clock() - started > seconds:
+            out["ended"] = "time"
+            return True
+        return False
+
+    def holds(got):
+        return got is not None and got["worst"] <= tolerance
+
+    def counted(target):
+        out["tries"] += 1
+        return attempt(int(target))
+
+    if triangles <= cap:
+        out["best"], _, n = lightest_within(triangles, cap, tolerance, attempt, bisections, expired)
+        out["tries"] += n
+    else:
+        at = counted(cap)
+        out["atCap"] = at
+        met = at is not None and at["triangles"] <= cap
+        out["capMet"] = met
+        if met and holds(at):
+            lighter, _, n = lightest_within(at["triangles"], at["triangles"], tolerance, attempt, bisections, expired)
+            out["tries"] += n
+            out["best"] = lighter or at
+        elif at is not None and not met and holds(at) and at["triangles"] < triangles:
+            # It stopped above the cap, and where it stopped it holds:
+            # the lightest this decimator makes of the mesh.
+            out["best"], out["won"] = at, "tolerance"
+        else:
+            lo = int(cap) if at is None or met else min(int(at["triangles"]), int(triangles))
+            hi, found = int(triangles), None
+            for _ in range(climb):
+                if hi <= lo * REDUCE_NEAR or expired():
+                    break
+                target = int(round(math.sqrt(lo * hi)))
+                if target <= lo or target >= hi:
+                    break
+                got = counted(target)
+                if holds(got) and got["triangles"] < hi:
+                    found, hi = got, int(got["triangles"])
+                else:
+                    lo = target
+            out["holds"], out["notHolding"] = found, lo
+            if met:
+                out["best"], out["won"] = at, "cap"
+            else:
+                out["best"], out["won"] = found, "tolerance"
+    return out
+
+
+REDUCE_STOPS = "it makes a hundred rounds at most and never a collapse that would turn a triangle over"
+
+
+def _off(row):
+    return max(row["max"], row["backMax"])
+
+
+def reduce_words(report):
+    """mesh_reduce's note or warning, from the report's own numbers: every
+    count and distance in the words is a figure of the report (found live,
+    run 3: "brought down to the cap of 2000" beside triangles 2,142).
+    Returns {} when both the cap and the tolerance hold, else { "note" }
+    (nothing lighter holds, under the cap) or { "warning" }."""
+    st = report["settings"]
+    tol, cap = st["tolerance"], st["maxTriangles"]
+    n, given = report["triangles"], report["inputTriangles"]
+    tries = report["tries"]
+    cut = f" (the search stopped at its {report['search']['seconds']:g} s)" if report.get("search", {}).get("ended") == "time" else ""
+    tries_said = f"{tries} {'try' if tries == 1 else 'tries'}{cut}"
+    if given <= cap:
+        if n >= given:
+            return {"note": f"No lighter mesh holds {tol:g} mm{cut}: this is the mesh as it is, {n} triangles. A larger tolerance lets triangles go."}
+        return {}
+    if report["capMet"]:
+        if report["held"]:
+            return {}
+        holds = report.get("holds")
+        if holds:
+            then = f"The lightest mesh found that holds {tol:g} mm has {holds['triangles']} triangles: mesh_reduce {{ maxTriangles: {holds['triangles']} }} makes that one; or a larger tolerance."
+        else:
+            then = f"No count under the {given} triangles it has was found to hold {tol:g} mm in {tries_said}: a larger tolerance, or a maxTriangles nearer {given}."
+        return {"warning": f"The cap won over the tolerance: brought down to {n} triangles (maxTriangles {cap}), this lies up to {_off(report):g} mm from the original (tolerance {tol:g} mm) — not a mesh to measure or model on. "
+                           f"{then} mesh_discard {{ what: \"reduced\" }} drops this one."}
+    # The cap is not kept: say the true count and why.
+    at = report.get("atCap")
+    if at is None and n < given:
+        # The try at the cap is the answer: it stopped above the cap, and holds.
+        return {"warning": f"maxTriangles {cap} could not be met: FreeCAD's decimation (Mesh.decimate) stops at {n} triangles on this mesh — {REDUCE_STOPS}. "
+                           f"What it leaves there holds the tolerance of {tol:g} mm, so this is that mesh: {n} triangles, {n - cap} over the cap. Where it stops depends on the mesh's own triangles: mesh_reduce after mesh_smooth or mesh_wrap may get further (not known until tried)."}
+    if at is None:
+        stopped = f"maxTriangles {cap} could not be met: FreeCAD's decimation (Mesh.decimate) gave no mesh back"
+    else:
+        stopped = (f"maxTriangles {cap} could not be met: FreeCAD's decimation (Mesh.decimate) stops at {at['triangles']} triangles on this mesh — {REDUCE_STOPS} — "
+                   f"and what it leaves there lies up to {_off(at):g} mm from the original (tolerance {tol:g} mm)")
+    if n < given:
+        floor = f", but not under about {at['triangles']}" if at is not None else ""
+        return {"warning": f"{stopped}. The tolerance won: this is the lightest mesh found that holds it, {n} triangles, {n - cap} over the cap. A larger tolerance lets it go lighter{floor}."}
+    return {"warning": f"{stopped}. No lighter mesh was found to hold {tol:g} mm in {tries_said}: this is the mesh as it is, {n} triangles, {n - cap} over the cap. A larger tolerance lets triangles go."}
+
+
+def reduce_applied_words(report):
+    """mesh_apply_reduced's warning for a reduction that does not hold its
+    tolerance or is over its cap, from the same numbers; None when it
+    holds both."""
+    st = report["settings"]
+    tol, cap, n = st["tolerance"], st["maxTriangles"], report["triangles"]
+    said = []
+    if not report.get("held", True):
+        holds = report.get("holds")
+        would = f"; {holds['triangles']} triangles would hold it (mesh_reduce {{ maxTriangles: {holds['triangles']} }})" if holds else ""
+        said.append(f"The reduction applied does not hold its tolerance: up to {_off(report):g} mm from the mesh it was made of (tolerance {tol:g} mm){would}.")
+    if not report.get("capMet", n <= cap):
+        at = report.get("atCap")
+        why = f": FreeCAD's decimation stops at {at['triangles']} on this mesh" if at else (": FreeCAD's decimation stops there on this mesh" if n < report["inputTriangles"] else ": no lighter mesh holds the tolerance")
+        said.append(f"The reduction applied has {n} triangles, over the maxTriangles of {cap} asked{why}{'; it holds its tolerance' if report.get('held', True) else ''}.")
+    if not said:
+        return None
+    return " ".join(said) + " mesh_undo puts the mesh it was made of back."
 
 
 def mean_edge_length(V, F, samples=4096):

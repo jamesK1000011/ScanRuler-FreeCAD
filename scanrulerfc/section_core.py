@@ -14,6 +14,7 @@ import math
 import numpy as np
 
 EDGE_MIN_FEATURE_MM = 1.0  # src/core/flat/edges.ts
+PLANE_SNAP = 1e-9  # of the mesh's box diagonal: a vertex this near the cutting plane is on it
 
 
 def _unit(v):
@@ -37,6 +38,19 @@ def slice_mesh(V, F, origin, normal, min_length=0.0):
         return empty
     nv = len(V)
     dist = V @ n - float(np.dot(n, origin))
+    # A vertex within rounding of the plane is on it. A plane laid through
+    # a fitted axis or a constructed point passes mesh vertices at 1e-13 mm,
+    # not at 0: every edge at such a vertex was then cut on its own, a
+    # cluster of points 1e-13 mm apart for each vertex, and where a row of
+    # vertices lies along the plane more than half of a chain's gaps were
+    # such — the median spacing read 0, and the fit's tolerance with it
+    # (found live, run 3: section_fit on the cut through the bore's axis,
+    # spacing 0.0 and tolerance 0.0 on chains of 303 and 464 points). The
+    # exact-zero rules below are slice.ts's own; this only says what zero
+    # is: a billionth of the mesh's size, far under anything a scan holds.
+    near = PLANE_SNAP * float(np.linalg.norm(V.max(axis=0) - V.min(axis=0)))
+    if near > 0:
+        dist[np.abs(dist) <= near] = 0.0
     pos = dist >= 0
     sa, sb, sc = pos[F[:, 0]], pos[F[:, 1]], pos[F[:, 2]]
     crossed = ~((sa == sb) & (sb == sc))
