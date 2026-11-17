@@ -9,6 +9,14 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- The scan's mesh object holds its points in the scan's own order (built
+  from Vector points and tuple triangles, the form FreeCAD 1.1 takes); a
+  document read back puts the triangles on the right points again, also
+  for documents saved before (scan_info read a small block as 9,049,056
+  mm², found live, run 4). A best fit's transform (deviation.align
+  transform and total) is kept in the document and read back. Findings in
+  docs/hardening/scanruler6-findings.md.
+
 - Hardening pass on the reverse, meshtools and flat tools (16 Nov 2026;
   nothing here ran on FreeCAD when written). Descriptions rewritten with
   inputs, traps, size limits and what the reply holds; `workbench`,
