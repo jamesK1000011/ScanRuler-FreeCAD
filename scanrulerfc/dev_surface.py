@@ -9,11 +9,11 @@
 # the nearest surface that faces a given way.
 #
 # ScanRuler searches a three-mesh-bvh tree one point at a time. Here the
-# points go through numpy together: the triangles are cut into small leaves
-# along a Morton curve, each with its box, and every query visits the leaves
-# best-first by the distance to their box, all queries a round at a time,
-# until no leaf left can hold anything nearer. The answer is the same exact
-# nearest triangle; only the search differs.
+# points go through numpy together. Triangles are cut into small leaves
+# along a Morton curve. Large references use centroid seeds and a hierarchy
+# of leaf boxes (dev_search_accel); the original two-level best-first search
+# remains the fallback. Both find the same exact nearest surface; triangle
+# distance, facing and pseudonormal calculations are shared.
 
 import numpy as np
 
@@ -277,6 +277,16 @@ class NominalSurface:
         return hits
 
     def _search(self, Q, cap2, facing, min_dot):
+        # Small references are cheaper to search without another index.
+        # The accelerator keeps exact triangle distances and normal rules;
+        # scipy is optional and its absence retains the original search.
+        if self.triangle_count < 4096:
+            return self._search_original(Q, cap2, facing, min_dot)
+        from .dev_search_accel import search
+
+        return search(self, Q, cap2, facing, min_dot)
+
+    def _search_original(self, Q, cap2, facing, min_dot):
         """Best-first over the nodes (a run of leaves each), every query a
         round at a time: a node is opened while its box is nearer than the
         best triangle found, then its leaves while theirs are."""
