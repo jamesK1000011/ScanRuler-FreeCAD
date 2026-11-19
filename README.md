@@ -7,6 +7,8 @@ ScanRuler's measuring of 3D scans, ported to FreeCAD from **ScanRuler by
 CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
 Licensed AGPL-3.0-only, the same as ScanRuler.
 
+How it plugs into Agent Link, with a diagram: [docs/workflow/](https://github.com/jamesK1000011/ScanRuler-FreeCAD/blob/main/docs/workflow/README.md).
+
 <!-- screenshot: FreeCAD with the ScanRuler workbench, a scan coloured by its deviation map, the ScanRuler panel beside the model tree -->
 
 Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of Agent Link for FreeCAD installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
