@@ -23,6 +23,25 @@ HINT_DROP = "Drop it anywhere in the window."
 PINS_HINT = "Hover the part for a live reading; click to pin one where you need a number."
 
 
+def field_tip(fd):
+    """A field's tooltip in STE: its hint (or what to do with it) and, for a
+    number, the unit."""
+    kind = fd.get("kind", "select")
+    name = (fd.get("label") or "").strip().rstrip(":")
+    lower = (name[:1].lower() + name[1:] if name[1:2].islower() or len(name) == 1 else name) or "value"
+    tip = (fd.get("hint") or "").strip()
+    if not tip:
+        tip = {"check": f"Click to turn on or off: {name}." if name else "Click to turn on or off.",
+               "select": f"Select the {lower}." if name else "Select an item in the list.",
+               "slider": f"Drag to set the {lower}.", "number": f"Type the {lower}."}.get(kind, f"{name}.")
+    if not tip.endswith((".", "!", "?")):
+        tip += "."
+    unit = fd.get("unit")
+    if kind in ("number", "slider") and unit and unit not in tip:
+        tip += " Unit: %s." % ("times" if unit == "×" else unit)
+    return tip
+
+
 def info_of(info, page, title):
     if not title:
         return None
@@ -570,8 +589,6 @@ def widget(model, on_key=None, on_field=None, parent=None):
                     w.setValue(float(fd["value"] or 0))
                 if fd["unit"]:
                     w.setSuffix(" " + fd["unit"] if fd["unit"] != "×" else "×")
-                if fd["hint"]:
-                    w.setToolTip(fd["hint"])
                 w.editingFinished.connect(lambda sid=s["id"], fid=fd["id"], w=w: emit(sid, fid, w.value()))
             elif k == "slider":
                 w = QtWidgets.QSlider(QtCore.Qt.Horizontal)
@@ -605,6 +622,8 @@ def widget(model, on_key=None, on_field=None, parent=None):
                 layouts.append(tl)
             row.addWidget(w, 0 if fd["label"] else 1)
         put(w, "field")
+        if k != "toggle":  # a toggle's keys carry their own tips
+            w.setToolTip(field_tip(fd))
         w.setEnabled(fd["enabled"])
         if fd.get("info"):
             row.addWidget(info_button(fd["info"], fd["info_text"]))
@@ -666,7 +685,7 @@ def widget(model, on_key=None, on_field=None, parent=None):
             row.addWidget(label("<span style='color:%s'>●</span> <b>%s</b><br>%s" % (sl["dot"], sl["name"], sl["detail"])), 1)
             rows.append(row)
             b = QtWidgets.QPushButton(button_text(sl["button"]["label"]))
-            b.setToolTip(sl["button"].get("tip") or "")
+            b.setToolTip(sl["button"].get("tip") or field_tip({"kind": "key", "label": sl["button"]["label"]}))
             b.setEnabled(sl["button"]["enabled"])
             if on_key:
                 b.clicked.connect(lambda _=False, kid=sl["button"]["id"]: on_key(s["id"], kid))

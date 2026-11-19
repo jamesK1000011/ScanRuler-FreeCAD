@@ -353,7 +353,7 @@ class Field:
         lay.setSpacing(3)
         self.edit = QtWidgets.QLineEdit()
         self.edit.setMaximumWidth(90)
-        self.edit.setToolTip("The number this grip drags — type a value and press Enter; Escape closes the field")
+        self.edit.setToolTip("Type a value for this grip, then press Enter. Press Escape to close the field.")
         self.unit = QtWidgets.QLabel()
         lay.addWidget(self.edit)
         lay.addWidget(self.unit)

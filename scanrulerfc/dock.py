@@ -20,6 +20,7 @@ import importlib
 
 from . import commands as C
 from . import statusbar
+from . import theme
 from . import workspaces as W
 from .pages import deviation, flat2d, measure3d, meshtools, reverse, thickness
 
@@ -93,18 +94,21 @@ def _nb(text):
     return text.replace(" ", "&nbsp;")
 
 
-def header_html(h):
+def header_html(h, tone=None):
     """The header label's rich text: the project and scan, the agent's dot
     and word, and the save state on a line of its own, each phrase kept
-    whole, so a narrow panel (354 px) wraps between them, never inside."""
+    whole, so a narrow panel (354 px) wraps between them, never inside.
+    tone(colour, need) makes a colour readable on the theme (theme.text_on);
+    None keeps the colours as they are."""
+    tone = tone or (lambda c, need=None: c)
     first = ["<b>%s</b>" % h["title"]]
     if h["agent"]:
-        first.append("<span style='color:%s'>●</span>&nbsp;%s" % (h["agent_dot"], _nb(h["agent"])))
+        first.append("<span style='color:%s'>●</span>&nbsp;%s" % (tone(h["agent_dot"], 3.0), _nb(h["agent"])))
     lines = [" &nbsp; ".join(first)]
     if h["save"]:
         lines.append(_nb(h["save"]))
     if h.get("error"):
-        lines.append("<span style='color:%s'>⚠ %s</span>" % (statusbar.COLOURS["ERROR"], h["error"]))
+        lines.append("<span style='color:%s'>⚠ %s</span>" % (tone(statusbar.COLOURS["ERROR"], theme.TEXT_MIN), h["error"]))
     return "<br>".join(lines)
 
 
@@ -341,7 +345,9 @@ class Dock:
             except Exception:
                 pass
         self.current = m["workspace"]
-        self.head.setText(header_html({**m["header"], "error": self.error}))
+        seen = getattr(self.widget, "_scanruler_seen", None)
+        self.head.setText(header_html({**m["header"], "error": self.error},
+                                      tone=lambda c, need=theme.TEXT_MIN: theme.text_on(c, seen, need)))
         statusbar.feed(st, error=self.error)
         page = PAGES[self.current]
         self.slots[self.current].setWidget(page.widget(m["page"], on_key=self.key, on_field=self.field))
