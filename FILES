@@ -16,6 +16,7 @@ docs/hardening/scanruler-reverse-findings.md
 docs/hardening/scanruler-reverse-model.json
 docs/hardening/scanruler6-findings.md
 docs/hardening/sr4-findings.md
+docs/workflow/README.md
 package.xml
 scanrulerfc/__init__.py
 scanrulerfc/agentlink/__init__.py
