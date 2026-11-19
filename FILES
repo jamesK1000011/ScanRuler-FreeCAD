@@ -314,6 +314,7 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 scanrulerfc/workbench.py
 scanrulerfc/workspaces.py
+scripts/benchmark_deviation.py
 scripts/ste_check.py
 scripts/ste_originals.json
 tests/fakedoc.py

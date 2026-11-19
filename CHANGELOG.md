@@ -9,6 +9,13 @@ release. The dated versions before it were never tagged.
 
 ## [Unreleased]
 
+- Speed up exact nearest-surface searches on large references when scipy is
+  available. Centroid seeds and a hierarchy of triangle-leaf boxes avoid
+  sorting every top-level box for each scan point. Distances, facing rules
+  and signs keep their existing calculations; the original search remains
+  the fallback without scipy, for small references and for large frontiers.
+  Add accelerated and NumPy-only numerical CI coverage.
+
 ## 1.0.0 — 2026-11-19
 
 The first tagged release (V1). ScanRuler for FreeCAD is a port of ScanRuler by Stefan Hermann (CNC Kitchen) into FreeCAD.

@@ -36,7 +36,8 @@ Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 202
 
 - FreeCAD 1.0 or newer (1.1 recommended), on macOS, Linux or Windows.
 - numpy, which comes with FreeCAD. scipy, when FreeCAD has it, makes a
-  few steps faster (symmetry, mesh grids, flatbed parts); they run without it.
+  few steps faster (large-reference deviation searches, symmetry, mesh grids,
+  flatbed parts); they run without it.
 - Nothing else: no other add-on, no account, no network.
 - Optional: [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD) and an MCP client (for example Claude Desktop), so that an agent can use the tools.
 
