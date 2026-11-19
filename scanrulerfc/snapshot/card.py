@@ -21,6 +21,10 @@ BUTTON_TIP = "Screenshot FreeCAD (⌥⇧S / Alt+Shift+S)"
 NOTE_PLACEHOLDER = "What to look at — “the Patent panel’s numerals are off”"
 TOLD_HINT = "The agent is told about it with its next answer, and can look with scan_snapshot_latest."
 SAVE_LABEL = "Save shots beside the project"
+# Tooltips (STE): what each mark tool and colour does.
+TOOL_TIPS = {"pin": "Put a numbered pin on the shot.", "arrow": "Draw an arrow.", "box": "Draw a box.",
+             "circle": "Draw a circle.", "pen": "Draw a free line."}
+COLOUR_NAMES = {"#e5262b": "red", "#f2b705": "yellow", "#1877c0": "blue"}
 
 _cls = {}
 _open = {}
@@ -165,7 +169,7 @@ def _classes():
             for tid, label, key in MK.TOOLS:
                 b = QtW.QPushButton(label)
                 b.setCheckable(True)
-                b.setToolTip(f"{label} ({key})")
+                b.setToolTip(TOOL_TIPS.get(tid, label) + f" Key: {key}.")
                 b.clicked.connect(lambda _c=False, t=tid: (self.model.set_tool(t), self.refresh()))
                 row.addWidget(b)
                 self.tool_buttons[tid] = b
@@ -174,12 +178,12 @@ def _classes():
             for c in MK.COLOURS:
                 b = QtW.QPushButton()
                 b.setFixedSize(22, 22)
-                b.setToolTip(c)
+                b.setToolTip(f"Draw the next marks in {COLOUR_NAMES.get(c, c)}.")
                 b.setStyleSheet(f"background:{c}")
                 b.clicked.connect(lambda _c=False, col=c: self.model.set_colour(col))
                 crow.addWidget(b)
             self.undo = QtW.QPushButton("Undo")
-            self.undo.setToolTip("Undo (⌘Z)")
+            self.undo.setToolTip("Remove the last mark (⌘Z).")
             self.undo.clicked.connect(lambda: (self.model.undo(), self.refresh()))
             crow.addWidget(self.undo)
             side.addLayout(crow)
@@ -187,12 +191,15 @@ def _classes():
             side.addLayout(self.pins)
             side.addWidget(QtW.QLabel("NOTE"))
             self.note = QtW.QPlainTextEdit(shot.note)
+            self.note.setToolTip("Type a note for the agent about this shot.")
             side.addWidget(self.note)
             brow = QtW.QHBoxLayout()
             done = QtW.QPushButton("Done")
             done.setDefault(True)
+            done.setToolTip("Keep the marks with the shot and tell the agent.")
             done.clicked.connect(self.done_)
             cancel = QtW.QPushButton("Cancel")
+            cancel.setToolTip("Close without a change to the shot.")
             cancel.clicked.connect(self.reject)
             brow.addWidget(done)
             brow.addWidget(cancel)
@@ -215,6 +222,7 @@ def _classes():
             for p in self.model.pins():
                 ed = QtW.QLineEdit(p.comment or "")
                 ed.setPlaceholderText(f"Pin {p.n}")
+                ed.setToolTip(f"Type a comment for pin {p.n}.")
                 ed.textChanged.connect(lambda text, n=p.n: (self.model.comment(n, text), self.canvas.update()))
                 self.pins.addWidget(ed)
             self.canvas.update()
@@ -245,7 +253,7 @@ def _classes():
             head.addWidget(QtW.QLabel(card_aside(shot)))
             lay.addLayout(head)
             thumb = QtW.QPushButton()
-            thumb.setToolTip("Mark it up")
+            thumb.setToolTip("Click to draw marks on the shot.")
             img = QtGui.QImage()
             img.loadFromData(shot.png)
             pm = QtGui.QPixmap.fromImage(img).scaledToWidth(320, QtCore.Qt.SmoothTransformation)
@@ -258,6 +266,7 @@ def _classes():
             self.note = QtW.QPlainTextEdit(shot.note)
             self.note.setPlaceholderText(NOTE_PLACEHOLDER)
             self.note.setFixedHeight(54)
+            self.note.setToolTip("Type a note for the agent about this shot.")
             lay.addWidget(self.note)
             told = QtW.QLabel(TOLD_HINT)
             told.setWordWrap(True)
@@ -266,11 +275,16 @@ def _classes():
             lay.addWidget(self.saved)
             save = QtW.QCheckBox(SAVE_LABEL)
             save.setChecked(store.save)
+            save.setToolTip("Save each new shot as a PNG in the project folder.")
             save.toggled.connect(store.set_save)
             lay.addWidget(save)
             row = QtW.QHBoxLayout()
-            for label, fn in (("Mark up", self.mark_up), ("Save PNG", self.save_png), ("Copy", self.copy), ("Discard", self.discard)):
+            for label, tip, fn in (("Mark up", "Draw pins, arrows and boxes on the shot.", self.mark_up),
+                                   ("Save PNG", "Save the shot as a PNG file.", self.save_png),
+                                   ("Copy", "Copy the shot to the clipboard.", self.copy),
+                                   ("Discard", "Delete the shot. The agent does not get it.", self.discard)):
                 b = QtW.QPushButton(label)
+                b.setToolTip(tip)
                 b.clicked.connect(fn)
                 row.addWidget(b)
                 if label == "Copy":

@@ -9,6 +9,7 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Panel polish (V1): each control of the panels has a tooltip in STE. The screenshot card (20 tooltips), the page fields (check boxes, lists, sliders and number boxes say what to do and the unit) and the grip field. The swatches name their colour, not "#rrggbb". In a dark theme the dock header's error line and agent dot are lighter, so they read (theme.text_on, 4.5:1). The credit to Stefan Hermann (CNC Kitchen) stays. A new test (tests/test_panel_polish.py) finds a control with no tooltip and a fixed colour in panel code.
 - Red team 3 fixes (scanrulerfc/guard.py): ZIP, zlib and scan reads are capped (size, ratio, members, triangles); pack_setup takes files from the session folder only, never hidden, printer or Agent Link state files, and the scrub empties a bare key field; names from files are cleaned and capped; paths under home show as ~/... in answers and refusals; the project import removes its temporary folder.
 - Window pass 3. Every ScanRuler tool's caption says what it did with its
   key values (the 2D sheet, print fit, scan noise, repeat, wear, Mesh

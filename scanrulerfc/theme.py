@@ -93,6 +93,16 @@ def readable(fg, bg, need=TEXT_MIN):
     return end
 
 
+def text_on(colour, seen=None, need=TEXT_MIN):
+    """colour made readable on what the theme shows behind the panel (seen:
+    theme.detect's answer; the card's colour when known, else the window's).
+    A light or dark theme that is not known: colour as it is. A status
+    colour (red, green) keeps its hue, only lighter on dark, darker on light."""
+    c = colours(seen)
+    bg = c.get("card") or c.get("window")
+    return readable(colour, bg, need) if bg else colour
+
+
 # --- the theme accent (FreeCAD parameter) -----------------------------------------
 
 def _hex_param(v):
