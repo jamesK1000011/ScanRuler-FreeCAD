@@ -4,11 +4,19 @@
 All notable changes to ScanRuler for FreeCAD, a port of ScanRuler by Stefan
 Hermann (CNC Kitchen). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
-[Semantic Versioning](https://semver.org/). The dated versions below were
-never tagged: the first tagged release is being prepared.
+[Semantic Versioning](https://semver.org/). 1.0.0 is the first tagged
+release. The dated versions before it were never tagged.
 
 ## [Unreleased]
 
+## 1.0.0 — 2026-11-19
+
+The first tagged release (V1). ScanRuler for FreeCAD is a port of ScanRuler by Stefan Hermann (CNC Kitchen) into FreeCAD.
+It measures 3D scans against CAD in FreeCAD: alignment, deviation, wall thickness, sections, fitted elements, 2D measuring and reverse engineering, with ScanRuler's plugins.
+It works alone in its own workbench. With Agent Link for FreeCAD installed, an agent uses its tools too.
+Licence: AGPL-3.0-only, as ScanRuler. Credit for the measuring work goes to Stefan Hermann (CNC Kitchen).
+
+- Release (V1): version 1.0.0. REUSE.toml covers docs/hardening.
 - Panel polish (V1): each control of the panels has a tooltip in STE. The screenshot card (20 tooltips), the page fields (check boxes, lists, sliders and number boxes say what to do and the unit) and the grip field. The swatches name their colour, not "#rrggbb". In a dark theme the dock header's error line and agent dot are lighter, so they read (theme.text_on, 4.5:1). The credit to Stefan Hermann (CNC Kitchen) stays. A new test (tests/test_panel_polish.py) finds a control with no tooltip and a fixed colour in panel code.
 - Red team 3 fixes (scanrulerfc/guard.py): ZIP, zlib and scan reads are capped (size, ratio, members, triangles); pack_setup takes files from the session folder only, never hidden, printer or Agent Link state files, and the scrub empties a bare key field; names from files are cleaned and capped; paths under home show as ~/... in answers and refusals; the project import removes its temporary folder.
 - Window pass 3. Every ScanRuler tool's caption says what it did with its
