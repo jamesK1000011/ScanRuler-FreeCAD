@@ -106,8 +106,14 @@ def pack_array(a):
     return zlib.compress(buf.getvalue(), 6)
 
 
-def unpack_array(data):
-    return np.lib.format.read_array(io.BytesIO(zlib.decompress(data)), allow_pickle=False)
+def unpack_array(data, limit=None):
+    """An array back from pack_array's bytes, unpacked to at most limit
+    bytes (guard.MAX_TOTAL by default): a .FCStd from the web can hold a
+    zlib bomb (red team 3, R3-6)."""
+    from . import guard
+
+    raw = guard.inflate(data, guard.MAX_TOTAL if limit is None else limit, "an array of the ScanRuler state")
+    return np.lib.format.read_array(io.BytesIO(raw), allow_pickle=False)
 
 
 class Packs:
@@ -293,16 +299,30 @@ def decode(data, scan_points=None):
     from .dev_rigid import Rigid
     from .scanstate import Scan
 
+    from . import guard
+
+    # The state comes in a .FCStd, which can come from the web: every read
+    # is capped, all arrays together to guard.MAX_TOTAL (red team 3, R3-6).
     with zipfile.ZipFile(io.BytesIO(data)) as z:
-        head = json.loads(z.read("state.json").decode("utf-8"))
+        guard.zip_check(z, "the ScanRuler state")
+        head = json.loads(guard.zip_read(z, "state.json", "the ScanRuler state", 256 * 1024 * 1024).decode("utf-8"))
         if head.get("format", 0) > FORMAT:
             raise ValueError("The ScanRuler state in this document was written by a newer version of ScanRuler for FreeCAD: update the add-on to read it.")
         names = z.namelist()
+        left = guard.MAX_TOTAL
         if "arrays.npz" in names:  # format 1
-            with np.load(io.BytesIO(z.read("arrays.npz")), allow_pickle=False) as npz:
+            npz_bytes = guard.zip_read(z, "arrays.npz", "the ScanRuler state")
+            with zipfile.ZipFile(io.BytesIO(npz_bytes)) as inner:
+                guard.zip_check(inner, "the ScanRuler state's arrays")
+            with np.load(io.BytesIO(npz_bytes), allow_pickle=False) as npz:
                 arrays = {k: npz[k] for k in npz.files}
         else:
-            arrays = {n[len(ARRAYS):-len(PACKED)]: unpack_array(z.read(n)) for n in names if n.startswith(ARRAYS) and n.endswith(PACKED)}
+            arrays = {}
+            for n in names:
+                if n.startswith(ARRAYS) and n.endswith(PACKED):
+                    a = unpack_array(guard.zip_read(z, n, "the ScanRuler state", left), left)
+                    left -= a.nbytes
+                    arrays[n[len(ARRAYS):-len(PACKED)]] = a
     scans, missing = {}, []
 
     def scan(rec):
@@ -857,6 +877,10 @@ def put_reference(doc, ref):
 
 
 def _file_bytes(path):
+    from . import guard
+
+    if os.path.getsize(path) > guard.MAX_TOTAL:
+        raise guard.TooLarge(f"The ScanRuler state in this document is larger than {guard.MAX_TOTAL // (1024 * 1024)} MB: not read.")
     with open(path, "rb") as f:
         return f.read()
 

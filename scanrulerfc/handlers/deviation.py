@@ -13,7 +13,7 @@ import os
 import numpy as np
 
 from .. import dev_rigid as R
-from .. import meshio
+from .. import guard, meshio
 from .. import errors, on_reference
 from .. import scanstate as S
 from ..dev_align import AlignError, align_from_pairs, align_local, auto_align, quality_warnings
@@ -136,7 +136,7 @@ def read_reference(session, a):
         if not os.path.isfile(path):
             raise ToolError("not_found", f"path {path!r}: no such file — give the reference's path on this computer.")
         ext = os.path.splitext(path)[1].lower()
-        name = os.path.basename(path)
+        name = guard.text(os.path.basename(path), 120) or "reference"  # text from a file name, for the agent (R3-11)
         if ext in CAD:
             import Part
 
@@ -149,7 +149,10 @@ def read_reference(session, a):
             if units != "mm":
                 note = "A STEP, IGES or BREP file carries its own units: units is for mesh files."
         elif ext in MESH:
-            V, F = meshio.read(path, S.UNITS[units])
+            try:
+                V, F = meshio.read(path, S.UNITS[units])
+            except guard.TooLarge as e:
+                raise ToolError("invalid_input", str(e)) from None
             kind = "mesh"
         elif S.more_formats() and ext.lstrip(".") in S.more_formats().FORMATS:
             V, F, _info = S.more_formats().read(path, units if "units" in a else None)

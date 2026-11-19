@@ -33,6 +33,37 @@ def pstate(session):
     return st.setdefault("pack", {"settings": dict(P.DEFAULT_PACK), "bodies": None, "files": [], "upstream": None})
 
 
+# Files that hold printer keys: never in a pack (red team 3, R3-8).
+NEVER_PACK = {"printers.json", ".agentlink-printers.json"}
+
+
+def _pack_file(session, f):
+    """f when it may go in a pack, else a refusal (red team 3, R3-8): a
+    file in the session's folder, not hidden and not in a hidden folder,
+    not a printer file, not Agent Link's own state. There is no file
+    picker for the pack yet, so a file from anywhere else is refused: the
+    person copies it into the session's folder first."""
+    from .. import guard
+
+    shown = guard.tilde(f)
+    if not isinstance(f, str) or not os.path.isfile(f):
+        raise ToolError("not_found", f"No such file: {shown}.")
+    real = os.path.realpath(f)
+    if os.path.basename(f).casefold() in NEVER_PACK or os.path.basename(real).casefold() in NEVER_PACK:
+        raise ToolError("invalid_input", f"files: {shown} holds printer keys. It never goes in a pack.")
+    out = os.path.realpath(session.out_dir) if getattr(session, "out_dir", None) else None
+    if not out or out == "/" or not real.startswith(out.rstrip("/") + "/"):
+        raise ToolError("invalid_input", f"files: {shown} is not in the session's folder ({guard.tilde(out or 'none')}). "
+                                         "Only files in that folder go in a pack: the person copies the file there first.")
+    hidden = [x for x in os.path.relpath(real, out).split(os.sep) if x.startswith(".")]
+    if hidden or os.path.basename(f).startswith("."):
+        raise ToolError("invalid_input", f"files: {shown} is hidden ({(hidden or [os.path.basename(f)])[0]}). Hidden files never go in a pack.")
+    state = lent.AGENTLINK_STATE(real, out) if lent.AGENTLINK_STATE else None
+    if state:
+        raise ToolError("invalid_input", f"files: {shown} is Agent Link's own state ({state}). It never goes in a pack.")
+    return f
+
+
 def _safe(name):
     return "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "part"
 
@@ -73,10 +104,7 @@ def bind(session):
                 session.body(b)
             ps["bodies"] = a["bodies"]
         if a.get("files") is not None:
-            missing = [f for f in a["files"] if not os.path.isfile(f)]
-            if missing:
-                raise ToolError("not_found", f"No such file: {', '.join(missing)}.")
-            ps["files"] = a["files"]
+            ps["files"] = [_pack_file(session, f) for f in a["files"]]
         if a.get("upstream") is not None:
             ps["upstream"] = a["upstream"]
         return {"settings": s, "bodies": ps["bodies"] or [o.Label for o in session.bodies()], "files": ps["files"], "upstream": upstream_of(ps),
@@ -131,11 +159,17 @@ def bind(session):
                 img[bg] = (0.96, 0.96, 0.97)
                 entries[f"images/{v}.png"] = R.png(img)
         for f in ps["files"]:
+            _pack_file(session, f)  # checked again: the folder can have changed since pack_setup
             with open(f, "rb") as fh:
                 entries[f"files/{os.path.basename(f)}"] = fh.read()
         users, changes = set(), []
+        from .. import guard
+
         for k in list(entries):
-            entries[k], ch = P.scrub_file(k, entries[k], users)
+            try:
+                entries[k], ch = P.scrub_file(k, entries[k], users)
+            except guard.TooLarge as e:
+                raise ToolError("invalid_input", f"{k}: {e}") from None
             changes += ch
         year = datetime.date.today().year
         entries["LICENSE"] = P.licence_file(s["licence"], s["author"], year).encode()

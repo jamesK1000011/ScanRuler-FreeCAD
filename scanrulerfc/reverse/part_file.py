@@ -15,6 +15,7 @@
 # keys (features, rolledBack, nextFeatureId, ...).
 
 import math
+import os
 import zipfile
 from array import array
 
@@ -466,13 +467,23 @@ def loads(text):
 def read_scanruler(path):
     """The Reverse engineer part of a .scanruler archive: (part, members),
     the part validated, members holding the STEP texts' member if any."""
+    from .. import guard
+
+    # Each read capped (red team 3, R3-6): a project from the web.
     with zipfile.ZipFile(path) as z:
-        manifest = parse(z.read(PROJECT_MEMBER).decode("utf-8"))
+        guard.zip_check(z, os.path.basename(path))
+        manifest = parse(guard.zip_read(z, PROJECT_MEMBER, "project.json", 64 * 1024 * 1024).decode("utf-8"))
         part = manifest.get(KEY) if isinstance(manifest, dict) else None
         members = {}
         if isinstance(part, dict) and isinstance(part.get("stepFiles"), str) and part["stepFiles"] in z.namelist():
-            members[part["stepFiles"]] = z.read(part["stepFiles"])
-    return (None if part is None else validate_reverse_part(part)), members
+            members[part["stepFiles"]] = guard.zip_read(z, part["stepFiles"], "the project's STEP texts", 256 * 1024 * 1024)
+    part = None if part is None else validate_reverse_part(part)
+    # Feature names are text from the file that the agent reads: cleaned
+    # (red team 3, R3-11).
+    for f in (part or {}).get("features") or []:
+        if isinstance(f, dict) and isinstance(f.get("name"), str):
+            f["name"] = guard.text(f["name"], 120)
+    return part, members
 
 
 def write_members(state):

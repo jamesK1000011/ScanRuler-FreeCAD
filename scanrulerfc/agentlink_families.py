@@ -119,6 +119,12 @@ def _lend():
     from . import lent, meshio
 
     lent.RENDER = lambda: importlib.import_module("agentlink.render")
+    try:
+        from agentlink import paths
+
+        lent.AGENTLINK_STATE = getattr(paths, "agentlink_state", None)
+    except ImportError:
+        pass
     meshio.EXTRA = lambda: importlib.import_module("agentlink.meshformats")
 
 

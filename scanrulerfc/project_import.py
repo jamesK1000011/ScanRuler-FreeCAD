@@ -18,9 +18,11 @@
 # what it did.
 import json
 import os
+import shutil
 import tempfile
 import zipfile
 
+from . import guard
 from .errors import ToolError
 
 APP = "ScanRuler"
@@ -32,7 +34,9 @@ REVERSE_LATER = "Reverse engineer data: needs FreeCAD's Part kernel to build —
 
 def read_manifest(zf):
     try:
-        m = json.loads(zf.read(MANIFEST).decode("utf-8"))
+        m = json.loads(guard.zip_read(zf, MANIFEST, "project.json", 64 * 1024 * 1024).decode("utf-8"))
+    except guard.TooLarge as e:
+        raise ToolError("invalid_input", str(e))
     except KeyError:
         raise ToolError("invalid_input", "Not a ScanRuler project file: it holds no project.json.")
     except ValueError as e:
@@ -44,13 +48,22 @@ def read_manifest(zf):
     return m
 
 
+def _name(x):
+    """A name from the project file, cleaned for the agent (red team 3,
+    R3-11), or None."""
+    n = x.get("name")
+    return guard.text(n, 120) or None if isinstance(n, str) else None
+
+
 def _element_call(e):
+    e = {**e, "name": _name(e)}
     src = e.get("source") or {}
     kind = e.get("kind")
     if kind not in KINDS:
+        kind = guard.text(kind, 40)
         return None, f"{e.get('name') or kind}: a {kind} is not fitted here."
     if src.get("type") != "fitted":
-        return None, f"{e.get('name') or kind}: {src.get('type') or 'this'} elements are not loaded yet."
+        return None, f"{e.get('name') or kind}: {guard.text(src.get('type'), 40) or 'this'} elements are not loaded yet."
     seeds = [int(v) for v in (src.get("seeds") or [])]
     if not seeds:
         return None, f"{e.get('name') or kind}: fitted on a marked region — fit it again (element_fit_marked)."
@@ -61,6 +74,7 @@ def _element_call(e):
 
 
 def _section_call(s):
+    s = {**s, "name": _name(s)}
     frame = s.get("frame") or {}
     if not (frame.get("origin") and frame.get("normal")):
         return None, f"{s.get('name') or 'A section'}: no plane in the file."
@@ -116,26 +130,51 @@ def load(path, run, folder=None, doc_fn=None):
 
 
 def _load(path, run, folder=None):
+    """_load_in with the scan's copy in a temporary folder of its own when
+    no folder is given; that folder is removed after the call (red team 3,
+    R3-13: copies of private scans stayed in the temporary folder)."""
+    if folder is not None:
+        return _load_in(path, run, folder)
+    tmp = tempfile.mkdtemp(prefix="scanruler-")
+    try:
+        return _load_in(path, run, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _load_in(path, run, folder):
     try:
         zf = zipfile.ZipFile(path)
     except (OSError, zipfile.BadZipFile) as e:
-        raise ToolError("invalid_input", f"{os.path.basename(path)}: not a ScanRuler project file ({e}).")
+        raise ToolError("invalid_input", f"{guard.text(os.path.basename(path), 80)}: not a ScanRuler project file ({e}).")
     out = {"project": None, "scan": None, "elements": 0, "sections": 0, "reverse": None, "notLoaded": [], "errors": []}
     with zf:
+        # A project from the web: refused before it is unpacked when it is
+        # a ZIP bomb (red team 3, R3-6).
+        try:
+            guard.zip_check(zf, os.path.basename(path))
+        except guard.TooLarge as e:
+            raise ToolError("invalid_input", guard.text(str(e), 300))
         m = read_manifest(zf)
-        out["project"] = m.get("name") or os.path.splitext(os.path.basename(path))[0]
+        # The name is text from the file: cleaned before the agent reads it (R3-11).
+        out["project"] = guard.text(m.get("name") if isinstance(m.get("name"), str) and m.get("name") else os.path.splitext(os.path.basename(path))[0], 120)
         out["_reverse"] = bool(m.get("reverse"))
         scan = m.get("scan")
         members = zf.namelist()
         if not scan:
             return out
-        member, name = scan.get("member"), os.path.basename(scan.get("fileName") or "scan.stl")
+        member, name = scan.get("member"), guard.text(os.path.basename(str(scan.get("fileName") or "scan.stl")), 120)
+        if name in ("", ".", ".."):
+            name = "scan.stl"
         if member not in members:
-            raise ToolError("invalid_input", f"The project names a scan ({member}) it does not hold.")
-        folder = folder or tempfile.mkdtemp(prefix="scanruler-")
+            raise ToolError("invalid_input", f"The project names a scan ({guard.text(member, 80)}) it does not hold.")
         target = os.path.join(folder, name)
+        try:
+            data = guard.zip_read(zf, member, "the project's scan", guard.MAX_SCAN_BYTES)
+        except guard.TooLarge as e:
+            raise ToolError("invalid_input", str(e))
         with open(target, "wb") as f:
-            f.write(zf.read(member))
+            f.write(data)
     args = {"path": target, "discard": True}
     if scan.get("units") in ("mm", "cm", "m", "in"):
         args["units"] = scan["units"]

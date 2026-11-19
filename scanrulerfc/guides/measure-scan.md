@@ -120,6 +120,7 @@ A scan is a cloud of noisy samples of a surface. Every number you give rests on 
 
 - `pack_setup { title, author, licence }`, then `pack_plan`: every part taken from others (catalog_provenance's records) is checked against the licence. A guide, not legal advice: the person confirms each upstream licence and the choice of their own.
 - `pack_write` scrubs every file (paths, user names, printer access codes and serials, e-mails, metadata) and says what it took out. The upload is the person's.
+- `pack_setup { files }` takes only files in the folder of the session. It refuses hidden files, printer files and Agent Link's own state. For another file, the person copies it into that folder first.
 
 ## 7g. Calibrate the printer from a scan of a print
 

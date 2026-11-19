@@ -9,6 +9,7 @@ never tagged: the first tagged release is being prepared.
 
 ## [Unreleased]
 
+- Red team 3 fixes (scanrulerfc/guard.py): ZIP, zlib and scan reads are capped (size, ratio, members, triangles); pack_setup takes files from the session folder only, never hidden, printer or Agent Link state files, and the scrub empties a bare key field; names from files are cleaned and capped; paths under home show as ~/... in answers and refusals; the project import removes its temporary folder.
 - Window pass 3. Every ScanRuler tool's caption says what it did with its
   key values (the 2D sheet, print fit, scan noise, repeat, wear, Mesh
   Tools, the Reverse engineer, the report); flat_profile's caption was its
