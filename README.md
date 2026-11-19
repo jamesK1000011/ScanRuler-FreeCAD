@@ -23,11 +23,12 @@ A 3D scan is a mesh: many small triangles that a scanner or photos make of a rea
 With this add-on you can measure the scan, fit planes, holes and other shapes to it,
 compare it with a CAD part (a deviation map), check wall thickness, and rebuild the part as a CAD model (reverse engineering).
 
-It is ported to FreeCAD from **ScanRuler by CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
+It is ported to FreeCAD from **ScanRuler by Stefan Hermann (CNC Kitchen)** ([github.com/CNCKitchen/ScanRuler](https://github.com/CNCKitchen/ScanRuler); see [NOTICE.md](https://github.com/jamesK1000011/ScanRuler-FreeCAD/blob/main/NOTICE.md)).
 Licensed AGPL-3.0-only, the same as ScanRuler.
 
 It works alone, as a FreeCAD workbench (a set of toolbars and menus for one kind of work).
 With [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD), an AI agent can use all of its tools for you, in the background.
+Agent Link is the hub: the add-on that connects an AI agent (Claude, for example) to FreeCAD through MCP, the Model Context Protocol. ScanRuler for FreeCAD does not need it.
 Checks such as deviation and wall thickness tell you if a part is feasible. They are never a sign-off.
 
 Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it).
@@ -58,6 +59,10 @@ at the commit its tests passed with.
 2. Under *Custom repositories*, add `https://github.com/jamesK1000011/ScanRuler-FreeCAD`, branch `main`.
 3. Open **Tools ▸ Addon manager**. Find **ScanRuler for FreeCAD**. Click **Install**.
 4. Restart FreeCAD.
+
+The Addon Manager puts it in the `Mod` folder as `ScanRuler-FreeCAD`.
+For an agent, also install Agent Link and connect your agent
+([Agent Link: Install](https://github.com/jamesK1000011/AgentLink-FreeCAD#install)).
 
 ### By hand
 
