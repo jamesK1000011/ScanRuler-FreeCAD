@@ -16,6 +16,9 @@ docs/hardening/scanruler-reverse-findings.md
 docs/hardening/scanruler-reverse-model.json
 docs/hardening/scanruler6-findings.md
 docs/hardening/sr4-findings.md
+docs/images/panel-scanruler.png
+docs/images/scan-deviation.png
+docs/images/toolbar-scanruler.png
 docs/workflow/README.md
 package.xml
 scanrulerfc/__init__.py

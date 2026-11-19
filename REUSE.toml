@@ -36,3 +36,9 @@ path = [".github/privacy/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Agent Link contributors"
 SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+[[annotations]]
+# Screenshots of FreeCAD with this add-on, taken by Agent Link on 19 Nov 2026 and looked at (no personal data).
+path = ["docs/images/*.png"]
+SPDX-FileCopyrightText = "ScanRuler for FreeCAD contributors"
+SPDX-License-Identifier = "AGPL-3.0-only"
