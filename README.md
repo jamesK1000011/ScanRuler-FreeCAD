@@ -99,15 +99,19 @@ and use the keys of the 3D Measure workspace.
 
 ## Screenshots
 
-<!-- screenshots: no screenshots are in the repository yet. Take these and add them under docs/images/:
-- FreeCAD with the ScanRuler workbench, a scan coloured by its deviation map, the ScanRuler panel beside the model tree
-- the ScanRuler workspaces toolbar and the 3D Measure page
-- a wall thickness colour map
-- the Reverse Engineer page with a section fitted and made into a sketch
-- the ScanRuler tab in the Agent Link panel
--->
+<!-- screenshots: still to take: the Reverse Engineer page with a section fitted and made into a sketch; the ScanRuler tab in the Agent Link panel -->
 
-No screenshots yet.
+![A scanned tray coloured by its deviation from the CAD part](https://github.com/jamesK1000011/ScanRuler-FreeCAD/raw/main/docs/images/scan-deviation.png)
+
+*A scan against its CAD part: red stands proud of it (excess material), blue is below it (material missing).*
+
+![The ScanRuler workbench toolbar](https://github.com/jamesK1000011/ScanRuler-FreeCAD/raw/main/docs/images/toolbar-scanruler.png)
+
+*The ScanRuler workbench: workspaces (3D Measure), alignment, elements and dimensions.*
+
+![The ScanRuler panel beside the model tree](https://github.com/jamesK1000011/ScanRuler-FreeCAD/raw/main/docs/images/panel-scanruler.png)
+
+*The ScanRuler panel: model, alignment, elements, dimensions, GD&T. The tools are by Stefan Hermann (CNC Kitchen), ported to FreeCAD.*
 
 ## The workbench
 
