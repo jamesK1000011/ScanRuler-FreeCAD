@@ -625,6 +625,13 @@ class HardenedInADocument(unittest.TestCase):
         # Run 2's unread step: reverse_feature_clear, then history_undo
         # (Agent Link: undo, then a document recompute) — and Edit › Undo,
         # which recomputes nothing. Written without a FreeCAD to run it on.
+        # A name left standing in the application by an earlier test's edit
+        # that changed nothing (FreeCAD 1.x: commitTransaction with no step
+        # pending keeps the active transaction): every change here would go
+        # under it as one step. Closed first, as in a fresh FreeCAD.
+        close = getattr(FreeCAD, "closeActiveTransaction", None)
+        if close is not None:
+            close(False)
         doc = FreeCAD.newDocument("ReverseClearUndo")
         try:
             doc.UndoMode = 1
