@@ -132,7 +132,9 @@ class Integration(unittest.TestCase):
         idx = {g["topic"]: g for g in self.call("guide_read")["guides"]}
         for t in ("measure-scan", "mesh-tools", "start", "view"):
             self.assertIn(t, idx)
-        self.assertIn("6. Deviation against a reference", idx["measure-scan"]["sections"])
+        # The index names each section once, with its cost (sectionTokens).
+        g = idx["measure-scan"]
+        self.assertIn("6. Deviation against a reference", g.get("sectionTokens") or g.get("sections"))
         sec = self.call("guide_read", {"topic": "measure-scan", "section": "6. Deviation"})
         self.assertIn("deviation_hotspots", sec["text"])
         init = self.server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})["result"]
