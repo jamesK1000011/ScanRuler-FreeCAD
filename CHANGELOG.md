@@ -197,7 +197,7 @@ Licence: AGPL-3.0-only, as ScanRuler. Credit for the measuring work goes to Stef
 - Boolean (mesh_boolean) and Trim to scan now cut with meshbool, a boolean
   written for this add-on in numpy alone, in place of FreeCAD's Mesh
   booleans. On a 140,698-triangle scan minus a 5,212-triangle cutter
-  (an M18 shell test drive) Mesh.difference came back with 2,607 open
+  (a scanned-shell test drive) Mesh.difference came back with 2,607 open
   edges and 7,417 bad ones, and the result was then turned inside out patch
   by patch (volume −133,160 mm³); with a Part solid as the cutter it removed
   515 mm³ of ~100,000. meshbool decides every crossing by one orientation
