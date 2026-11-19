@@ -65,7 +65,17 @@ class Measure(unittest.TestCase):
         return self.ok("scan_open", {"path": path, "discard": True})
 
     def test_tools_listed(self):
-        r = self.server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]
+        # The classic list: Agent Link's default lists only its base tools
+        # and finds the rest with tool_find (agentlink/staticbase.py).
+        was = os.environ.get("AGENTLINK_TOOLLIST")
+        os.environ["AGENTLINK_TOOLLIST"] = "classic"
+        try:
+            r = self.server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]
+        finally:
+            if was is None:
+                os.environ.pop("AGENTLINK_TOOLLIST", None)
+            else:
+                os.environ["AGENTLINK_TOOLLIST"] = was
         names = {t["name"] for t in r["tools"]}
         for n in ("scan_nearest", "scan_query", "scan_segment", "element_fit", "element_construct", "align_datum", "align_symmetry", "scan_scale", "dimension_add", "report_get", "export_csv"):
             self.assertIn(n, names)
