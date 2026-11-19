@@ -44,6 +44,11 @@ def core_in_source():
     for p in files:
         with open(p, encoding="utf-8") as f:
             out.update(re.findall(r'\bTool\(\s*"([a-z][a-z0-9_]*)"', f.read()))
+    # A newer Agent Link keeps most of its tools as data (agentlink/data/tools.json).
+    data = os.path.join(AL, "data", "tools.json")
+    if os.path.isfile(data):
+        with open(data, encoding="utf-8") as f:
+            out.update(json.load(f).get("entries", {}))
     return out
 
 

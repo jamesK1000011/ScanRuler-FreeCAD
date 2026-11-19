@@ -443,13 +443,19 @@ def load(path, units="mm", given=True):
 
     if units not in UNITS:
         raise ValueError(f"units: one of {', '.join(UNITS)}.")
+    from . import guard
+
+    # The file's name goes to the agent: cleaned (red team 3, R3-11).
+    name = guard.text(os.path.basename(path), 120) or "scan"
     if meshio.extra_reads(path):
+        guard.scan_check(path)
         V, F, _info = meshio.extra().read(path, units if given else None)
-        return Scan(os.path.basename(path), V, F, units if given else "mm", path)
+        guard.triangles_check(len(F), name)
+        return Scan(name, V, F, units if given else "mm", path)
     V, F = meshio.read(path, UNITS[units])
     if len(F) == 0:
-        raise ValueError(f"{os.path.basename(path)}: no triangles read.")
-    return Scan(os.path.basename(path), V, F, units, path)
+        raise ValueError(f"{name}: no triangles read.")
+    return Scan(name, V, F, units, path)
 
 
 def from_mesh(m, name):

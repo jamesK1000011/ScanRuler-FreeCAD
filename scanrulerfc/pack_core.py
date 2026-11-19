@@ -167,6 +167,8 @@ def licence_file(lid, holder, year):
 # ---- scrub ---------------------------------------------------------------------
 
 SECRET = r"(access[_ -]?code|api[_ -]?key|apikey|print_?host_?apikey|token|password|passwd|secret|auth(orization)?)"
+# The whole field name, any case: key, apiKey, api_key, token, password, secret.
+BARE_SECRET = r"(key|api_?key|token|password|passwd|secret|pass|pwd)"
 SERIAL = r"(serial(_?number)?|dev_?id|device_?id|printer_?sn|\bsn\b)"
 HOST = r"(print_?host|printhost|host_?ip|ip_?address|printer_?ip|\bhost\b)"
 PATH = re.compile(r"(?:[A-Za-z]:[\\/]+(?:Users|Documents and Settings)[\\/]+([^\\/\"'<>\s;,]+)(?:[\\/]+[^\"'<>\r\n;,]*)?|/(?:Users|home)/([^/\"'<>\s;,]+)(?:/[^\"'<>\r\n;,]*)?)")
@@ -190,9 +192,10 @@ def _base(p):
 
 
 def scrub_text(text, t, users):
-    def line_key(key, label):
+    def line_key(key, label, exact=False):
         nonlocal text
         k0 = re.sub(r"\((?!\?)", "(?:", key)
+        name = r"[ \t]*" + k0 if exact else r"[\w .-]*" + k0 + r"[\w.-]*"
 
         def blank(m):
             pre, k, sep, v = m.group(1), m.group(2), m.group(3), m.group(4)
@@ -203,16 +206,28 @@ def scrub_text(text, t, users):
             quoted = v.strip()[:1] in ('"', "'")
             return pre + k + sep + ('""' if quoted else "")
 
-        text = re.sub(r"(^|[\n\0;{,]\s*[\"']?)([\w .-]*" + k0 + r"[\w.-]*)([\"']?\s*[:=]\s*)(\"(?:[^\"\\]|\\.)*\"|'[^']*'|[^\n\0,}\]]*)", blank, text, flags=re.I | re.M)
+        # The separator stays on its line for an exact name: a value this
+        # pass or an earlier one emptied must not take the next line.
+        sep = r"([\"']?[ \t]*[:=][ \t]*)" if exact else r"([\"']?\s*[:=]\s*)"
+        text = re.sub(r"(^|[\n\0;{,]\s*[\"']?)(" + name + r")" + sep + r"(\"(?:[^\"\\]|\\.)*\"|'[^']*'|[^\n\0,}\]]*)", blank, text, flags=re.I | re.M)
 
         def attr(m):
             t.add(label)
             return m.group(1) + m.group(3)
 
-        text = re.sub(r"(<[^>]*\bkey\s*=\s*\"[^\"]*" + k0 + r"[^\"]*\"[^>]*\bvalue\s*=\s*\")([^\"]+)(\")", attr, text, flags=re.I)
-        text = re.sub(r"(\b[\w-]*" + k0 + r"[\w-]*\s*=\s*\")([^\"]+)(\")", attr, text, flags=re.I)
+        if exact:
+            # <metadata key="key" value="…">; a key="…" attribute alone is
+            # XML's own attribute name, not a secret.
+            text = re.sub(r"(<[^>]*\bkey\s*=\s*\"\s*" + k0 + r"\s*\"[^>]*\bvalue\s*=\s*\")([^\"]+)(\")", attr, text, flags=re.I)
+        else:
+            text = re.sub(r"(<[^>]*\bkey\s*=\s*\"[^\"]*" + k0 + r"[^\"]*\"[^>]*\bvalue\s*=\s*\")([^\"]+)(\")", attr, text, flags=re.I)
+            text = re.sub(r"(\b[\w-]*" + k0 + r"[\w-]*\s*=\s*\")([^\"]+)(\")", attr, text, flags=re.I)
 
     line_key(SECRET, "access codes, keys, tokens or passwords emptied")
+    # A field named only "key" (an OctoPrint or PrusaLink API key in a
+    # printer file), or one of the other secret names as the whole name
+    # (red team 3, R3-8). Exact: "keyboard" or "monkey" stay.
+    line_key(BARE_SECRET, "access codes, keys, tokens or passwords emptied", exact=True)
     line_key(SERIAL, "printer serial numbers emptied")
     line_key(HOST, "printer addresses emptied")
 
@@ -296,21 +311,34 @@ def scrub_stl(b, t):
     return b
 
 
-def scrub_file(name, data, users=None):
-    """The file's bytes scrubbed, and what changed: [{file, what, count}]."""
+ZIP_DEPTH = 2  # a ZIP or 3MF in a ZIP in the pack is read; deeper ones are refused
+
+
+def scrub_file(name, data, users=None, depth=0):
+    """The file's bytes scrubbed, and what changed: [{file, what, count}].
+    A ZIP or 3MF is read with guard's caps (red team 3, R3-6): a ZIP bomb,
+    or ZIPs nested deeper than ZIP_DEPTH, raise guard.TooLarge."""
+    from . import guard
+
     users = users if users is not None else set()
     t = Tally()
     low = name.lower()
     out = data
     if low.endswith((".3mf", ".zip")):
-        src = zipfile.ZipFile(io.BytesIO(data))
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
-            for info in src.infolist():
-                b2, inner = scrub_file(info.filename, src.read(info.filename), users)
-                dst.writestr(info.filename, b2)
-                for c in inner:
-                    t.add(c["what"], c["count"])
+        if depth >= ZIP_DEPTH:
+            raise guard.TooLarge(f"{guard.text(name, 80)}: a ZIP inside a ZIP inside a ZIP: not read. Add the inner files on their own.")
+        with zipfile.ZipFile(io.BytesIO(data)) as src:
+            infos = guard.zip_check(src, guard.text(name, 80))
+            buf = io.BytesIO()
+            left = guard.MAX_TOTAL
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
+                for info in infos:
+                    member = guard.zip_read(src, info, guard.text(name, 80), left)
+                    left -= len(member)
+                    b2, inner = scrub_file(info.filename, member, users, depth + 1)
+                    dst.writestr(info.filename, b2)
+                    for c in inner:
+                        t.add(c["what"], c["count"])
         out = buf.getvalue()
     elif low.endswith(".png"):
         out = scrub_png(data, t)

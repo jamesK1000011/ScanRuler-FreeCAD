@@ -83,6 +83,7 @@ scanrulerfc/fonts/barlow-semi-condensed-500.woff2
 scanrulerfc/fonts/barlow-semi-condensed-600.woff2
 scanrulerfc/geom2d.py
 scanrulerfc/grow.py
+scanrulerfc/guard.py
 scanrulerfc/guides/measure-scan.md
 scanrulerfc/guides/mesh-tools.md
 scanrulerfc/handlers/__init__.py
@@ -368,6 +369,7 @@ tests/test_pack_service.py
 tests/test_pages_draw.py
 tests/test_paths.py
 tests/test_qa.py
+tests/test_redteam3.py
 tests/test_redteam_boundary.py
 tests/test_redteam_deviation.py
 tests/test_redteam_fits.py

@@ -60,5 +60,24 @@ def touching(fn, session, tool):
     return run
 
 
+def home_short(fn):
+    """fn, with paths under the home folder shown as ~/... in its answer and
+    in its refusals (red team 3, R3-12: transcripts are shared). A ~/...
+    path given back to a tool is read as the same file (paths.resolve)."""
+    from .. import guard
+
+    @functools.wraps(fn)
+    def run(*a):
+        try:
+            out = fn(*a)
+        except (errors.ToolError, AgentToolError) as e:
+            raise AgentToolError(e.code, guard.tilde(e.message)) from e
+        except ValueError as e:  # Agent Link answers a bare ValueError invalid_input with its text: the same, paths short
+            raise AgentToolError("invalid_input", guard.tilde(str(e))) from e
+        return guard.tilde(out)
+
+    return run
+
+
 def tools(group, module, session):
-    return hooks.tools_from_data(DATA, group, {k: refusing(touching(fn, session, k)) for k, fn in handlers.bound(session, module).items()}, WHO)
+    return hooks.tools_from_data(DATA, group, {k: home_short(refusing(touching(fn, session, k))) for k, fn in handlers.bound(session, module).items()}, WHO)

@@ -14,3 +14,9 @@ def render():
     if RENDER is None:
         raise ToolError("unavailable", "Pictures need Agent Link's renderer: install Agent Link (the FreeCAD add-on) beside ScanRuler for FreeCAD.")
     return RENDER()
+
+
+# Agent Link's paths.agentlink_state(real, out_dir): what of Agent Link's
+# own state (settings, logs, approvals) a path is, or None. Lent by
+# agentlink_families; alone None. pack_setup keeps that state out of a pack.
+AGENTLINK_STATE = None
