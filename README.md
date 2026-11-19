@@ -3,15 +3,108 @@
 
 > An independent port: not an official CNC Kitchen or FreeCAD project, and not endorsed by the FreeCAD project association (FPA), whose trademark FreeCAD is.
 
-ScanRuler's measuring of 3D scans, ported to FreeCAD from **ScanRuler by
-CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
-Licensed AGPL-3.0-only, the same as ScanRuler.
+- [What it is](#what-it-is)
+- [What you need](#what-you-need)
+- [Install](#install)
+- [First steps](#first-steps)
+- [Screenshots](#screenshots)
+- [The workbench](#the-workbench)
+- [What is ported](#what-is-ported)
+- [Troubleshooting](#troubleshooting)
+- [Uninstall](#uninstall), [Privacy](#privacy), [Tests](#tests)
+- [Credits and licence](#credits-and-licence)
 
 How it plugs into Agent Link, with a diagram: [docs/workflow/](https://github.com/jamesK1000011/ScanRuler-FreeCAD/blob/main/docs/workflow/README.md).
 
-<!-- screenshot: FreeCAD with the ScanRuler workbench, a scan coloured by its deviation map, the ScanRuler panel beside the model tree -->
+## What it is
 
-Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it). The Claude Desktop extension of Agent Link for FreeCAD installs it into FreeCAD's `Mod` folder as `ScanRulerFC` beside `AgentLink`.
+ScanRuler for FreeCAD measures 3D scans in FreeCAD.
+A 3D scan is a mesh: many small triangles that a scanner or photos make of a real part.
+With this add-on you can measure the scan, fit planes, holes and other shapes to it,
+compare it with a CAD part (a deviation map), check wall thickness, and rebuild the part as a CAD model (reverse engineering).
+
+It is ported to FreeCAD from **ScanRuler by CNC Kitchen** (https://github.com/CNCKitchen/ScanRuler; see NOTICE.md).
+Licensed AGPL-3.0-only, the same as ScanRuler.
+
+It works alone, as a FreeCAD workbench (a set of toolbars and menus for one kind of work).
+With [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD), an AI agent can use all of its tools for you, in the background.
+Checks such as deviation and wall thickness tell you if a part is feasible. They are never a sign-off.
+
+Repository: https://github.com/jamesK1000011/ScanRuler-FreeCAD (until 14 Nov 2026 it lived in the `freecad/ScanRulerFC` folder of a ScanRuler fork; its history came with it).
+
+## What you need
+
+- FreeCAD 1.0 or newer (1.1 recommended), on macOS, Linux or Windows.
+- numpy, which comes with FreeCAD. scipy, when FreeCAD has it, makes a
+  few steps faster (symmetry, mesh grids, flatbed parts); they run without it.
+- Nothing else: no other add-on, no account, no network.
+- Optional: [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD) and an MCP client (for example Claude Desktop), so that an agent can use the tools.
+
+## Install
+
+Pick one, not two.
+
+### With Agent Link's Claude Desktop extension (easiest)
+
+1. Install [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD#install) with its Claude Desktop extension.
+2. Start a new chat.
+
+The extension installs this add-on for you into FreeCAD's `Mod` folder as `ScanRulerFC`,
+at the commit its tests passed with.
+
+### Addon Manager (custom repository, until it is listed)
+
+1. In FreeCAD, open **Edit ▸ Preferences ▸ Addon Manager**.
+2. Under *Custom repositories*, add `https://github.com/jamesK1000011/ScanRuler-FreeCAD`, branch `main`.
+3. Open **Tools ▸ Addon manager**. Find **ScanRuler for FreeCAD**. Click **Install**.
+4. Restart FreeCAD.
+
+### By hand
+
+1. Download a release from [Releases](https://github.com/jamesK1000011/ScanRuler-FreeCAD/releases)
+   (or the current [main as a zip](https://github.com/jamesK1000011/ScanRuler-FreeCAD/archive/refs/heads/main.zip)).
+2. Unzip it into FreeCAD's `Mod` folder. To find the folder, type `FreeCAD.getUserAppDataDir()` in FreeCAD's Python console.
+3. Rename the folder to `ScanRulerFC`.
+4. Restart FreeCAD.
+
+A `git clone` into `Mod/ScanRulerFC` works too.
+
+Then pick **ScanRuler** from the workbench list and use **ScanRuler ▸ Open Scan…**.
+
+## First steps
+
+**With an agent** (Agent Link installed). Start a new chat and try these prompts:
+
+1. "Open the scan bracket.stl and tell me how big it is."
+
+   The agent opens the scan. The ScanRuler tab of the Agent Link panel shows it.
+   The agent tells you the size in millimetres.
+
+2. "Fit a cylinder to the big hole and tell me its diameter."
+
+   The agent fits a cylinder to the hole. The fitted shape shows on the scan, and the agent gives the diameter.
+
+3. "Compare the scan with my CAD part bracket.step and show me where it is off."
+
+   The agent aligns the scan to the part and measures the deviation.
+   You see the scan coloured by how far each point is from the part, and the worst spots.
+
+**Without an agent.** Pick the **ScanRuler** workbench, use **ScanRuler ▸ Open Scan…**,
+and use the keys of the 3D Measure workspace.
+
+## Screenshots
+
+<!-- screenshots: no screenshots are in the repository yet. Take these and add them under docs/images/:
+- FreeCAD with the ScanRuler workbench, a scan coloured by its deviation map, the ScanRuler panel beside the model tree
+- the ScanRuler workspaces toolbar and the 3D Measure page
+- a wall thickness colour map
+- the Reverse Engineer page with a section fitted and made into a sketch
+- the ScanRuler tab in the Agent Link panel
+-->
+
+No screenshots yet.
+
+## The workbench
 
 It is a **ScanRuler workbench** of its own, laid out as the original: the
 workspace tabs (3D Measure, Surface Deviation, Wall Thickness, 2D Measure,
@@ -51,40 +144,6 @@ last tool it ran.
 The tool names are ScanRuler's own (`scan_open`, `element_fit`,
 `deviation_align` …), so ScanRuler's guides read the same here.
 Everything is in millimetres.
-
-## What you need
-
-- FreeCAD 1.0 or newer (1.1 recommended), on macOS, Linux or Windows.
-- numpy, which comes with FreeCAD. scipy, when FreeCAD has it, speeds up a
-  few steps (symmetry, mesh grids, flatbed parts); they run without it.
-- Nothing else: no other add-on, no account, no network. Agent Link for
-  FreeCAD is optional; with it, an agent can use the tools below.
-
-## Install
-
-Pick one, not two.
-
-- **Addon Manager (custom repository, until it is listed).** In FreeCAD:
-  **Edit ▸ Preferences ▸ Addon Manager**, under *Custom repositories* add
-  `https://github.com/jamesK1000011/ScanRuler-FreeCAD`, branch `main`. Then
-  **Tools ▸ Addon manager**, find **ScanRuler for FreeCAD**, Install, and
-  restart FreeCAD.
-- **With Agent Link's Claude Desktop extension.** It installs this add-on
-  for you into FreeCAD's `Mod` folder as `ScanRulerFC`, at the commit its
-  tests passed with.
-- **By hand.** Download a release from
-  [Releases](https://github.com/jamesK1000011/ScanRuler-FreeCAD/releases)
-  (or the current
-  [main as a zip](https://github.com/jamesK1000011/ScanRuler-FreeCAD/archive/refs/heads/main.zip)),
-  unzip it into FreeCAD's `Mod` folder (find it with
-  `FreeCAD.getUserAppDataDir()` in FreeCAD's Python console), rename the
-  folder to `ScanRulerFC` and restart FreeCAD. A `git clone` into
-  `Mod/ScanRulerFC` works too.
-
-Then pick **ScanRuler** from the workbench list and use **ScanRuler ▸ Open
-Scan…**.
-
-<!-- screenshot: the ScanRuler workspaces toolbar and the 3D Measure page -->
 
 ## What is ported
 
@@ -205,14 +264,26 @@ Not ported yet: patent kit (TechDraw does most of it),
 and the electronics pages (KiCad's own tools and KiCad StepUp cover the
 board).
 
-## Tests
+## Troubleshooting
 
-`python -m unittest discover -s tests` with Agent Link
-(github.com/jamesK1000011/AgentLink-FreeCAD) and this folder on `PYTHONPATH`.
-The tests that need FreeCAD skip without it; the ones that need Agent Link
-skip without it, and the rest run alone. CI (`.github/workflows/ci.yml`)
-runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
-out beside it.
+**A key does nothing.**
+A key that cannot run yet says why in the status bar. Most keys need a scan: use **ScanRuler ▸ Open Scan…** first.
+
+**The agent does not have the ScanRuler tools.**
+- Most clients read the tool list when a chat starts. After an install or an update, **start a new chat**.
+- In Agent Link, `session_state` shows an add-on that did not load under `leftOut`, with the error.
+  Update it (`agentlink_update` with the Claude extension, or the Addon Manager), then restart FreeCAD.
+- The Reverse engineer tools are a deferred group: they are listed only when the session asks for them.
+  Ask the agent to turn on the `reverse` group (`tool_groups`).
+
+**The volume error says `unsure`.**
+The scan has holes. Closing them with the reference is not ported yet.
+
+**Where are my files?**
+Beside the open document. When the document is not saved yet, in `~/ScanRuler` (exports, `scanners.json`, reports).
+
+**The window or FreeCAD is stuck.**
+See the troubleshooting of [Agent Link for FreeCAD](https://github.com/jamesK1000011/AgentLink-FreeCAD#troubleshooting) (`job_status`, `dialog_answer`, `app_force_restart`).
 
 ## Uninstall
 
@@ -234,6 +305,15 @@ Snapshots are taken only when you press the camera key. Library packs
 addresses and serials) before they are written. With Agent Link, what the
 agent reads goes to the AI provider your MCP client uses, under that
 provider's terms.
+
+## Tests
+
+`python -m unittest discover -s tests` with Agent Link
+(github.com/jamesK1000011/AgentLink-FreeCAD) and this folder on `PYTHONPATH`.
+The tests that need FreeCAD skip without it; the ones that need Agent Link
+skip without it, and the rest run alone. CI (`.github/workflows/ci.yml`)
+runs them on the newest FreeCAD and on 1.1 and 1.0, with Agent Link checked
+out beside it.
 
 ## Credits and licence
 
