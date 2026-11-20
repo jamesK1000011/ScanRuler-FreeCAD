@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
-  <name>ScanRuler for FreeCAD</name>
+  <name>ScanRuler FC</name>
   <description>ScanRuler's scan measuring (fits, alignment, deviation, wall thickness, sections, mesh tools, reverse engineering) and its plugins (scanner noise, thread match, wear repair, print fit from a scan, parts catalog, assembly manual, library pack), ported from ScanRuler by Stefan Hermann (CNC Kitchen): a ScanRuler workbench of its own, and tools for agents through Agent Link for FreeCAD when it is installed. An independent port, not made or endorsed by CNC Kitchen; not affiliated with or endorsed by the FreeCAD project or the FPA.</description>
   <version>1.0.0</version>
   <date>2026-11-19</date>
@@ -10,7 +10,7 @@
   <url type="repository" branch="main">https://github.com/jamesK1000011/ScanRuler-FreeCAD</url>
   <url type="bugtracker">https://github.com/jamesK1000011/ScanRuler-FreeCAD/issues</url>
   <url type="readme">https://github.com/jamesK1000011/ScanRuler-FreeCAD/blob/main/README.md</url>
-  <freecadmin>1.0.0</freecadmin>
+  <freecadmin>1.1.0</freecadmin>
   <tag>3D scanning</tag>
   <tag>metrology</tag>
   <tag>reverse engineering</tag>
