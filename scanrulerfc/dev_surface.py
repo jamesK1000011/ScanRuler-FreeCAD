@@ -24,6 +24,8 @@ LEAF = 16
 NODE = 16
 # Queries times leaves held at once while ordering the leaves.
 _BLOCK = 3_000_000
+# Resolve closest points and pseudonormals without all-query intermediates.
+_HIT_BATCH = 16_384
 # Rays cast together against the leaves near them (the leaf-ordered search
 # raycast_first used before the grid; kept as raycast_first_leaves, which
 # the tests hold the grid's answers against).
@@ -273,7 +275,10 @@ class NominalSurface:
         if np.isfinite(max_distance):
             ok &= best2 <= cap2
         if ok.any():
-            self._fill(P, np.nonzero(ok)[0], best_face[ok], hits)
+            rows = np.flatnonzero(ok)
+            for start in range(0, len(rows), _HIT_BATCH):
+                selected = rows[start:start + _HIT_BATCH]
+                self._fill(P, selected, best_face[selected], hits)
         return hits
 
     def _search(self, Q, cap2, facing, min_dot):

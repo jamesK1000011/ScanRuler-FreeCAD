@@ -14,6 +14,8 @@ except ImportError:
     _KDTree = None
 
 _MAX_FRONTIER = 500_000
+_QUERY_BATCH = 128
+_LEAF_BATCH = 4096
 
 
 def _prepare(surface):
@@ -36,6 +38,18 @@ def _prepare(surface):
 
 
 def search(surface, Q, cap2, facing, min_dot):
+    # Bound temporary arrays in both the hierarchy and original fallbacks.
+    faces = np.empty(len(Q), dtype=np.int64)
+    distances = np.empty(len(Q), dtype=float)
+    for start in range(0, len(Q), _QUERY_BATCH):
+        end = min(start + _QUERY_BATCH, len(Q))
+        f, d = _search_batch(surface, Q[start:end], cap2,
+                             None if facing is None else facing[start:end], min_dot)
+        faces[start:end], distances[start:end] = f, d
+    return faces, distances
+
+
+def _search_batch(surface, Q, cap2, facing, min_dot):
     # The original query treats non-finite locations as unmeasured. scipy's
     # tree rejects them, so preserve the original behavior for that batch.
     if _KDTree is None or not np.isfinite(Q).all():
@@ -90,6 +104,12 @@ def search(surface, Q, cap2, facing, min_dot):
         if len(rows) > _MAX_FRONTIER:
             # Pathological overlap must not grow an unbounded frontier.
             return surface._search_original(Q, cap2, facing, min_dot)
-    if len(rows):
-        surface._leaf_pass(Q, rows, nodes, facing, min_dot, best2, best_face)
+    # Bound triangle expansion when many leaf boxes overlap. Improvements
+    # from earlier batches can eliminate work in later ones.
+    for start in range(0, len(rows), _LEAF_BATCH):
+        rr = rows[start:start + _LEAF_BATCH]
+        nn = nodes[start:start + _LEAF_BATCH]
+        bounds = _box_d2_pairs(Q[rr], surface.leaf_lo[nn], surface.leaf_hi[nn])
+        live = bounds < best2[rr]
+        surface._leaf_pass(Q, rr[live], nn[live], facing, min_dot, best2, best_face)
     return best_face, best2

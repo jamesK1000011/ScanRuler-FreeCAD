@@ -8,6 +8,7 @@ import numpy as np
 from meshes import box_mesh
 from scanrulerfc.dev_surface import NominalSurface
 from scanrulerfc import dev_search_accel as accel
+from scanrulerfc import dev_surface
 
 
 class AcceleratedSearch(unittest.TestCase):
@@ -78,4 +79,22 @@ class AcceleratedSearch(unittest.TestCase):
         a = self.original(points)
         b = self.surface.closest(points)
         np.testing.assert_array_equal(b.found, [False, False, True])
+        self.same(a, b)
+
+    def test_query_batches_also_bound_fallback_calls(self):
+        a = self.original(self.points)
+        with patch.object(accel, "_QUERY_BATCH", 16), patch.object(accel, "_KDTree", None), \
+                patch.object(self.surface, "_search_original", wraps=self.surface._search_original) as used:
+            b = self.surface.closest(self.points)
+        self.assertGreater(used.call_count, 1)
+        self.assertLessEqual(max(len(c.args[0]) for c in used.call_args_list), 16)
+        self.same(a, b)
+
+    def test_hit_resolution_is_bounded(self):
+        a = self.original(self.points)
+        with patch.object(dev_surface, "_HIT_BATCH", 64), \
+                patch.object(self.surface, "_fill", wraps=self.surface._fill) as used:
+            b = self.surface.closest(self.points)
+        self.assertGreater(used.call_count, 1)
+        self.assertLessEqual(max(len(c.args[1]) for c in used.call_args_list), 64)
         self.same(a, b)

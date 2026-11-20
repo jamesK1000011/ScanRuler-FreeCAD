@@ -14,7 +14,9 @@ release. The dated versions before it were never tagged.
   sorting every top-level box for each scan point. Distances, facing rules
   and signs keep their existing calculations; the original search remains
   the fallback without scipy, for small references and for large frontiers.
-  Add accelerated and NumPy-only numerical CI coverage.
+  Bound query, triangle-leaf and final-hit batches to control temporary
+  memory, including fallback searches. Add accelerated and NumPy-only
+  numerical CI coverage.
 
 ## 1.0.0 — 2026-11-19
 
