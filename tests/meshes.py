@@ -61,3 +61,36 @@ def subdivide(V, F, edge):
         a, b, c = F[:, 0], F[:, 1], F[:, 2]
         ab, bc, ca = m[:, 0], m[:, 1], m[:, 2]
         F = np.concatenate([np.stack([a, ab, ca], 1), np.stack([ab, b, bc], 1), np.stack([ca, bc, c], 1), np.stack([ab, bc, ca], 1)])
+
+
+def open_tray(L=80.0, W=50.0, H=30.0, t=2.0, t_end=None):
+    """An open tray as a closed solid, L x W x H with walls and floor t
+    thick (the wall at x = L t_end thick, when given, so it has no turn
+    that maps it onto itself), its corner at the origin, the cavity open
+    at +Z: CAD-like, each flat face two triangles, wound outward."""
+    e = t if t_end is None else t_end
+    o = [(0, 0), (L, 0), (L, W), (0, W)]
+    i = [(t, t), (L - e, t), (L - e, W - t), (t, W - t)]
+    soup = []
+
+    def quad(a, b, c, d):
+        soup.extend([a, b, c, a, c, d])
+
+    quad((0, 0, 0), (0, W, 0), (L, W, 0), (L, 0, 0))
+    for j in range(4):
+        a, b = o[j], o[(j + 1) % 4]
+        ia, ib = i[j], i[(j + 1) % 4]
+        quad((*a, 0), (*b, 0), (*b, H), (*a, H))
+        quad((*ib, t), (*ia, t), (*ia, H), (*ib, H))
+        quad((*a, H), (*b, H), (*ib, H), (*ia, H))
+    quad((t, t, t), (L - e, t, t), (L - e, W - t, t), (t, W - t, t))
+    return weld_soup(np.array(soup, dtype=float))
+
+
+def drop_faces_below(V, F, z):
+    """The mesh without the triangles whose middle lies at or below z, and
+    without the vertices left unused: a scan that did not see the part's
+    underside."""
+    F = np.asarray(F)[np.asarray(V)[F].mean(axis=1)[:, 2] > z]
+    used, inv = np.unique(F, return_inverse=True)
+    return np.asarray(V)[used], inv.reshape(-1, 3)

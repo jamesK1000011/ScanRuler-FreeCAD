@@ -249,6 +249,8 @@ def describe(d):
             **({"converged": a["converged"]} if "converged" in a else {}),
             **({"matchedShare": round(a["matchedShare"], 3)} if "matchedShare" in a else {}),
             **({"ambiguous": True} if a.get("ambiguous") else {}),
+            **({"poses": a["poses"], "chosenOn": a["chosenOn"]} if a.get("poses", 1) > 1 else {}),
+            **({"tied": a["tied"], "tieTurnDeg": round(a["tieTurnDeg"], 1)} if a.get("tied") else {}),
             **({"pairRms": round(a["pairRms"], 4)} if "pairRms" in a else {}),
             **({"underconstrained": True} if a.get("underconstrained") else {}),
             "transform": a["total"].to_json(),
