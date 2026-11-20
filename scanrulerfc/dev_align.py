@@ -10,7 +10,9 @@
 # cannot snap onto a neighbouring feature). Poses are compared on a capped
 # mean over every sample, so a fit cannot score better by letting go of the
 # part. The arithmetic is ScanRuler's; each pass pairs every sample at once
-# through numpy instead of one at a time.
+# through numpy instead of one at a time. Added here: the fine fit's passes
+# on a thinned share first, a stop when the rms holds, and, where two poses
+# screen almost alike, each refined and read before one is taken (or none).
 
 import math
 
@@ -51,16 +53,17 @@ def _flipped(s):
 # ---- pairing ----
 
 
-def pair_all(surface, samples, transform, max_pair, facing_search, min_dot, score_cap):
+def pair_all(surface, samples, transform, max_pair, facing_search, min_dot, score_cap, hint=None):
     """Every sample paired with the reference under `transform`: the sample
     in the reference frame, its closest point and pseudonormal there, the
-    distance, what it adds to the pose score, and whether it may drive the
-    step."""
+    distance, what it adds to the pose score, whether it may drive the
+    step, and the triangle each found (the next pass's hint)."""
     xyz = samples["xyz"]
     n = len(xyz)
     q = transform.apply(xyz)
     sn = transform.rotate(samples["normals"]) if samples["normals"] is not None else None
-    hit = surface.closest(q, max_pair)
+    hit = surface.closest(q, max_pair, hint=hint)
+    faces = hit.face.copy()
     paired = hit.found.copy()
     cp, cn, dist = hit.point, hit.normal, hit.distance
     if facing_search and sn is not None:
@@ -77,17 +80,30 @@ def pair_all(surface, samples, transform, max_pair, facing_search, min_dot, scor
     if sn is not None:
         ok &= ~(np.einsum("ij,ij->i", sn, cn) < min_dot)
     score[ok] = np.minimum(dist[ok], score_cap)
-    return q, cp, cn, dist, score, ok
+    return q, cp, cn, dist, score, ok, faces
 
 
 # ---- ICP ----
 
 
-def icp(surface, samples, initial, max_iterations=60, reject_median_factor=3.0, min_normal_dot=0.0, facing_search=False, max_pair_distance=math.inf, score_cap=None, tolerance=None, on_iteration=None):
+# A pass whose rms differs from the last one's by no more than this share
+# (or by the motion tolerance) is steady; STEADY_PASSES of them in a row end
+# the fit as converged. Without it a pose that only creeps (a plate sliding
+# in its own plane, a rejection cut that trades the same few points back and
+# forth) ran every pass: 70 passes, 106 s, "not converged" on the Mac.
+RMS_STEADY = 1e-4
+STEADY_PASSES = 2
+SCORE_SLACK = 0.01
+
+
+def icp(surface, samples, initial, max_iterations=60, reject_median_factor=3.0, min_normal_dot=0.0, facing_search=False, max_pair_distance=math.inf, score_cap=None, tolerance=None, on_iteration=None, rms_steady=RMS_STEADY):
     """Point-to-plane ICP fitting samples (scan frame) onto surface
     (reference frame) from `initial`. The increment is taken about the
     correspondences' centroid, so the 6x6 solve stays well conditioned for a
-    part far from the origin."""
+    part far from the origin. Each pass starts its closest-point search
+    from the triangle the sample found on the last pass (a bound only: the
+    pairs are the same). Converged: the step moves less than the
+    tolerance, or the rms holds steady (rms_steady, None for off)."""
     facing_search = facing_search is True and samples["normals"] is not None and min_normal_dot > 0 and math.isfinite(max_pair_distance)
     diag = surface.bbox_diagonal
     tolerance = diag * 1e-7 if tolerance is None else tolerance
@@ -102,10 +118,14 @@ def icp(surface, samples, initial, max_iterations=60, reject_median_factor=3.0, 
     iterations = 0
     converged = False
     n = samples["count"]
+    hint = None
+    last = None
+    last_rms = math.inf
+    steady = 0
 
     for it in range(max_iterations):
         iterations = it + 1
-        q, cp, cn, dist, pscore, ok = pair_all(surface, samples, transform, max_pair_distance, facing_search, min_normal_dot, score_cap)
+        q, cp, cn, dist, pscore, ok, hint = pair_all(surface, samples, transform, max_pair_distance, facing_search, min_normal_dot, score_cap, hint)
         # Truncated mean over every sample, not just the survivors of the cut.
         score = float(pscore.sum()) / n
         found = int(ok.sum())
@@ -131,6 +151,13 @@ def icp(surface, samples, initial, max_iterations=60, reject_median_factor=3.0, 
         if score < best_score:
             best_score, best_rms, best_mean, best_matched = score, rms, mean_distance, matched
             best = transform.copy()
+        last = (transform.copy(), score, rms, mean_distance, matched)
+        if rms_steady is not None:
+            steady = steady + 1 if abs(rms - last_rms) <= max(rms * rms_steady, tolerance) else 0
+            last_rms = rms
+            if steady >= STEADY_PASSES:
+                converged = True
+                break
         # A touch of Levenberg damping: a plate free to slide in its own
         # plane would otherwise answer with an arbitrary slide along it.
         lam = (np.trace(ata) / 6) * 1e-9 + 1e-12
@@ -155,6 +182,14 @@ def icp(surface, samples, initial, max_iterations=60, reject_median_factor=3.0, 
         if moved < tolerance:
             converged = True
             break
+
+    # The pose it settled on, when it settled and scores within SCORE_SLACK
+    # of the best seen: the score (a truncated mean) is too coarse to choose
+    # between poses a few micrometres apart, and the passes after the first
+    # good one still close in (a 4-pair fit, 0.0085 mm off at the best
+    # score, 0.0018 mm settled).
+    if converged and last is not None and last[1] <= best_score + max(best_score * SCORE_SLACK, tolerance):
+        best, best_score, best_rms, best_mean, best_matched = last[0], last[1], last[2], last[3], last[4]
 
     return {
         "transform": best,
@@ -205,6 +240,7 @@ def _outward(surface, samples, pose):
 # ---- the fits ----
 
 SCREEN_ITERATIONS = 6
+SCREEN_REACH = 0.1
 COARSE_ITERATIONS = 20
 SHORTLIST = 5
 FINE_ITERATIONS = 70
@@ -213,17 +249,31 @@ MIN_LOCAL_POINTS = 50
 FLAT_SELECTION = 0.05
 
 
+# The fine fit runs its passes on a thinned share of the samples (every
+# k-th, about THIN_SAMPLES of them), then settles on all of them in a few
+# FULL_PASSES from there: the same pose, the cost of the passes cut by the
+# share thinned away.
+THIN_SAMPLES = 6000
+FULL_PASSES = 12
+
+
+def _fine_icp(surface, samples, start, progress, label):
+    def note(stage):
+        return (lambda i, d, m: progress(f"{label} — pass {i}{stage}, mean deviation {d:.4f} mm…")) if progress else None
+
+    kw = dict(reject_median_factor=3, min_normal_dot=0.3)
+    every = samples["count"] // THIN_SAMPLES
+    if every < 2:
+        return icp(surface, samples, start, max_iterations=FINE_ITERATIONS, on_iteration=note(""), **kw)
+    thin = icp(surface, _thinned(samples, every), start, max_iterations=FINE_ITERATIONS, on_iteration=note(" (thinned)"), **kw)
+    full = icp(surface, samples, thin["transform"] if thin["matched"] else start, max_iterations=FULL_PASSES, on_iteration=note(" (all samples)"), **kw)
+    full["iterations"] += thin["iterations"]
+    return full
+
+
 def _fine(surface, given, start, source, ambiguous, progress=None, orient=True):
     samples = _outward(surface, given, start) if orient else given
-    r = icp(
-        surface,
-        samples,
-        start,
-        max_iterations=FINE_ITERATIONS,
-        reject_median_factor=3,
-        min_normal_dot=0.3,
-        on_iteration=(lambda i, d, m: progress(f"Aligning — pass {i}, mean deviation {d:.4f} mm…")) if progress else None,
-    )
+    r = _fine_icp(surface, samples, start, progress, "Aligning")
     if r["matched"] == 0:
         raise AlignError(
             "No scan point found reference surface facing its way, so the scan was left where it was. Check that the scan and the reference are the same part, or pick a few point pairs to start from."
@@ -247,6 +297,8 @@ def quality_warnings(res):
     share = res.get("matchedShare")
     if share is not None and share < MIN_MATCHED_SHARE:
         out.append(f"Only {share * 100:.0f} % of the sampled scan points found the reference within reach when the fit ended (under {MIN_MATCHED_SHARE * 100:.0f} %): the pose rests on a minority of the scan. Check the scan and the reference are the same part in the same units, or start from point pairs (mode points).")
+    if res.get("tied"):
+        out.append(f"{res['tied']} poses fitted equally well (the part turns onto itself, or nearly). The one that leaves the scan turned as it was opened ({res['tieTurnDeg']:.0f}°) was taken. If the scan was not opened in the reference's orientation, give three point pairs (mode points).")
     if res.get("converged") is False:
         out.append(f"The best fit had not settled after {res.get('iterations')} passes: the pose is the best one seen, not a converged one. Run deviation_align again, or start from point pairs (mode points).")
     return out
@@ -263,11 +315,16 @@ def auto_align(surface, positions, normals, coarse_samples=4000, fine_samples=25
     turned = _flipped(coarse) if coarse["normals"] is not None else None
     windings = [(coarse, coarse), (turned, _thinned(turned, 4))] if turned is not None else [(coarse, coarse)]
     screened = []
+    # A screen pairs no further than SCREEN_REACH of the diagonal: past the
+    # score's own cap (5 %) a pair adds the same to the score found or not,
+    # and the search for it in a far pose is what made a screen slow (42 s
+    # of 50 on a 167,000-triangle reference).
+    reach = surface.bbox_diagonal * SCREEN_REACH
     for i, cand in enumerate(candidates):
         if progress:
             progress(f"Aligning — screening start {i + 1} of {len(candidates)}…")
         for samples, screen in windings:
-            r = icp(surface, screen, cand, max_iterations=SCREEN_ITERATIONS, reject_median_factor=2.5, min_normal_dot=0)
+            r = icp(surface, screen, cand, max_iterations=SCREEN_ITERATIONS, reject_median_factor=2.5, min_normal_dot=0, max_pair_distance=reach)
             screened.append({**r, "samples": samples})
     screened.sort(key=lambda r: r["score"])
     scored = []
@@ -278,18 +335,146 @@ def auto_align(surface, positions, normals, coarse_samples=4000, fine_samples=25
         scored.append({**r, "samples": s["samples"]})
     scored.sort(key=lambda r: r["score"])
     winner = scored[0]
-    runner = scored[1] if len(scored) > 1 else None
     radius = float(np.linalg.norm(coarse["xyz"] - scan_frame["centroid"], axis=1).max()) if coarse["count"] else 0.0
-    ambiguous = bool(
-        runner is not None
-        and runner["score"] < winner["score"] * AMBIGUITY_MARGIN
-        and R.disagreement(winner["transform"], runner["transform"], scan_frame["centroid"], radius) > surface.bbox_diagonal * 0.01
+    # Any start on the shortlist, not only the runner-up (often the
+    # winner's own pose, wound the other way), that scored almost as well
+    # and sits apart from the winner.
+    ambiguous = any(
+        s["score"] < winner["score"] * AMBIGUITY_MARGIN + surface.bbox_diagonal * RMS_FLOOR and R.disagreement(winner["transform"], s["transform"], scan_frame["centroid"], radius) > surface.bbox_diagonal * 0.01
+        for s in scored[1:]
     )
     if progress:
         progress("Aligning — refining…")
     sampled = sample_scan(positions, normals, fine_samples)
-    samples = sampled if winner["samples"] is coarse else _flipped(sampled)
-    return _fine(surface, samples, winner["transform"], "auto", ambiguous, progress, orient=False)
+
+    def fine_of(s):
+        samples = sampled if s["samples"] is coarse else _flipped(sampled)
+        return _fine(surface, samples, s["transform"], "auto", False, progress, orient=False), samples
+
+    if not ambiguous:
+        return fine_of(winner)[0]
+    return _settle_ambiguous(surface, scored, winner, fine_of, scan_frame["centroid"], radius, progress)
+
+
+# ---- two poses that fit almost as well ----
+
+# Rivals refined when the screen is ambiguous, and how far apart two
+# refined poses must read before one is taken over the other.
+MAX_RIVALS = 4
+FACING_GAP = 0.05
+SHARE_GAP = 0.02
+RMS_RATIO = 1.1
+RMS_FLOOR = 1e-5
+
+
+def facing_check(surface, samples, transform, reach):
+    """How one-sided the pairs are under a pose: of the samples within
+    reach of the reference, the share whose normal agrees with the
+    reference's there (dot > 0) or, if fewer, the share that disagrees.
+    Near 1 when every surface of the scan lies on a surface of the
+    reference facing the same way (as wound); lower when the pose lays the
+    scan's outside on the reference's inside somewhere, as an open part
+    turned over does. Also the share of the samples within reach."""
+    if samples["normals"] is None or samples["count"] == 0:
+        return {"facing": None, "within": 0.0}
+    q = transform.apply(samples["xyz"])
+    hit = surface.closest(q, reach)
+    f = hit.found
+    if not f.any():
+        return {"facing": None, "within": 0.0}
+    agree = float((np.einsum("ij,ij->i", transform.rotate(samples["normals"][f]), hit.normal[f]) > 0).mean())
+    return {"facing": max(agree, 1 - agree), "within": float(f.mean())}
+
+
+def _better(a, b, rms_floor=0.0):
+    """Whether refined pose a reads clearly better than b, and on what:
+    the facing check first, then the matched share, then the rms (two
+    rms closer than rms_floor, mm, are the same: on a scan with no noise
+    both are rounding)."""
+    fa, fb = a["check"]["facing"], b["check"]["facing"]
+    if fa is not None and fb is not None and abs(fa - fb) > FACING_GAP:
+        return fa > fb, "facing"
+    if abs(a["matchedShare"] - b["matchedShare"]) > SHARE_GAP:
+        return a["matchedShare"] > b["matchedShare"], "matchedShare"
+    ra, rb = a["rms"], b["rms"]
+    if max(ra, rb) > RMS_RATIO * min(ra, rb) + rms_floor:
+        return ra < rb, "rms"
+    return None, None
+
+
+def _settle_ambiguous(surface, scored, winner, fine_of, centre, radius, progress):
+    """The screen found a second pose almost as good (a part near a
+    symmetry). Each distinct rival is refined in full and read on its
+    facing check, matched share and rms; the clear best is taken. When
+    none reads clearly better, nothing is moved: three point pairs decide."""
+    reach = surface.bbox_diagonal * 0.02
+    floor = surface.bbox_diagonal * RMS_FLOOR
+    apart = surface.bbox_diagonal * 0.01
+    rivals = []
+    for s in scored:
+        if s["score"] >= winner["score"] * AMBIGUITY_MARGIN + floor:
+            continue
+        if any(R.disagreement(s["transform"], o["transform"], centre, radius) <= apart for o in rivals):
+            continue
+        rivals.append(s)
+        if len(rivals) == MAX_RIVALS:
+            break
+    done = []
+    for i, s in enumerate(rivals):
+        if progress:
+            progress(f"Aligning — two poses fit almost as well: refining pose {i + 1} of {len(rivals)}…")
+        try:
+            res, samples = fine_of(s)
+        except AlignError:
+            continue
+        res["check"] = facing_check(surface, samples, res["transform"], reach)
+        done.append(res)
+    # Refined poses that came together are one pose.
+    distinct = []
+    for res in done:
+        if not any(R.disagreement(res["transform"], o["transform"], centre, radius) <= apart for o in distinct):
+            distinct.append(res)
+    if not distinct:
+        raise AlignError(AMBIGUOUS_REFUSAL)
+    best = distinct[0]
+    for res in distinct[1:]:
+        won, _ = _better(res, best, floor)
+        if won:
+            best = res
+    tied = [best] + [res for res in distinct if res is not best and not _better(best, res, floor)[0]]
+    tie_turn = None
+    if len(tied) > 1:
+        # No pose reads clearly best: a part that turns onto itself (a
+        # plain box, a tray) or a scan that sees too little. Where exactly
+        # one of them leaves the scan turned as it was opened (under
+        # TIE_TURN_DEG), it is taken: the scan was placed like the
+        # reference, and a turn of it would be the flip. Else nothing moves.
+        turns = [math.degrees(R.rotation_angle(res["transform"])) for res in tied]
+        near = [i for i, a in enumerate(turns) if a < TIE_TURN_DEG]
+        if len(near) != 1:
+            raise AlignError(AMBIGUOUS_REFUSAL)
+        best, tie_turn = tied[near[0]], turns[near[0]]
+    out = {k: v for k, v in best.items() if k != "check"}
+    out["ambiguous"] = False
+    out["poses"] = len(distinct)
+    out["chosenOn"] = sorted({_better(best, r, floor)[1] or "nearest the scan's own turn" for r in distinct if r is not best})
+    out["facing"] = best["check"]["facing"]
+    if tie_turn is not None:
+        out["tied"] = len(tied)
+        out["tieTurnDeg"] = tie_turn
+    return out
+
+
+TIE_TURN_DEG = 45.0
+
+
+AMBIGUOUS_REFUSAL = (
+    "Two or more poses fit the scan almost equally well (the part is near a symmetry, or the scan sees too little of it): "
+    "none was clearly better on matched share, rms or which way its surfaces face, and none leaves the scan turned as it was opened — "
+    "so the scan was left where it was, not fitted the wrong way round. Give three point pairs: deviation_align { mode: \"points\", pairs: [{ scan, reference }, ...] }, "
+    "three or more places on the scan and the same places on the reference, not in a line, at least one on a feature that breaks the symmetry "
+    "(scan_nearest reads a place on the scan)."
+)
 
 
 def align_from_pairs(surface, positions, normals, pairs, fine_samples=25_000, vertices=None, progress=None):

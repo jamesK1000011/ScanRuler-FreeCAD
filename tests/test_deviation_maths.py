@@ -13,9 +13,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 
-from meshes import box_mesh, subdivide  # noqa: E402
+from meshes import box_mesh, drop_faces_below, open_tray, subdivide  # noqa: E402
+from scanrulerfc import dev_align as DA  # noqa: E402
 from scanrulerfc import dev_rigid as R  # noqa: E402
+from scanrulerfc import dev_surface as DS  # noqa: E402
 from scanrulerfc.dev_align import align_from_pairs, auto_align, AlignError  # noqa: E402
+from scanrulerfc.meshtools.densify import densify_mesh  # noqa: E402
 from scanrulerfc.dev_field import nice_ceil, nice_floor  # noqa: E402
 from scanrulerfc.dev_hotspots import hotspots, point_spacing  # noqa: E402
 from scanrulerfc.dev_map import DEFAULT_MAP_FACING_DEG, MAX_AUTO_RANGE, compute_deviation, deviation_report, deviation_stats, suggest_range, vertex_normals  # noqa: E402
@@ -351,6 +354,163 @@ class BestFit(unittest.TestCase):
         line = [(np.array([i, 0, 0.0]), np.array([i, 0, 0.0])) for i in (0, 5, 10)]
         with self.assertRaises(AlignError):
             align_from_pairs(self.surface, scan, None, line)
+
+
+class ClosestFromAHint(unittest.TestCase):
+    """A hint (the triangle a point found on the last pass of a best fit)
+    and the guess a large batch starts from are bounds only: the nearest
+    point, its distance, sign and normal are the ones every triangle
+    tried one by one gives."""
+
+    @classmethod
+    def setUpClass(cls):
+        V, F = open_tray(30, 20, 12, 1.5, 2.5)
+        cls.V, cls.F = densify_mesh(V, F, 2.0)[:2]
+        cls.surface = DS.NominalSurface(cls.V, cls.F)
+        rng = np.random.default_rng(11)
+        near = cls.V[rng.integers(0, len(cls.V), 2500)] + rng.normal(0, 0.4, (2500, 3))
+        cls.P = np.vstack([near, rng.uniform(-20, 50, (500, 3))])
+        f = rng.normal(size=cls.P.shape)
+        cls.facing = f / np.linalg.norm(f, axis=1)[:, None]
+        cls.rng = rng
+
+    def brute(self, P, cap=np.inf, facing=None, min_dot=None):
+        s = self.surface
+        best = np.full(len(P), np.inf)
+        for i in range(0, len(s.index)):
+            X, _ = DS.closest_on_triangles(P, np.repeat(s.A[i : i + 1], len(P), 0), np.repeat(s.B[i : i + 1], len(P), 0), np.repeat(s.C[i : i + 1], len(P), 0))
+            d = np.linalg.norm(X - P, axis=1)
+            if facing is not None:
+                d[facing @ s.face_normal[i] < min_dot] = np.inf
+            best = np.minimum(best, d)
+        best[best > cap] = np.inf
+        return best
+
+    def test_same_answer_with_any_hint(self):
+        P = self.P[::6]
+        n = len(P)
+        for kw in ({}, {"max_distance": 1.0}, {"facing": self.facing[::6], "min_dot": 0.3}):
+            want = self.brute(P, kw.get("max_distance", np.inf), kw.get("facing"), kw.get("min_dot"))
+            plain = self.surface.closest(P, **kw)
+            for hint in (np.full(n, -1), self.rng.integers(-3, len(self.F) + 3, n), plain.face):
+                got = self.surface.closest(P, hint=hint, **kw)
+                np.testing.assert_array_equal(got.found, np.isfinite(want))
+                f = got.found
+                np.testing.assert_allclose(got.distance[f], want[f], atol=1e-9)
+                np.testing.assert_allclose(got.distance[f], plain.distance[f], atol=1e-12)
+                np.testing.assert_array_equal(np.sign(got.signed[f]), np.sign(plain.signed[f]))
+                np.testing.assert_allclose(got.normal[f], plain.normal[f], atol=1e-12)
+
+    def test_a_large_batch_from_its_guess(self):
+        self.assertGreaterEqual(len(self.P), DS.GUESS_FROM)
+        got = self.surface.closest(self.P)
+        want = self.brute(self.P)
+        np.testing.assert_allclose(got.distance, want, atol=1e-9)
+
+    def test_hint_must_be_one_a_point(self):
+        with self.assertRaises(ValueError):
+            self.surface.closest(self.P[:10], hint=[0, 1])
+
+
+def _tray_scan(t_end=None, edge=1.5, seed=1, turn=0.5):
+    """An open tray (80 x 50 x 30, walls 2) and a scan of it that did not
+    see its underside, noise 0.03 mm, moved by a known pose (turned by
+    `turn` radians)."""
+    V, F = open_tray(80, 50, 30, 2, t_end)
+    Vs, Fs = drop_faces_below(*densify_mesh(V, F, edge)[:2], 1e-6)
+    Vs = Vs + np.random.default_rng(seed).normal(0, 0.03, Vs.shape)
+    pose = R.from_axis_angle([1, 0.2, 0], turn)
+    pose.t = np.array([3.0, 4.0, -2.0])
+    scan = pose.apply(Vs)
+    return DS.NominalSurface(V, F), Vs, scan, vertex_normals(scan, Fs)
+
+
+class NearASymmetry(unittest.TestCase):
+    """Found on the Mac: auto on a near-symmetric open tray returned the
+    turned-over pose with ambiguous: true. Now the rival poses are refined
+    and read; the clear best is taken, and with none clearly best the scan
+    is not moved and three pairs are asked for."""
+
+    def test_a_turn_onto_itself_is_refused_with_pairs_asked(self):
+        # Turned 69° from the reference: no tied pose leaves it as opened.
+        surface, _true, scan, N = _tray_scan(turn=1.2)
+        with self.assertRaises(AlignError) as e:
+            auto_align(surface, scan, N, fine_samples=8000)
+        self.assertIn("three point pairs", str(e.exception))
+        self.assertIn('mode: "points"', str(e.exception))
+
+    def test_a_tie_goes_to_the_scan_as_opened(self):
+        # Turned 29°: of the two poses that tie, one leaves the scan near
+        # its own turn; it is taken, and the answer says so.
+        surface, true, scan, N = _tray_scan()
+        r = auto_align(surface, scan, N, fine_samples=8000)
+        self.assertGreaterEqual(r["tied"], 2)
+        self.assertLess(r["tieTurnDeg"], DA.TIE_TURN_DEG)
+        err = np.linalg.norm(r["transform"].apply(scan) - true, axis=1).max()
+        self.assertLess(err, 0.05)
+        self.assertTrue(any("fitted equally well" in w for w in DA.quality_warnings(r)))
+
+    def test_rivals_refined_and_the_right_one_taken(self):
+        surface, true, scan, N = _tray_scan(t_end=3.0)
+        keep = DA.AMBIGUITY_MARGIN
+        DA.AMBIGUITY_MARGIN = 1e9  # every shortlisted start a rival
+        try:
+            r = auto_align(surface, scan, N, fine_samples=8000)
+        finally:
+            DA.AMBIGUITY_MARGIN = keep
+        self.assertFalse(r["ambiguous"])
+        self.assertGreaterEqual(r["poses"], 2)
+        self.assertTrue(r["chosenOn"])
+        err = np.linalg.norm(r["transform"].apply(scan) - true, axis=1).max()
+        self.assertLess(err, 0.05)
+
+    def test_turned_over_reads_worse(self):
+        surface, true, _scan, _N = _tray_scan(t_end=3.0)
+        V, F = open_tray(80, 50, 30, 2, 3.0)
+        Vs, Fs = drop_faces_below(*densify_mesh(V, F, 1.5)[:2], 1e-6)
+        s = DA.sample_scan(Vs, vertex_normals(Vs, Fs), 8000)
+        over = R.from_axis_angle([1, 0, 0], math.pi)
+        c = np.array([40.0, 25.0, 15.0])
+        over.t = c - over.r @ c
+        reach = surface.bbox_diagonal * 0.02
+        right = DA.facing_check(surface, s, R.identity(), reach)
+        turned = DA.facing_check(surface, s, DA.icp(surface, s, over, max_iterations=30)["transform"], reach)
+        self.assertGreater(right["facing"], 0.99)
+        self.assertLess(turned["within"], right["within"] - 0.05)
+
+
+class SettlesInFewPasses(unittest.TestCase):
+    """Found on the Mac: a 4-pair fit on 113,213 vertices ran all 70
+    passes (106 s) and was 'not converged'. The passes now run on a
+    thinned share, then on every sample, and stop when the rms holds."""
+
+    def test_from_pairs_settles(self):
+        surface, true, scan, N = _tray_scan(t_end=3.0)
+        picks = [np.array(p, dtype=float) for p in ((0, 0, 30), (80, 0, 30), (80, 50, 30), (0, 50, 15))]
+        near = [int(np.argmin(np.linalg.norm(true - p, axis=1))) for p in picks]
+        pairs = [(scan[v] + 0.4, true[v]) for v in near]
+        r = align_from_pairs(surface, scan, N, pairs)
+        self.assertTrue(r["converged"])
+        self.assertLess(r["iterations"], DA.FINE_ITERATIONS)
+        err = np.linalg.norm(r["transform"].apply(scan) - true, axis=1).max()
+        self.assertLess(err, 0.01)
+
+    def test_rms_steady_stops_the_passes(self):
+        surface, true, scan, N = _tray_scan(t_end=3.0)
+        s = DA.sample_scan(scan, N, 4000)
+        pose = R.from_axis_angle([1, 0.2, 0], 0.5)
+        pose.t = np.array([3.0, 4.0, -2.0])
+        start = R.invert(pose)
+        start.t = start.t + 0.3  # near, not on
+        both = DA.icp(surface, s, start, max_iterations=60, rms_steady=DA.RMS_STEADY)
+        motion = DA.icp(surface, s, start, max_iterations=60, rms_steady=None)
+        self.assertTrue(both["converged"])
+        self.assertLessEqual(both["iterations"], motion["iterations"])
+        # The same pose as the passes run on to the motion test give.
+        err = np.linalg.norm(both["transform"].apply(scan) - true, axis=1).max()
+        err_motion = np.linalg.norm(motion["transform"].apply(scan) - true, axis=1).max()
+        self.assertLess(err, 0.03)
+        self.assertLess(abs(err - err_motion), 0.005)
 
 
 if __name__ == "__main__":
