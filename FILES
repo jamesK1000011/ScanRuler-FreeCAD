@@ -61,6 +61,7 @@ scanrulerfc/dev_field.py
 scanrulerfc/dev_hotspots.py
 scanrulerfc/dev_map.py
 scanrulerfc/dev_rigid.py
+scanrulerfc/dev_search_accel.py
 scanrulerfc/dev_surface.py
 scanrulerfc/dev_volume.py
 scanrulerfc/dfm_wall.py
@@ -316,6 +317,7 @@ scanrulerfc/wall_thickness.py
 scanrulerfc/wear_core.py
 scanrulerfc/workbench.py
 scanrulerfc/workspaces.py
+scripts/benchmark_deviation.py
 scripts/ste_check.py
 scripts/ste_originals.json
 tests/fakedoc.py
@@ -335,6 +337,7 @@ tests/test_catalog.py
 tests/test_cloud_unlink.py
 tests/test_colormap.py
 tests/test_decoupled.py
+tests/test_dev_search_accel.py
 tests/test_deviation.py
 tests/test_deviation_maths.py
 tests/test_dfm_wall.py
