@@ -10,10 +10,11 @@
 #
 # ScanRuler searches a three-mesh-bvh tree one point at a time. Here the
 # points go through numpy together. Triangles are cut into small leaves
-# along a Morton curve. Large references use centroid seeds and a hierarchy
-# of leaf boxes (dev_search_accel); the original two-level best-first search
-# remains the fallback. Both find the same exact nearest surface; triangle
-# distance, facing and pseudonormal calculations are shared.
+# along a Morton curve. Unhinted large-reference queries use centroid seeds
+# and a hierarchy of leaf boxes (dev_search_accel). Hinted queries retain
+# the native bound-based search, which is also the fallback. Both find the
+# same exact nearest surface; triangle distance, facing and pseudonormal
+# calculations are shared.
 
 import numpy as np
 
@@ -22,6 +23,9 @@ VERTEX_A, VERTEX_B, VERTEX_C, EDGE_AB, EDGE_AC, EDGE_BC, FACE = range(7)
 
 LEAF = 16
 NODE = 16
+# A batch of this many queries or more, with no hint, starts each from a
+# guessed triangle (_guess).
+GUESS_FROM = 2000
 # Queries times leaves held at once while ordering the leaves.
 _BLOCK = 3_000_000
 # Resolve closest points and pseudonormals without all-query intermediates.
@@ -227,7 +231,12 @@ class NominalSurface:
         cent = (self.A + self.B + self.C) / 3
         span = np.maximum(self.bbox_max - self.bbox_min, 1e-12)
         q = np.clip((cent - self.bbox_min) / span * 1023, 0, 1023)
-        order = np.argsort(_morton(q), kind="stable")
+        codes = _morton(q)
+        order = np.argsort(codes, kind="stable")
+        # The triangles along the curve, for a first guess at a query's
+        # nearest one (_guess).
+        self.curve_codes = codes[order]
+        self.curve_tris = order
         k = -(-len(order) // size)
         table = np.full(k * size, -1, dtype=np.int64)
         table[: len(order)] = order
@@ -249,14 +258,30 @@ class NominalSurface:
         ns = np.where(nt >= 0, nt, nt[:, :1])
         self.node_lo = lo[ns].min(axis=1)
         self.node_hi = hi[ns].max(axis=1)
+        # Groups: runs of NODE nodes, for a search that starts from a bound
+        # (hint): only the nodes of groups nearer than it are ordered.
+        kg = -(-kn // NODE)
+        gt = np.full(kg * NODE, -1, dtype=np.int64)
+        gt[:kn] = np.arange(kn)
+        gt = gt.reshape(kg, NODE)
+        self.group_nodes = gt
+        gs = np.where(gt >= 0, gt, gt[:, :1])
+        self.group_lo = self.node_lo[gs].min(axis=1)
+        self.group_hi = self.node_hi[gs].max(axis=1)
 
     # ---- queries ----
 
-    def closest(self, P, max_distance=np.inf, facing=None, min_dot=None):
+    def closest(self, P, max_distance=np.inf, facing=None, min_dot=None, hint=None):
         """The nearest surface point to each row of P (n, 3) within
         max_distance — or, with facing (n, 3) and min_dot, the nearest
         triangle whose own normal n satisfies n . facing >= min_dot. Returns
-        Hits, signed by the pseudonormal of the feature landed on."""
+        Hits, signed by the pseudonormal of the feature landed on.
+
+        hint (n,), optional: a triangle per row to try first (-1 for none),
+        such as the one the row found on the last pass of a best fit. Its
+        distance is only a bound the search starts from, so the answer is
+        the same exact nearest triangle; a good hint makes the search open
+        few leaves (ICP: about a quarter of the time a pass)."""
         P = np.asarray(P, dtype=float).reshape(-1, 3)
         n = len(P)
         hits = Hits(n)
@@ -265,10 +290,13 @@ class NominalSurface:
         best_face = np.full(n, -1, dtype=np.int64)
         best2 = np.full(n, np.inf)
         cap2 = max_distance * max_distance if np.isfinite(max_distance) else np.inf
+        if hint is None and n >= GUESS_FROM:
+            hint = self._guess(P)
+        start2, start_face = self._hinted(P, hint, facing, min_dot)
         block = max(1, _BLOCK // len(self.node_lo))
         for s in range(0, n, block):
             e = min(n, s + block)
-            f, d2 = self._search(P[s:e], cap2, None if facing is None else facing[s:e], min_dot)
+            f, d2 = self._search(P[s:e], cap2, None if facing is None else facing[s:e], min_dot, None if start2 is None else start2[s:e], None if start_face is None else start_face[s:e])
             best_face[s:e] = f
             best2[s:e] = d2
         ok = best_face >= 0
@@ -281,29 +309,88 @@ class NominalSurface:
                 self._fill(P, selected, best_face[selected], hits)
         return hits
 
-    def _search(self, Q, cap2, facing, min_dot):
-        # Small references are cheaper to search without another index.
-        # The accelerator keeps exact triangle distances and normal rules;
-        # scipy is optional and its absence retains the original search.
+    def _guess(self, P):
+        """A first triangle to try per query, with no hint given: the
+        triangle beside the query's place on the Morton curve the leaves
+        are cut along. Only a bound for the search (the answer is the same);
+        it lets a large batch order a few nodes a query, not all of them."""
+        span = np.maximum(self.bbox_max - self.bbox_min, 1e-12)
+        q = np.clip((P - self.bbox_min) / span * 1023, 0, 1023)
+        at = np.searchsorted(self.curve_codes, _morton(q))
+        return self.curve_tris[np.clip(at, 0, len(self.curve_tris) - 1)]
+
+    def _hinted(self, P, hint, facing, min_dot):
+        """Resolve optional per-query hints in bounded batches."""
+        if hint is None:
+            return None, None
+        hint = np.asarray(hint, dtype=np.int64).reshape(-1)
+        if len(hint) != len(P):
+            raise ValueError("hint: one triangle per point.")
+        distances = np.empty(len(P), dtype=float)
+        faces = np.empty(len(P), dtype=np.int64)
+        for start in range(0, len(P), _HIT_BATCH):
+            end = min(start + _HIT_BATCH, len(P))
+            d, f = self._hinted_batch(P[start:end], hint[start:end],
+                                      None if facing is None else facing[start:end], min_dot)
+            distances[start:end], faces[start:end] = d, f
+        return distances, faces
+
+    def _hinted_batch(self, P, hint, facing, min_dot):
+        """The squared distance to each row's hinted triangle and that
+        triangle, or (None, None) without hints; inf and -1 where a row has
+        none, or (with facing) where its hint faces the wrong way."""
+        if hint is None:
+            return None, None
+        hint = np.asarray(hint, dtype=np.int64).reshape(-1)
+        if len(hint) != len(P):
+            raise ValueError("hint: one triangle per point.")
+        has = (hint >= 0) & (hint < self.triangle_count)
+        if facing is not None and has.any():
+            idx = np.nonzero(has)[0]
+            has[idx] = np.einsum("ij,ij->i", self.face_normal[hint[idx]], np.asarray(facing, dtype=float)[idx]) >= min_dot
+        d2 = np.full(len(P), np.inf)
+        face = np.full(len(P), -1, dtype=np.int64)
+        if has.any():
+            h = hint[has]
+            X, _ = closest_on_triangles(P[has], self.A[h], self.B[h], self.C[h])
+            d2[has] = ((X - P[has]) ** 2).sum(axis=1)
+            face[has] = h
+        return d2, face
+
+    def _search(self, Q, cap2, facing, min_dot, start2=None, start_face=None):
+        # Preserve upstream's hint reuse (including automatic Morton guesses).
+        # It avoids building a second index when a bound is already supplied.
+        if start2 is not None:
+            return self._search_original(Q, cap2, facing, min_dot, start2, start_face)
         if self.triangle_count < 4096:
             return self._search_original(Q, cap2, facing, min_dot)
         from .dev_search_accel import search
 
         return search(self, Q, cap2, facing, min_dot)
 
-    def _search_original(self, Q, cap2, facing, min_dot):
+    def _search_original(self, Q, cap2, facing, min_dot, start2=None, start_face=None):
         """Best-first over the nodes (a run of leaves each), every query a
         round at a time: a node is opened while its box is nearer than the
-        best triangle found, then its leaves while theirs are."""
+        best triangle found, then its leaves while theirs are. start2 and
+        start_face: a triangle already found per query (hint), the bound
+        the search starts from."""
         m = len(Q)
-        lb = _box_d2(Q, self.node_lo, self.node_hi)
-        if np.isfinite(cap2):
-            lb[lb > cap2] = np.inf
-        order = np.argsort(lb, axis=1)
-        lb_sorted = np.take_along_axis(lb, order, axis=1)
         best2 = np.full(m, np.inf if not np.isfinite(cap2) else cap2 * (1 + 1e-12) + 1e-300)
         best_face = np.full(m, -1, dtype=np.int64)
-        K = lb.shape[1]
+        if start2 is not None:
+            take = start2 < best2
+            best2[take] = start2[take]
+            best_face[take] = start_face[take]
+        if start2 is not None and np.isfinite(best2).all() and len(self.group_lo) > 1:
+            order, lb_sorted = self._near_nodes(Q, best2)
+        else:
+            lb = _box_d2(Q, self.node_lo, self.node_hi)
+            # A node no nearer than the bound is never opened: left out of
+            # the order (inf), so it costs nothing past this line.
+            lb[lb >= best2[:, None]] = np.inf
+            order = np.argsort(lb, axis=1)
+            lb_sorted = np.take_along_axis(lb, order, axis=1)
+        K = lb_sorted.shape[1]
         rows = np.arange(m)
         r = 0
         while r < K:
@@ -331,6 +418,35 @@ class NominalSurface:
                 self._leaf_pass(Q, pl[ok], pk[ok], facing, min_dot, best2, best_face)
             r += 1
         return best_face, best2
+
+    def _near_nodes(self, Q, best2):
+        """Each query's nodes nearer than its bound, nearest first, as
+        (order, bounds) rows padded with inf: the groups' boxes first, then
+        the nodes of the groups that pass. Where every query has a close
+        bound (a best fit's next pass) this orders a few nodes a query, not
+        all of them."""
+        m = len(Q)
+        glb = _box_d2(Q, self.group_lo, self.group_hi)
+        qi, gi = np.nonzero(glb < best2[:, None])
+        nodes = self.group_nodes[gi]
+        qq = np.repeat(qi, nodes.shape[1])
+        nn = nodes.ravel()
+        keep = nn >= 0
+        qq, nn = qq[keep], nn[keep]
+        d = _box_d2_pairs(Q[qq], self.node_lo[nn], self.node_hi[nn])
+        keep = d < best2[qq]
+        qq, nn, d = qq[keep], nn[keep], d[keep]
+        o = np.lexsort((d, qq))
+        qq, nn, d = qq[o], nn[o], d[o]
+        counts = np.bincount(qq, minlength=m)
+        width = max(1, int(counts.max()) if len(counts) else 1)
+        starts = np.concatenate([[0], np.cumsum(counts)[:-1]])
+        col = np.arange(len(qq)) - starts[qq]
+        order = np.zeros((m, width), dtype=np.int64)
+        bounds = np.full((m, width), np.inf)
+        order[qq, col] = nn
+        bounds[qq, col] = d
+        return order, bounds
 
     def _leaf_pass(self, Q, lq, ll, facing, min_dot, best2, best_face):
         if not len(lq):

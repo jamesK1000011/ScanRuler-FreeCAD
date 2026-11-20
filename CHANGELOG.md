@@ -9,7 +9,7 @@ release. The dated versions before it were never tagged.
 
 ## [Unreleased]
 
-- Speed up exact nearest-surface searches on large references when scipy is
+- Speed up unhinted exact nearest-surface searches on large references when scipy is
   available. Centroid seeds and a hierarchy of triangle-leaf boxes avoid
   sorting every top-level box for each scan point. Distances, facing rules
   and signs keep their existing calculations; the original search remains
@@ -17,6 +17,9 @@ release. The dated versions before it were never tagged.
   Bound query, triangle-leaf and final-hit batches to control temporary
   memory, including fallback searches. Add accelerated and NumPy-only
   numerical CI coverage.
+- deviation_align near a symmetry (found on the Mac: auto on a near-symmetric open tray returned the turned-over pose with ambiguous: true). When the screen finds rival poses, each is refined in full and read on a facing check (do the scan's surfaces lie on reference surfaces that face the same way), the matched share and the rms. The clear best is taken; the answer gives poses and chosenOn. On a tie (a part that turns onto itself) the one pose that leaves the scan turned as opened, under 45°, is taken with a warning (tied, tieTurnDeg). Else the call is refused and three point pairs are asked for; the scan is not moved. The ambiguity test reads every shortlisted start, not only the runner-up (often the winner wound the other way).
+- deviation_align speed and convergence (found on the Mac: 4 pairs on 113,213 vertices, 106 s, 70 passes, not converged). The closest-point search starts from a bound: the triangle each sample found on the last pass, or, for a large batch, the triangle beside it on the Morton curve. The answer is the same exact nearest point (tested against every triangle). The fine fit runs on about 6,000 samples, then up to 12 passes on all 25,000. A fit ends when the rms holds steady for 2 passes, and a settled pose is kept over an earlier one the score cannot tell apart (a 4-pair fit 0.0085 mm off before, 0.0004 mm now). The screen pairs no further than 10 % of the diagonal. Times in a Linux container, scan 108,674 vertices, reference 167,360 triangles: from points 17 s to 4 s, auto 92 s to 27 s, the map 8 s to 4 s. The Mac is not timed again.
+- mesh_densify card: the time is now what was measured here (0.17 s to 167,360 triangles, 0.55 s to 328,448, Linux). The 100 s batch on the Mac is in the other steps, not in the densify.
 
 ## 1.0.0 — 2026-11-19
 
@@ -206,7 +209,7 @@ Licence: AGPL-3.0-only, as ScanRuler. Credit for the measuring work goes to Stef
 - Boolean (mesh_boolean) and Trim to scan now cut with meshbool, a boolean
   written for this add-on in numpy alone, in place of FreeCAD's Mesh
   booleans. On a 140,698-triangle scan minus a 5,212-triangle cutter
-  (an M18 shell test drive) Mesh.difference came back with 2,607 open
+  (a scanned-shell test drive) Mesh.difference came back with 2,607 open
   edges and 7,417 bad ones, and the result was then turned inside out patch
   by patch (volume −133,160 mm³); with a Part solid as the cutter it removed
   515 mm³ of ~100,000. meshbool decides every crossing by one orientation

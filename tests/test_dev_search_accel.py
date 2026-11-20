@@ -98,3 +98,36 @@ class AcceleratedSearch(unittest.TestCase):
         self.assertGreater(used.call_count, 1)
         self.assertLessEqual(max(len(c.args[1]) for c in used.call_args_list), 64)
         self.same(a, b)
+
+    def test_hints_keep_upstream_bound_search_without_extra_index(self):
+        a = self.original(self.points)
+        for hint in (a.face, np.full(len(self.points), -1), np.zeros(len(self.points), dtype=np.int64)):
+            with self.subTest(hint=int(hint[0])):
+                with patch.object(accel, "search", side_effect=AssertionError("hinted queries must use upstream search")):
+                    b = self.surface.closest(self.points, hint=hint)
+                self.same(a, b)
+        a = self.original(self.points, 10., self.normals, .3)
+        b = self.surface.closest(self.points, 10., self.normals, .3,
+                                 hint=np.zeros(len(self.points), dtype=np.int64))
+        self.same(a, b)
+
+    def test_automatic_guesses_keep_upstream_path_and_bounded_hits(self):
+        points = np.tile(self.points, (5, 1))
+        a = self.original(points)
+        with patch.object(accel, "search", side_effect=AssertionError("automatic hints must use upstream search")), \
+                patch.object(dev_surface, "_HIT_BATCH", 64), \
+                patch.object(self.surface, "_fill", wraps=self.surface._fill) as used:
+            b = self.surface.closest(points)
+        self.assertLessEqual(max(len(c.args[1]) for c in used.call_args_list), 64)
+        self.same(a, b)
+
+    def test_hinted_preparation_is_bounded(self):
+        a = self.original(self.points)
+        with patch.object(dev_surface, "_HIT_BATCH", 64), \
+                patch.object(self.surface, "_hinted_batch", wraps=self.surface._hinted_batch) as prepared, \
+                patch.object(self.surface, "_search_original", wraps=self.surface._search_original) as searched:
+            b = self.surface.closest(self.points, hint=a.face)
+        self.assertGreater(prepared.call_count, 1)
+        self.assertLessEqual(max(len(c.args[0]) for c in prepared.call_args_list), 64)
+        self.assertTrue(searched.called)
+        self.same(a, b)

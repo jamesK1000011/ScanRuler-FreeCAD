@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # meshbool, the Boolean's and Trim to scan's kernel (numpy only), on a dense
 # scan-like mesh: a noisy rounded box of 139,968 triangles — the size of the
-# M18 scan whose cut FreeCAD's Mesh.difference left open and inside out —
+# a scan whose cut FreeCAD's Mesh.difference left open and inside out —
 # cut by a solid with large faces and a bore through it, placed every which
 # way; boxes whose faces lie on the mesh's own planes; and the scan untouched
-# away from the cut. The M18 pair itself is third-party and not in the
-# repository: set SCANRULER_M18_DIR to a folder holding m18.stl and fcu.stl
+# away from the cut. The real pair itself is third-party and not in the
+# repository: set SCANRULER_SCANPAIR_DIR to a folder holding scan.stl and fcu.stl
 # to run that case too.
 import os
 import struct
@@ -156,14 +156,14 @@ class Coplanar(unittest.TestCase):
             MB.boolean(V, F[1:], *coarse_box([0, 0, 0], [20, 20, 20]), "subtract")
 
 
-M18 = os.environ.get("SCANRULER_M18_DIR")
+PAIR = os.environ.get("SCANRULER_SCANPAIR_DIR")
 
 
-@unittest.skipUnless(M18 and os.path.exists(os.path.join(M18 or "", "m18.stl")), "the M18 scan is third-party: set SCANRULER_M18_DIR to run it")
+@unittest.skipUnless(PAIR and os.path.exists(os.path.join(PAIR or "", "scan.stl")), "the scan pair is third-party: set SCANRULER_SCANPAIR_DIR to run it")
 class M18TestDrive(unittest.TestCase):
     def test_scan_minus_fcu_cutout(self):
-        V, F = read_stl(os.path.join(M18, "m18.stl"))
-        BV, BF = read_stl(os.path.join(M18, "fcu.stl"))
+        V, F = read_stl(os.path.join(PAIR, "scan.stl"))
+        BV, BF = read_stl(os.path.join(PAIR, "fcu.stl"))
         # Placement [20.41, -9.7, 112.87], axis [0, 1, 1], 180°: (x, y, z) -> (-x + 20.41, z - 9.7, y + 112.87)
         BV = np.stack([-BV[:, 0] + 20.41, BV[:, 2] - 9.7, BV[:, 1] + 112.87], axis=1)
         whole = MB.volume(V, F)
