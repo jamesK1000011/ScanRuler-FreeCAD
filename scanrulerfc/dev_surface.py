@@ -9,11 +9,12 @@
 # the nearest surface that faces a given way.
 #
 # ScanRuler searches a three-mesh-bvh tree one point at a time. Here the
-# points go through numpy together: the triangles are cut into small leaves
-# along a Morton curve, each with its box, and every query visits the leaves
-# best-first by the distance to their box, all queries a round at a time,
-# until no leaf left can hold anything nearer. The answer is the same exact
-# nearest triangle; only the search differs.
+# points go through numpy together. Triangles are cut into small leaves
+# along a Morton curve. Unhinted large-reference queries use centroid seeds
+# and a hierarchy of leaf boxes (dev_search_accel). Hinted queries retain
+# the native bound-based search, which is also the fallback. Both find the
+# same exact nearest surface; triangle distance, facing and pseudonormal
+# calculations are shared.
 
 import numpy as np
 
@@ -27,6 +28,8 @@ NODE = 16
 GUESS_FROM = 2000
 # Queries times leaves held at once while ordering the leaves.
 _BLOCK = 3_000_000
+# Resolve closest points and pseudonormals without all-query intermediates.
+_HIT_BATCH = 16_384
 # Rays cast together against the leaves near them (the leaf-ordered search
 # raycast_first used before the grid; kept as raycast_first_leaves, which
 # the tests hold the grid's answers against).
@@ -300,7 +303,10 @@ class NominalSurface:
         if np.isfinite(max_distance):
             ok &= best2 <= cap2
         if ok.any():
-            self._fill(P, np.nonzero(ok)[0], best_face[ok], hits)
+            rows = np.flatnonzero(ok)
+            for start in range(0, len(rows), _HIT_BATCH):
+                selected = rows[start:start + _HIT_BATCH]
+                self._fill(P, selected, best_face[selected], hits)
         return hits
 
     def _guess(self, P):
@@ -314,6 +320,22 @@ class NominalSurface:
         return self.curve_tris[np.clip(at, 0, len(self.curve_tris) - 1)]
 
     def _hinted(self, P, hint, facing, min_dot):
+        """Resolve optional per-query hints in bounded batches."""
+        if hint is None:
+            return None, None
+        hint = np.asarray(hint, dtype=np.int64).reshape(-1)
+        if len(hint) != len(P):
+            raise ValueError("hint: one triangle per point.")
+        distances = np.empty(len(P), dtype=float)
+        faces = np.empty(len(P), dtype=np.int64)
+        for start in range(0, len(P), _HIT_BATCH):
+            end = min(start + _HIT_BATCH, len(P))
+            d, f = self._hinted_batch(P[start:end], hint[start:end],
+                                      None if facing is None else facing[start:end], min_dot)
+            distances[start:end], faces[start:end] = d, f
+        return distances, faces
+
+    def _hinted_batch(self, P, hint, facing, min_dot):
         """The squared distance to each row's hinted triangle and that
         triangle, or (None, None) without hints; inf and -1 where a row has
         none, or (with facing) where its hint faces the wrong way."""
@@ -336,6 +358,17 @@ class NominalSurface:
         return d2, face
 
     def _search(self, Q, cap2, facing, min_dot, start2=None, start_face=None):
+        # Preserve upstream's hint reuse (including automatic Morton guesses).
+        # It avoids building a second index when a bound is already supplied.
+        if start2 is not None:
+            return self._search_original(Q, cap2, facing, min_dot, start2, start_face)
+        if self.triangle_count < 4096:
+            return self._search_original(Q, cap2, facing, min_dot)
+        from .dev_search_accel import search
+
+        return search(self, Q, cap2, facing, min_dot)
+
+    def _search_original(self, Q, cap2, facing, min_dot, start2=None, start_face=None):
         """Best-first over the nodes (a run of leaves each), every query a
         round at a time: a node is opened while its box is nearer than the
         best triangle found, then its leaves while theirs are. start2 and
