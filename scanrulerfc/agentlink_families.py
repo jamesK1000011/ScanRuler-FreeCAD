@@ -89,7 +89,7 @@ OPENS = _EW.OPENS
 # (echo_words.words(name, args, body) -> str or None): Agent Link's
 # PHRASES reach only the top of an answer, where most of these tools keep
 # no figure. PHRASES has what the top holds today; WORDS is for an Agent
-# Link that reads it (docs/hardening/sr4-findings.md says what it needs).
+# Link that reads it (private records: sr4-findings.md says what it needs).
 PHRASES = dict(_EW.PHRASES)
 WORDS = _EW.words
 # What to select after a call (echo_words.selects(name, args, body, doc)
