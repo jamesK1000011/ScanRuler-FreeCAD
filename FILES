@@ -353,6 +353,7 @@ tests/test_freecad_owned.py
 tests/test_gui_commands.py
 tests/test_gui_guide.py
 tests/test_gui_pages.py
+tests/test_gui_words_neutral.py
 tests/test_heightmap.py
 tests/test_integration.py
 tests/test_layout.py
