@@ -8,14 +8,6 @@ LICENSES/OFL-1.1.txt
 NOTICE.md
 README.md
 REUSE.toml
-docs/hardening/scanruler-flat-model.json
-docs/hardening/scanruler-measure-findings.md
-docs/hardening/scanruler-measure-model.json
-docs/hardening/scanruler-meshtools-model.json
-docs/hardening/scanruler-reverse-findings.md
-docs/hardening/scanruler-reverse-model.json
-docs/hardening/scanruler6-findings.md
-docs/hardening/sr4-findings.md
 docs/images/panel-scanruler.png
 docs/images/scan-deviation.png
 docs/images/toolbar-scanruler.png
